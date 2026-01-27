@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "installCommand": "COREPACK_HOME=.corepack corepack npm ci",
+  "installCommand": "NPM_CONFIG_UPDATE_NOTIFIER=false NPM_CONFIG_AUDIT=false NPM_CONFIG_FUND=false npm ci --no-audit --no-fund",
   "buildCommand": "npm run build --workspace @careeros/web",
   "devCommand": "npm run dev --workspace @careeros/web",
   "outputDirectory": "apps/web/.next"
