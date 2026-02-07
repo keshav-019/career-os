@@ -1255,7 +1255,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             firebaseApiKey: "",
           },
           ok: true,
-          providers: config.providers,
+          // On Chrome, Google sign-in uses chrome.identity.getAuthToken() (manifest-embedded client_id, no
+          // server config needed at all - see startGoogleSignInChromeNative()), so it's always available there
+          // regardless of what the server reports. Firefox has no such API and still needs the server-configured
+          // relay, same as GitHub everywhere.
+          providers: {
+            ...config.providers,
+            google: IS_CHROME_NATIVE_IDENTITY
+              ? { clientId: null, enabled: true }
+              : config.providers?.google,
+          },
           redirectUri: getExtensionRedirectUri(),
         });
       })
