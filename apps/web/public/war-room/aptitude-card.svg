@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" role="img" aria-labelledby="title desc">
+  <title id="title">Aptitude Interview Category</title>
+  <desc id="desc">Illustration of charts and arithmetic symbols for aptitude interview tests.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1b1030"/>
+      <stop offset="100%" stop-color="#351a55"/>
+    </linearGradient>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f59e0b"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="620" fill="url(#bg)" rx="28"/>
+  <rect x="76" y="120" width="500" height="390" rx="24" fill="#2d1c4a" stroke="#5b3a86"/>
+  <rect x="112" y="158" width="192" height="92" rx="16" fill="url(#tile)"/>
+  <text x="152" y="216" fill="#2b1300" font-size="50" font-family="Arial, sans-serif" font-weight="700">75%</text>
+  <rect x="328" y="158" width="208" height="92" rx="16" fill="#4f2f77"/>
+  <text x="373" y="216" fill="#f3e8ff" font-size="44" font-family="Arial, sans-serif" font-weight="700">12:40</text>
+  <rect x="112" y="278" width="424" height="192" rx="18" fill="#25193d"/>
+  <g fill="#fcd34d">
+    <rect x="138" y="372" width="48" height="72" rx="10"/>
+    <rect x="206" y="338" width="48" height="106" rx="10"/>
+    <rect x="274" y="302" width="48" height="142" rx="10"/>
+    <rect x="342" y="324" width="48" height="120" rx="10"/>
+    <rect x="410" y="286" width="48" height="158" rx="10"/>
+  </g>
+  <g fill="#c4b5fd" font-family="Arial, sans-serif" font-weight="700">
+    <text x="660" y="220" font-size="98">+</text>
+    <text x="760" y="220" font-size="88">×</text>
+    <text x="860" y="220" font-size="98">÷</text>
+    <text x="960" y="220" font-size="84">%</text>
+  </g>
+  <rect x="620" y="280" width="490" height="190" rx="26" fill="#2a1843" stroke="#5f3f8a"/>
+  <text x="648" y="338" fill="#fbbf24" font-size="40" font-family="Arial, sans-serif" font-weight="700">Aptitude Sprints</text>
+  <text x="648" y="384" fill="#dbc8ff" font-size="30" font-family="Arial, sans-serif">Speed • Accuracy • Logic</text>
+  <text x="648" y="428" fill="#dbc8ff" font-size="30" font-family="Arial, sans-serif">Timed Quant + Reasoning Tests</text>
+</svg>

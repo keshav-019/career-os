@@ -34,6 +34,26 @@ export type InterviewStage =
 
 export type ResumeVersionStatus = "active" | "draft" | "archived";
 
+export type ResumeTemplateId =
+  | "ats-modern"
+  | "classic-professional"
+  | "executive-impact"
+  | "minimal-clean"
+  | "technical-depth"
+  | "academic-cv"
+  | "custom-blank";
+
+export type ResumeEditorMode = "builder" | "latex";
+
+export interface ResumeSection {
+  id: string;
+  title: string;
+  contentHtml: string;
+  plainText?: string;
+  page: number;
+  order: number;
+}
+
 export interface SalaryRange {
   min?: number;
   max?: number;
@@ -44,6 +64,7 @@ export interface JobRecord {
   id: string;
   userId: string;
   company: string;
+  companyLogoUrl?: string;
   role: string;
   location: string;
   remotePolicy: "remote" | "hybrid" | "onsite" | "unknown";
@@ -73,6 +94,12 @@ export interface ResumeVersion {
   fileUrl?: string;
   bulletHighlights: string[];
   keywordCoverage: number;
+  templateId?: ResumeTemplateId;
+  editorMode?: ResumeEditorMode;
+  pageCount?: number;
+  sections?: ResumeSection[];
+  latexCode?: string;
+  lastExportedAt?: string;
 }
 
 export interface InterviewRound {
@@ -111,10 +138,17 @@ export interface AnalyticsSnapshot {
 export interface JobSourcePayload {
   title?: string;
   company?: string;
+  companyLogoUrl?: string;
   location?: string;
   sourceUrl?: string;
   description?: string;
   source?: JobSource;
+  employmentType?: string;
+  experienceText?: string;
+  salaryText?: string;
+  skills?: string[];
+  tags?: string[];
+  remotePolicyHint?: "remote" | "hybrid" | "onsite" | "unknown";
 }
 
 export interface JobImportDraft {

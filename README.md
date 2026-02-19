@@ -1,37 +1,38 @@
-# CareerOS
+# CareerOS Monorepo
 
-CareerOS is a portfolio-ready career command center built around Next.js, Firebase, a Chrome job capture extension, and a future mobile app lane.
+## Purpose
+Top-level orchestration folder for all CareerOS runtime apps, shared packages, Firebase config, and project-wide tooling.
 
-## Workspace
+## What This Folder Owns
+Workspace-level dependency management, shared scripts, deployment config, and cross-app coordination.
 
-- `apps/web` - Next.js app for the CareerOS dashboard, applications pipeline, interview war room, resume studio, analytics, calendar, learning, notifications, and integrations.
-- `apps/extension` - Chrome Manifest V3 starter for saving job posts from any portal.
-- `apps/mobile` - Expo/React Native planning lane for notifications and mobile workflows.
-- `packages/shared` - Shared TypeScript domain models and scoring helpers.
+## Integration Points
+Coordinates app workspaces under apps/* and shared package code under packages/* via npm workspaces.
 
-## Getting Started
+## Files In This Folder
+- `.gitignore`
+- `.npmrc`
+- `.nvmrc`
+- `firebase.json`
+- `firestore.indexes.json`
+- `firestore.rules`
+- `package-lock.json`
+- `package.json`
+- `vercel.json`
 
-```bash
-npm install
-npm run dev
-```
+## Child Folders
+- `apps`
+- `images`
+- `packages`
+- `scripts`
 
-Then open `http://localhost:3000`.
+## Maintenance Notes
+Keep root scripts workspace-safe and avoid app-specific logic at root when it can live inside the relevant app folder.
+Never commit Firebase keys or server secrets to tracked files. Use environment variables (`.env.local` for local dev, Vercel project envs for deploys).
+For production API hardening, set `CAREEROS_ALLOWED_ORIGINS` and `CAREEROS_ALLOWED_EXTENSION_IDS` in deployment environments.
 
-## Firebase Setup
-
-1. Create a Firebase project.
-2. Copy `apps/web/.env.local.example` to `apps/web/.env.local`.
-3. Fill in the public Firebase web app values.
-4. Add Firebase Admin values when server-side persistence is added.
-
-The current UI runs with mock data so the product shell is usable before Firebase credentials exist.
-
-## Near-Term Build Plan
-
-- Persist saved jobs under `users/{uid}/jobs`.
-- Add Firebase Auth with Google sign-in.
-- Connect the Chrome extension import route to Firestore.
-- Add Gmail API ingestion for recruiter, interview, rejection, and offer signals.
-- Add Calendar reminders for follow-ups, interviews, prep blocks, and application check-ins.
-- Expand CareerOS into mobile notifications, learning plans, and a richer interview memory workspace.
+## Contributor Checklist
+1. Keep changes scoped to this folder responsibility before reaching into adjacent modules.
+2. If contracts change (types, payloads, route behavior), update dependent folders in the same PR.
+3. Prefer additive changes over breaking renames, and document any migration impact clearly.
+4. Run lint/typecheck for affected workspaces after edits and capture known gaps in PR notes.

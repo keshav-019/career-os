@@ -6,11 +6,43 @@
     <link rel="stylesheet" href="popup.css">
   </head>
   <body>
-    <main>
-      <div class="brand">CO</div>
-      <h1>Save job</h1>
-      <p id="status">Ready</p>
-      <button id="saveJob" type="button">Save to CareerOS</button>
+    <main class="popup">
+      <header class="header-card">
+        <div class="brand-mark">CO</div>
+        <div class="brand-copy">
+          <h1>CareerOS Capture</h1>
+          <p id="status" class="status-line">Checking extension status...</p>
+        </div>
+      </header>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Extension Access</h2>
+          <span id="authBadge" class="chip chip-muted">Token required</span>
+        </div>
+        <p class="hint">Copy your extension token package from CareerOS Settings and paste it here once.</p>
+        <p id="accountMeta" class="account-meta">Not connected</p>
+        <label class="field-label" for="tokenInput">Token package</label>
+        <textarea
+          id="tokenInput"
+          placeholder='{"apiKey":"...","idToken":"...","refreshToken":"..."}'
+          rows="5"
+        ></textarea>
+
+        <div class="actions actions-token">
+          <button id="saveTokenButton" type="button">Save token</button>
+          <button id="clearTokenButton" class="ghost danger" type="button">Clear token</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Job Detection</h2>
+          <span id="detectionBadge" class="chip chip-muted">No job detected</span>
+        </div>
+        <strong id="jobTitle" class="job-title">No job detected</strong>
+        <p id="jobMeta" class="job-meta">Open a job details page on LinkedIn, Indeed, or Naukri.</p>
+      </section>
     </main>
     <script src="popup.js"></script>
   </body>

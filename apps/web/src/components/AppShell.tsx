@@ -3,18 +3,16 @@
 import {
   AlarmClock,
   BarChart3,
-  Bell,
   BookOpen,
   Briefcase,
   CalendarDays,
+  CircleUserRound,
   FileText,
-  FlaskConical,
   GraduationCap,
   LayoutDashboard,
   LogOut,
   Menu,
   Moon,
-  PanelLeftClose,
   Search,
   Settings,
   Sparkles,
@@ -27,6 +25,17 @@ import { usePathname, useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { auth, isFirebaseClientConfigured } from "@/lib/firebase/client";
+import {
+  PROFILE_CHANGE_EVENT,
+  PROFILE_SAVE_REQUEST_EVENT,
+  THEME_CHANGE_EVENT,
+  readProfileNamePreference,
+  readProfilePhotoPreference,
+  readThemePreference,
+  writeThemePreference
+} from "@/lib/preferences";
+import { useUserJobs } from "@/lib/firebase/jobs";
+import { sanitizeExternalUrl } from "@/lib/url-safety";
 
 type NavItem = {
   href: string;
@@ -44,8 +53,8 @@ const navSections: NavSection[] = [
   {
     title: "Command",
     items: [
-      { href: "/", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/applications", label: "Applications", icon: Briefcase, badge: "24" },
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/applications", label: "Applications", icon: Briefcase },
       { href: "/resumes", label: "Resume Studio", icon: FileText }
     ]
   },
@@ -53,7 +62,6 @@ const navSections: NavSection[] = [
     title: "Mission Prep",
     items: [
       { href: "/interview-prep", label: "Interview War Room", icon: Swords },
-      { href: "/mock-tests", label: "Mock Tests", icon: FlaskConical },
       { href: "/learning", label: "Learning Center", icon: GraduationCap }
     ]
   },
@@ -62,15 +70,34 @@ const navSections: NavSection[] = [
     items: [
       { href: "/analytics", label: "Analytics", icon: BarChart3 },
       { href: "/calendar", label: "Calendar", icon: CalendarDays },
-      { href: "/notifications", label: "Notifications", icon: Bell, badge: "3" },
-      { href: "/integrations", label: "Integrations", icon: PanelLeftClose },
+      { href: "/profile", label: "Profile", icon: CircleUserRound },
       { href: "/settings", label: "Settings", icon: Settings }
     ]
   }
 ];
 
+type ApplicationPipelineStats = {
+  applied: number;
+  archived: number;
+  interviewing: number;
+  offer: number;
+  rejected: number;
+  saved: number;
+};
+
+function summarizeApplicationPipeline(stats: ApplicationPipelineStats): string {
+  const inLine = stats.saved + stats.applied + stats.interviewing;
+  const closed = stats.rejected + stats.archived;
+
+  if (inLine + stats.offer + closed === 0) {
+    return "No applications in line yet. Save your first role to begin tracking.";
+  }
+
+  return `${inLine} in line / ${stats.interviewing} interviewing / ${stats.offer} offers / ${closed} closed`;
+}
+
 const routeCopy: Record<string, { title: string; subtitle: string; action?: string }> = {
-  "/": {
+  "/dashboard": {
     title: "Dashboard Overview",
     subtitle: "Real-time intelligence for your career journey.",
     action: "New Application"
@@ -87,7 +114,7 @@ const routeCopy: Record<string, { title: string; subtitle: string; action?: stri
   },
   "/interview-prep": {
     title: "Interview War Room",
-    subtitle: "OrbitWorks / Senior Product Engineer / next round queued.",
+    subtitle: "Zero-AI practice tracks, Firestore-backed attempts, and timed test launches.",
     action: "Start Simulation"
   },
   "/war-room": {
@@ -97,48 +124,62 @@ const routeCopy: Record<string, { title: string; subtitle: string; action?: stri
   },
   "/resumes": {
     title: "Resume Studio",
-    subtitle: "Visual editor / ATS scoring / version history.",
-    action: "New Resume"
+    subtitle: "Desktop-exclusive workspace for resume creation, editing, and exports."
+  },
+  "/resumes/new": {
+    title: "Resume Studio",
+    subtitle: "Open the Desktop app to create or edit resume versions."
   },
   "/analytics": {
     title: "Analytics",
-    subtitle: "Response rates, source performance, and career funnel health."
+    subtitle: "Date-filtered test performance, score trends, and topic-level strengths."
   },
   "/calendar": {
     title: "Calendar",
-    subtitle: "Interview, follow-up, prep, and deadline reminders.",
-    action: "Add Event"
+    subtitle: "Private CareerOS calendar for interviews, prep, and deadlines."
   },
-  "/notifications": {
-    title: "Notifications",
-    subtitle: "Priority career signals grouped by urgency."
+  "/profile": {
+    title: "Career Profile",
+    subtitle: "Your personal profile, preferences, education, projects, and achievements.",
+    action: "Update Profile"
   },
   "/learning": {
     title: "Learning Center",
     subtitle: "AI-tailored learning paths for your top skill gaps.",
     action: "Generate Plan"
   },
-  "/mock-tests": {
-    title: "Mock Tests",
-    subtitle: "Practice sessions, scoring, and weak-topic drills.",
-    action: "Start Mock"
-  },
-  "/integrations": {
-    title: "Integrations",
-    subtitle: "Chrome, Gmail, Calendar, Firebase, and mobile notification hooks."
+  "/test-room": {
+    title: "Test Room",
+    subtitle: "Immersive timer-based practice in progress."
   },
   "/settings": {
     title: "Settings",
-    subtitle: "Profile, preferences, privacy, and automation controls."
+    subtitle: "Security, privacy, preferences, and account controls."
+  },
+  "/desktop": {
+    title: "CareerOS Desktop",
+    subtitle: "Desktop helper setup for local LaTeX compile and advanced resume features."
   }
 };
 
-function getRouteCopy(pathname: string) {
-  return routeCopy[pathname] ?? routeCopy["/"];
+function getRouteCopy(pathname: string, pipelineStats: ApplicationPipelineStats) {
+  if (pathname.startsWith("/test-room")) {
+    return routeCopy["/test-room"] ?? routeCopy["/dashboard"];
+  }
+
+  if (pathname === "/applications") {
+    const baseCopy = routeCopy[pathname] ?? routeCopy["/dashboard"];
+    return {
+      ...baseCopy,
+      subtitle: summarizeApplicationPipeline(pipelineStats)
+    };
+  }
+
+  return routeCopy[pathname] ?? routeCopy["/dashboard"];
 }
 
-function getUserInitials(user: User | null) {
-  const source = user?.displayName ?? user?.email ?? "CareerOS";
+function getUserInitials(user: User | null, profileNameOverride: string | null) {
+  const source = getUserDisplayName(user, profileNameOverride);
   const pieces = source
     .split(/[^\p{L}\p{N}]+/u)
     .filter(Boolean)
@@ -147,24 +188,51 @@ function getUserInitials(user: User | null) {
   return pieces.map((part) => part[0]?.toUpperCase() ?? "").join("") || "CO";
 }
 
+function getUserDisplayName(user: User | null, profileNameOverride: string | null) {
+  if (profileNameOverride?.trim()) {
+    return profileNameOverride.trim();
+  }
+
+  if (user?.displayName?.trim()) {
+    return user.displayName.trim();
+  }
+
+  const emailPrefix = user?.email?.split("@")[0]?.replace(/[._-]+/g, " ").trim();
+  if (!emailPrefix) {
+    return "CareerOS User";
+  }
+
+  return emailPrefix
+    .split(" ")
+    .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : ""))
+    .join(" ");
+}
+
 function SidebarNav({
+  applicationsInLineCount,
   pathname,
   onNavigate,
+  profileNameOverride,
+  profilePhotoOverride,
   user,
   onSignOut
 }: {
+  applicationsInLineCount: number;
   pathname: string;
   onNavigate?: () => void;
+  profileNameOverride: string | null;
+  profilePhotoOverride: string | null;
   user: User | null;
   onSignOut: () => Promise<void>;
 }) {
-  const userName = user?.displayName ?? "CareerOS User";
+  const userName = getUserDisplayName(user, profileNameOverride);
   const userEmail = user?.email ?? "Signed in";
-  const userInitials = getUserInitials(user);
+  const userInitials = getUserInitials(user, profileNameOverride);
+  const userPhotoUrl = sanitizeExternalUrl(profilePhotoOverride || user?.photoURL || "");
 
   return (
     <>
-      <Link className="career-brand" href="/" onClick={onNavigate}>
+      <Link className="career-brand" href="/dashboard" onClick={onNavigate}>
         <span className="career-brand-mark">
           <Sparkles size={17} />
         </span>
@@ -181,8 +249,8 @@ function SidebarNav({
             <div>
               {section.items.map((item) => {
                 const Icon = item.icon;
-                const active =
-                  item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                const active = item.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(item.href);
+                const badge = item.href === "/applications" ? String(applicationsInLineCount) : item.badge;
 
                 return (
                   <Link
@@ -194,7 +262,7 @@ function SidebarNav({
                   >
                     <Icon size={17} strokeWidth={1.85} />
                     <span>{item.label}</span>
-                    {item.badge ? <em>{item.badge}</em> : null}
+                    {badge ? <em>{badge}</em> : null}
                   </Link>
                 );
               })}
@@ -204,7 +272,14 @@ function SidebarNav({
       </nav>
 
       <div className="career-profile">
-        <div className="career-avatar">{userInitials}</div>
+        <div className="career-avatar">
+          {userPhotoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img alt={`${userName} profile`} className="career-avatar-image" loading="lazy" src={userPhotoUrl} />
+          ) : (
+            userInitials
+          )}
+        </div>
         <div>
           <strong>{userName}</strong>
           <span>{userEmail}</span>
@@ -218,15 +293,92 @@ function SidebarNav({
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
+  const { jobs } = useUserJobs();
   const pathname = usePathname();
   const router = useRouter();
   const [mobileMenuState, setMobileMenuState] = useState({ open: false, route: "" });
   const [lightMode, setLightMode] = useState(false);
+  const [profileNameOverride, setProfileNameOverride] = useState<string | null>(null);
+  const [profilePhotoOverride, setProfilePhotoOverride] = useState<string | null>(null);
   const [isAuthResolved, setIsAuthResolved] = useState(!isFirebaseClientConfigured || !auth);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const copy = useMemo(() => getRouteCopy(pathname), [pathname]);
+  const pipelineStats = useMemo<ApplicationPipelineStats>(() => {
+    return jobs.reduce<ApplicationPipelineStats>(
+      (stats, job) => {
+        if (job.status === "saved") {
+          stats.saved += 1;
+        } else if (job.status === "applied") {
+          stats.applied += 1;
+        } else if (job.status === "interviewing") {
+          stats.interviewing += 1;
+        } else if (job.status === "offer") {
+          stats.offer += 1;
+        } else if (job.status === "rejected") {
+          stats.rejected += 1;
+        } else {
+          stats.archived += 1;
+        }
+
+        return stats;
+      },
+      { saved: 0, applied: 0, interviewing: 0, offer: 0, rejected: 0, archived: 0 }
+    );
+  }, [jobs]);
+  const applicationsInLineCount = pipelineStats.saved + pipelineStats.applied + pipelineStats.interviewing;
+  const copy = useMemo(() => getRouteCopy(pathname, pipelineStats), [pathname, pipelineStats]);
+  const isPrimaryActionDisabled =
+    copy.action === "Start Simulation" || copy.action === "Generate Plan";
   const isAuthRoute = pathname.startsWith("/login");
+  const isTestRoomRoute = pathname.startsWith("/test-room");
   const sidebarOpen = mobileMenuState.open && mobileMenuState.route === pathname;
+
+  useEffect(() => {
+    let animationFrameId: number | null = null;
+
+    const onProfilePreferenceChange = () => {
+      setProfileNameOverride(readProfileNamePreference());
+      setProfilePhotoOverride(readProfilePhotoPreference());
+    };
+
+    animationFrameId = window.requestAnimationFrame(onProfilePreferenceChange);
+    window.addEventListener(PROFILE_CHANGE_EVENT, onProfilePreferenceChange as EventListener);
+    return () => {
+      if (animationFrameId !== null) {
+        window.cancelAnimationFrame(animationFrameId);
+      }
+
+      window.removeEventListener(PROFILE_CHANGE_EVENT, onProfilePreferenceChange as EventListener);
+    };
+  }, []);
+
+  useEffect(() => {
+    let animationFrameId: number | null = null;
+
+    const applyThemePreference = (preference: string | null) => {
+      if (preference === "light") {
+        setLightMode(true);
+      } else if (preference === "dark") {
+        setLightMode(false);
+      }
+    };
+
+    animationFrameId = window.requestAnimationFrame(() => {
+      applyThemePreference(readThemePreference());
+    });
+
+    const onThemePreferenceChange = (event: Event) => {
+      applyThemePreference((event as CustomEvent<string>).detail ?? null);
+    };
+
+    window.addEventListener(THEME_CHANGE_EVENT, onThemePreferenceChange as EventListener);
+    return () => {
+      if (animationFrameId !== null) {
+        window.cancelAnimationFrame(animationFrameId);
+      }
+
+      window.removeEventListener(THEME_CHANGE_EVENT, onThemePreferenceChange as EventListener);
+    };
+  }, []);
 
   useEffect(() => {
     document.documentElement.classList.toggle("light-theme", lightMode);
@@ -256,7 +408,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
 
     if (currentUser && isAuthRoute) {
-      router.replace("/");
+      router.replace("/dashboard");
     }
   }, [currentUser, isAuthResolved, isAuthRoute, router]);
 
@@ -281,6 +433,28 @@ export function AppShell({ children }: { children: ReactNode }) {
     setMobileMenuState({ open: false, route: pathname });
   };
 
+  const toggleTheme = () => {
+    setLightMode((current) => {
+      const next = !current;
+      writeThemePreference(next ? "light" : "dark");
+      return next;
+    });
+  };
+
+  const handlePrimaryAction = () => {
+    if (!copy.action) {
+      return;
+    }
+
+    if (copy.action === "Start Simulation" || copy.action === "Generate Plan") {
+      return;
+    }
+
+    if (copy.action === "Update Profile") {
+      window.dispatchEvent(new Event(PROFILE_SAVE_REQUEST_EVENT));
+    }
+  };
+
   if (isAuthRoute) {
     return <>{children}</>;
   }
@@ -296,6 +470,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
   }
 
+  if (isTestRoomRoute) {
+    return <div className="test-room-immersive-shell">{children}</div>;
+  }
+
   return (
     <div className="career-shell">
       <button
@@ -309,7 +487,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       </button>
 
       <aside className="career-sidebar">
-        <SidebarNav pathname={pathname} user={currentUser} onSignOut={handleSignOut} />
+        <SidebarNav
+          applicationsInLineCount={applicationsInLineCount}
+          pathname={pathname}
+          profileNameOverride={profileNameOverride}
+          profilePhotoOverride={profilePhotoOverride}
+          user={currentUser}
+          onSignOut={handleSignOut}
+        />
       </aside>
 
       <div
@@ -319,8 +504,11 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <aside className={sidebarOpen ? "mobile-sidebar open" : "mobile-sidebar"}>
         <SidebarNav
+          applicationsInLineCount={applicationsInLineCount}
           pathname={pathname}
           onNavigate={closeSidebar}
+          profileNameOverride={profileNameOverride}
+          profilePhotoOverride={profilePhotoOverride}
           user={currentUser}
           onSignOut={handleSignOut}
         />
@@ -343,30 +531,38 @@ export function AppShell({ children }: { children: ReactNode }) {
             <button
               aria-label="Toggle color theme"
               className="icon-button"
-              onClick={() => setLightMode((value) => !value)}
+              onClick={toggleTheme}
               type="button"
             >
               {lightMode ? <Sun size={17} /> : <Moon size={17} />}
             </button>
 
-            <button aria-label="Notifications" className="icon-button notification-button" type="button">
-              <Bell size={17} />
-              <span className="notification-dot" />
-            </button>
-
             {copy.action ? (
-              <button className="primary-button" type="button">
-                {pathname.includes("interview") || pathname.includes("war-room") ? (
-                  <Swords size={16} />
-                ) : pathname.includes("learning") ? (
-                  <BookOpen size={16} />
-                ) : pathname.includes("calendar") ? (
-                  <AlarmClock size={16} />
-                ) : (
-                  <Sparkles size={16} />
-                )}
-                {copy.action}
-              </button>
+              <span className={isPrimaryActionDisabled ? "instant-tooltip-wrap" : undefined}>
+                <button
+                  aria-disabled={isPrimaryActionDisabled}
+                  className="primary-button"
+                  disabled={isPrimaryActionDisabled}
+                  onClick={handlePrimaryAction}
+                  type="button"
+                >
+                  {pathname.includes("interview") || pathname.includes("war-room") ? (
+                    <Swords size={16} />
+                  ) : pathname.includes("learning") ? (
+                    <BookOpen size={16} />
+                  ) : pathname.includes("calendar") ? (
+                    <AlarmClock size={16} />
+                  ) : (
+                    <Sparkles size={16} />
+                  )}
+                  {copy.action}
+                </button>
+                {isPrimaryActionDisabled ? (
+                  <span className="instant-tooltip" role="status">
+                    This feature is still in development.
+                  </span>
+                ) : null}
+              </span>
             ) : null}
           </div>
         </header>
