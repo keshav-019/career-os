@@ -16,7 +16,7 @@
     "desktop:dist": "npm run dist --workspace @careeros/desktop"
   },
   "engines": {
-    "node": ">=20.9.0"
+    "node": "20.x"
   },
   "devDependencies": {
     "@types/node": "latest",
