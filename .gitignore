@@ -29,6 +29,12 @@ pnpm-debug.log*
 __pycache__/
 *.pyc
 
+# Playwright - test-results/report are regenerated per run; e2e/.auth holds a live signed-in session
+# (storageState), never commit it.
+apps/web/test-results/
+apps/web/playwright-report/
+apps/web/e2e/.auth/
+
 .vercel
 .env*
 !apps/web/.env.production
