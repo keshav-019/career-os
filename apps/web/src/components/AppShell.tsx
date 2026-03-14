@@ -35,6 +35,11 @@ import {
   writeThemePreference
 } from "@/lib/preferences";
 import { useUserJobs } from "@/lib/firebase/jobs";
+import {
+  clearLocalAdminSessions,
+  readLocalAdminSession,
+  type LocalAdminSession
+} from "@/lib/local-admin-session";
 import { sanitizeExternalUrl } from "@/lib/url-safety";
 
 type NavItem = {
@@ -83,6 +88,10 @@ type ApplicationPipelineStats = {
   offer: number;
   rejected: number;
   saved: number;
+};
+
+type ShellUser = Pick<User, "displayName" | "email" | "photoURL"> & {
+  isLocalAdmin?: boolean;
 };
 
 function summarizeApplicationPipeline(stats: ApplicationPipelineStats): string {
@@ -178,7 +187,16 @@ function getRouteCopy(pathname: string, pipelineStats: ApplicationPipelineStats)
   return routeCopy[pathname] ?? routeCopy["/dashboard"];
 }
 
-function getUserInitials(user: User | null, profileNameOverride: string | null) {
+function toLocalAdminShellUser(session: LocalAdminSession): ShellUser {
+  return {
+    displayName: session.displayName,
+    email: session.email,
+    photoURL: null,
+    isLocalAdmin: true
+  };
+}
+
+function getUserInitials(user: ShellUser | null, profileNameOverride: string | null) {
   const source = getUserDisplayName(user, profileNameOverride);
   const pieces = source
     .split(/[^\p{L}\p{N}]+/u)
@@ -188,7 +206,7 @@ function getUserInitials(user: User | null, profileNameOverride: string | null) 
   return pieces.map((part) => part[0]?.toUpperCase() ?? "").join("") || "CO";
 }
 
-function getUserDisplayName(user: User | null, profileNameOverride: string | null) {
+function getUserDisplayName(user: ShellUser | null, profileNameOverride: string | null) {
   if (profileNameOverride?.trim()) {
     return profileNameOverride.trim();
   }
@@ -222,7 +240,7 @@ function SidebarNav({
   onNavigate?: () => void;
   profileNameOverride: string | null;
   profilePhotoOverride: string | null;
-  user: User | null;
+  user: ShellUser | null;
   onSignOut: () => Promise<void>;
 }) {
   const userName = getUserDisplayName(user, profileNameOverride);
@@ -296,12 +314,17 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { jobs } = useUserJobs();
   const pathname = usePathname();
   const router = useRouter();
+  const initialLocalAdminSession = readLocalAdminSession();
   const [mobileMenuState, setMobileMenuState] = useState({ open: false, route: "" });
   const [lightMode, setLightMode] = useState(false);
   const [profileNameOverride, setProfileNameOverride] = useState<string | null>(null);
   const [profilePhotoOverride, setProfilePhotoOverride] = useState<string | null>(null);
-  const [isAuthResolved, setIsAuthResolved] = useState(!isFirebaseClientConfigured || !auth);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAuthResolved, setIsAuthResolved] = useState(
+    Boolean(initialLocalAdminSession) || !isFirebaseClientConfigured || !auth
+  );
+  const [currentUser, setCurrentUser] = useState<ShellUser | null>(
+    initialLocalAdminSession ? toLocalAdminShellUser(initialLocalAdminSession) : null
+  );
   const pipelineStats = useMemo<ApplicationPipelineStats>(() => {
     return jobs.reduce<ApplicationPipelineStats>(
       (stats, job) => {
@@ -385,11 +408,23 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [lightMode]);
 
   useEffect(() => {
+    const localAdminSession = readLocalAdminSession();
+    if (localAdminSession) {
+      return;
+    }
+
     if (!auth) {
       return;
     }
 
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      const refreshedLocalAdminSession = readLocalAdminSession();
+      if (refreshedLocalAdminSession) {
+        setCurrentUser(toLocalAdminShellUser(refreshedLocalAdminSession));
+        setIsAuthResolved(true);
+        return;
+      }
+
       setCurrentUser(user);
       setIsAuthResolved(true);
     });
@@ -413,11 +448,18 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [currentUser, isAuthResolved, isAuthRoute, router]);
 
   const handleSignOut = async () => {
-    if (!auth) {
-      return;
+    clearLocalAdminSessions();
+    await fetch("/api/learning/admin/session", {
+      method: "DELETE"
+    }).catch(() => {
+      // Ignore local admin cookie cleanup failures during sign-out.
+    });
+
+    if (auth?.currentUser) {
+      await signOut(auth);
     }
 
-    await signOut(auth);
+    setCurrentUser(null);
     router.replace("/login");
   };
 

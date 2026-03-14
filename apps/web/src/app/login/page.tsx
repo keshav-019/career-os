@@ -21,6 +21,7 @@ import {
   clearStoredTwoFactorSessionToken,
   setStoredTwoFactorSessionToken
 } from "@/lib/two-factor-session";
+import { writeLocalAdminSession } from "@/lib/local-admin-session";
 
 type AuthMethod = "email" | "google" | "github" | "mfa" | null;
 
@@ -191,13 +192,48 @@ export default function LoginPage() {
     return unsubscribe;
   }, [handlePostSignInRouting]);
 
+  const tryLocalAdminSignIn = async (): Promise<boolean> => {
+    if (mode !== "signin") {
+      return false;
+    }
+
+    const username = email.trim();
+    if (!username || !password) {
+      return false;
+    }
+
+    const response = await fetch("/api/learning/admin/session", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        username,
+        password
+      })
+    });
+
+    if (response.ok) {
+      const payload = (await response.json().catch(() => null)) as { username?: string } | null;
+      const resolvedUsername = payload?.username || username;
+      writeLocalAdminSession({
+        username: resolvedUsername,
+        displayName: "Learning Admin",
+        email: `${resolvedUsername}@local.admin`
+      });
+      await handlePostSignInRouting();
+      return true;
+    }
+
+    if (response.status === 401 && !username.includes("@")) {
+      throw new Error("Incorrect local admin username or password.");
+    }
+
+    return false;
+  };
+
   const handleEmailSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
-    if (!auth) {
-      setErrorMessage("Firebase auth is not configured.");
-      return;
-    }
 
     setBusyMethod("email");
     setErrorMessage(null);
@@ -206,6 +242,15 @@ export default function LoginPage() {
     authFlowInProgressRef.current = true;
 
     try {
+      if (await tryLocalAdminSignIn()) {
+        return;
+      }
+
+      if (!auth) {
+        setErrorMessage("Firebase auth is not configured.");
+        return;
+      }
+
       if (mode === "signin") {
         const normalizedEmail = email.trim().toLowerCase();
         clearPendingTwoFactorUserId();
@@ -244,7 +289,7 @@ export default function LoginPage() {
       setRequiresTwoFactor(false);
       setTwoFactorCode("");
       clearStoredTwoFactorSessionToken();
-      if (auth.currentUser) {
+      if (auth?.currentUser) {
         try {
           await signOut(auth);
         } catch {
@@ -434,14 +479,15 @@ export default function LoginPage() {
             </>
           ) : null}
 
-          <label htmlFor="auth-email">Email</label>
+          <label htmlFor="auth-email">{mode === "signin" ? "Email or username" : "Email"}</label>
           <input
-            autoComplete="email"
+            autoComplete={mode === "signin" ? "username" : "email"}
             id="auth-email"
+            inputMode={mode === "signin" ? "text" : "email"}
             onChange={(event) => setEmail(event.target.value)}
-            placeholder="you@example.com"
+            placeholder={mode === "signin" ? "you@example.com or admin" : "you@example.com"}
             required
-            type="email"
+            type={mode === "signin" ? "text" : "email"}
             value={email}
           />
 
@@ -449,9 +495,9 @@ export default function LoginPage() {
           <input
             autoComplete={mode === "signin" ? "current-password" : "new-password"}
             id="auth-password"
-            minLength={6}
+            minLength={mode === "signin" ? 1 : 6}
             onChange={(event) => setPassword(event.target.value)}
-            placeholder="At least 6 characters"
+            placeholder={mode === "signin" ? "Password" : "At least 6 characters"}
             required
             type="password"
             value={password}

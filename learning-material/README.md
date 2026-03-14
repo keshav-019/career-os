@@ -4,7 +4,7 @@
 Stores source learning-content files consumed by the web Learning Center.
 
 ## What This Folder Owns
-Minified JSON content files (for example CSE, System Design, Aptitude, AI) that are parsed server-side and rendered in hierarchical UI tiles.
+Minified JSON content files (for example CSE and AI) that are parsed server-side and rendered in hierarchical UI tiles.
 
 ## Integration Points
 Read by `apps/web/src/lib/learning/material-library.ts` through Learning APIs:
@@ -13,13 +13,13 @@ Read by `apps/web/src/lib/learning/material-library.ts` through Learning APIs:
 
 ## Files In This Folder
 - `cse_detailed_reading_material_minified.json`
-- `system_design_deep_reading_materials_210.min.json`
-- `ai_ml_reading_materials_phase_1.min.json`
-- `ai_ml_reading_materials_phase_2.min.json`
-- `ai_ml_reading_materials_phase_3.min.json`
-- `ai_ml_reading_materials_phase_4.min.json`
-- `ai_ml_reading_materials_phase_5.min.json`
-- `aptitude_reading_materials_by_subtopic_54.min.json`
+- `algorithms_textbook_clean.min.json`
+- `operating_systems_textbook_clean.min.json`
+- `c_programming_textbook_clean.min.json`
+- `data_structures_textbook_clean.min.json`
+- `python_programming_textbook_clean.min.json`
+- `system_design_interview_textbook_clean.min.json`
+- `ai_textbook_curriculum_clean.min.json`
 
 ## Child Folders
 - No direct child folders.
@@ -29,6 +29,13 @@ Read by `apps/web/src/lib/learning/material-library.ts` through Learning APIs:
 2. Preserve link fields (`url`) for references so UI can render clickable resources.
 3. Avoid deleting this folder even when content is temporarily sparse; additional files can be dropped in incrementally.
 4. Prefer additive updates to existing files to keep IDs stable for bookmarks and analytics.
+5. `python_programming_textbook_clean.min.json` is chapter-driven content generated from the PDF source with compressed figure assets and inline-placement metadata.
+6. `c_programming_textbook_clean.min.json` is unit-driven content generated from `DECAP010_PROGRAMMING_IN_C.pdf` with cleaned headers, triple-quoted code blocks, compressed figure assets, and inline-placement metadata.
+7. `data_structures_textbook_clean.min.json` is unit-driven content generated from `DCAP407_DATA_STRUCTURE.pdf` with Objectives/Contents removed, numbered section prefixes stripped from headers (for example `1.1`), triple-quoted code blocks, compressed figure assets, and inline-placement metadata.
+8. `algorithms_textbook_clean.min.json` is chapter-driven CLRS content generated from `Cormen Introduction to Algorithms.pdf`, where each chapter starts at the chapter opening and stops at the first `Exercises` heading (all exercises and content after that point are excluded).
+9. `operating_systems_textbook_clean.min.json` is chapter-driven OS textbook content generated from `Abraham-Silberschatz-Operating-System-Concepts-10th-2018.pdf`, where each chapter removes Objectives and stops at the first `Summary` heading (summary, practice exercises, and all later chapter content excluded).
+10. `system_design_interview_textbook_clean.min.json` is chapter-driven content generated from `System Design Interview by Alex Xu.pdf`, with per-chapter Reference materials sections removed and embedded visuals, code snippets, and tables extracted from the PDF, compressed, and loaded as a Computer Science subject.
+11. `ai_textbook_curriculum_clean.min.json` is ordered AI textbook material generated from the supplied ML, math, deep learning, NLP, transformer, computer vision, and MLOps PDFs. Text-bearing PDFs are extracted by chapter or section with chapter-end summaries omitted, figures are compressed under `apps/web/public/learning/ai-textbooks`, the image-only Deep Learning PDF is converted to OCR text instead of published page screenshots, and MLOps is represented as one direct whitepaper topic.
 
 ## Supported Content Shapes
 The parser supports multiple JSON formats and normalizes them into the same track -> subject -> topic UI flow:
@@ -47,11 +54,6 @@ The parser supports multiple JSON formats and normalizes them into the same trac
 - top-level `modules[]`
 - modules grouped into subjects by `area`
 - each module treated as a topic (with drill-down fields + extracted links)
-
-4. Aptitude section format:
-- top-level `sections[]`
-- each section contains `topics[]`
-- each topic contains nested `reading_material`, worked examples, traps, drills, and mastery checks
 
 ## Authoring Notes For Future Files
 1. Prefer setting `metadata.trackId` when available to avoid any ambiguity in category mapping.
