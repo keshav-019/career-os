@@ -22,7 +22,7 @@ const KNOWN_SKILLS = [
   "PyTorch",
   "Golang",
   "Spring Boot",
-  "Angular"
+  "Angular",
 ];
 
 const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"]);
@@ -34,7 +34,7 @@ const STRONG_JOB_KEYWORDS = [
   "experience",
   "apply",
   "skills",
-  "role"
+  "role",
 ];
 
 let lastPayloadSignature = "";
@@ -150,7 +150,11 @@ const firstImageSrc = (scope, selectors) => {
     const image = root.querySelector(selector);
     const src = cleanText(image?.getAttribute("src") || "");
     const dataSrc = cleanText(image?.getAttribute("data-src") || "");
-    const lazySrc = cleanText(image?.getAttribute("data-delayed-url") || image?.getAttribute("data-ghost-url") || "");
+    const lazySrc = cleanText(
+      image?.getAttribute("data-delayed-url") ||
+      image?.getAttribute("data-ghost-url") ||
+      "",
+    );
     const candidate = src || dataSrc || lazySrc;
 
     if (candidate && !candidate.startsWith("data:")) {
@@ -180,7 +184,9 @@ const readPrimaryDescription = (scope, selectors) => {
 const readPrimaryDescriptionMultiline = (scope, selectors) => {
   for (const selector of selectors) {
     const element = (scope || document).querySelector(selector);
-    const text = normalizeMultilineText(element?.innerText || element?.textContent || "");
+    const text = normalizeMultilineText(
+      element?.innerText || element?.textContent || "",
+    );
     if (text.length > 120) {
       return text.slice(0, 26000);
     }
@@ -199,7 +205,7 @@ const safeOuterHtml = (element) => {
 
 const inferSalaryText = (sourceText) => {
   const salaryMatch = sourceText.match(
-    /(₹|INR|\$|USD|EUR|GBP)\s?[0-9][0-9,.\s]*(?:-|to)\s?(₹|INR|\$|USD|EUR|GBP)?\s?[0-9][0-9,.\s]*(?:a year|per year|a month|per month|a day|per day)?/i
+    /(₹|INR|\$|USD|EUR|GBP)\s?[0-9][0-9,.\s]*(?:-|to)\s?(₹|INR|\$|USD|EUR|GBP)?\s?[0-9][0-9,.\s]*(?:a year|per year|a month|per month|a day|per day)?/i,
   );
 
   return cleanText(salaryMatch?.[0] || "");
@@ -227,19 +233,23 @@ const inferEmploymentType = (sourceText) => {
 };
 
 const inferExperienceText = (sourceText) => {
-  const match = sourceText.match(/(\d+\+?\s*-\s*\d+\+?\s*years|\d+\+?\s*years)/i);
+  const match = sourceText.match(
+    /(\d+\+?\s*-\s*\d+\+?\s*years|\d+\+?\s*years)/i,
+  );
   return cleanText(match?.[0] || "");
 };
 
 const inferPostedAtText = (sourceText) => {
   const match = sourceText.match(
-    /(reposted\s+\d+\s+(?:day|days|week|weeks|month|months)\s+ago|posted\s*[:\-]?\s*\d+\s+(?:day|days|week|weeks|month|months)\s+ago|\d+\s+(?:day|days|week|weeks|month|months)\s+ago|few hours ago|today|yesterday)/i
+    /(reposted\s+\d+\s+(?:day|days|week|weeks|month|months)\s+ago|posted\s*[:\-]?\s*\d+\s+(?:day|days|week|weeks|month|months)\s+ago|\d+\s+(?:day|days|week|weeks|month|months)\s+ago|few hours ago|today|yesterday)/i,
   );
   return cleanText(match?.[0] || "");
 };
 
 const inferWorkplaceTypeText = (sourceText) => {
-  const match = sourceText.match(/\b(remote|hybrid|on-site|onsite|on site|work from home|wfh)\b/i);
+  const match = sourceText.match(
+    /\b(remote|hybrid|on-site|onsite|on site|work from home|wfh)\b/i,
+  );
   if (!match?.[0]) {
     return "";
   }
@@ -258,7 +268,7 @@ const inferWorkplaceTypeText = (sourceText) => {
 
 const inferJobTypeText = (sourceText) => {
   const match = sourceText.match(
-    /\b(full[-\s]?time|part[-\s]?time|contract(?:ual)?|internship|temporary|freelance|permanent)\b/i
+    /\b(full[-\s]?time|part[-\s]?time|contract(?:ual)?|internship|temporary|freelance|permanent)\b/i,
   );
   if (!match?.[0]) {
     return "";
@@ -283,7 +293,10 @@ const inferLocationOptions = (primaryLocation, sourceText) => {
     values.push(seed);
   }
 
-  const matches = sourceText.match(/[A-Z][A-Za-z\s.&-]+,\s*[A-Z][A-Za-z\s.&-]+(?:,\s*[A-Z][A-Za-z\s.&-]+)?/g) || [];
+  const matches =
+    sourceText.match(
+      /[A-Z][A-Za-z\s.&-]+,\s*[A-Z][A-Za-z\s.&-]+(?:,\s*[A-Z][A-Za-z\s.&-]+)?/g,
+    ) || [];
   matches.forEach((entry) => {
     const normalized = cleanText(entry);
     if (!normalized) {
@@ -298,7 +311,12 @@ const inferLocationOptions = (primaryLocation, sourceText) => {
   return values.slice(0, 8);
 };
 
-const extractSectionText = (sourceText, headingPatterns, stopPatterns, maxLength = 1800) => {
+const extractSectionText = (
+  sourceText,
+  headingPatterns,
+  stopPatterns,
+  maxLength = 1800,
+) => {
   const text = String(sourceText || "");
   if (!text) {
     return "";
@@ -313,7 +331,9 @@ const extractSectionText = (sourceText, headingPatterns, stopPatterns, maxLength
   }
 
   const findHeadingIndex = (patterns) =>
-    lines.findIndex((line) => patterns.some((pattern) => new RegExp(pattern, "i").test(line)));
+    lines.findIndex((line) =>
+      patterns.some((pattern) => new RegExp(pattern, "i").test(line)),
+    );
 
   const startIndex = findHeadingIndex(headingPatterns);
   if (startIndex === -1) {
@@ -338,28 +358,39 @@ const extractSectionText = (sourceText, headingPatterns, stopPatterns, maxLength
 
 const inferSkills = (sourceText) => {
   const lowerText = sourceText.toLowerCase();
-  const detected = KNOWN_SKILLS.filter((skill) => lowerText.includes(skill.toLowerCase()));
+  const detected = KNOWN_SKILLS.filter((skill) =>
+    lowerText.includes(skill.toLowerCase()),
+  );
   return Array.from(new Set(detected)).slice(0, 20);
 };
 
 const inferTags = (payload) => {
   const tags = new Set(["new", payload.source || "chrome-extension"]);
-  const locationText = `${payload.location || ""} ${(payload.locationOptions || []).join(" ")} ${payload.description || ""} ${
-    payload.workplaceTypeText || ""
-  }`.toLowerCase();
+  const locationText =
+    `${payload.location || ""} ${(payload.locationOptions || []).join(" ")} ${payload.description || ""} ${payload.workplaceTypeText || ""
+      }`.toLowerCase();
 
-  if (locationText.includes("remote") || locationText.includes("work from home")) {
+  if (
+    locationText.includes("remote") ||
+    locationText.includes("work from home")
+  ) {
     tags.add("remote");
     payload.remotePolicyHint = "remote";
   } else if (locationText.includes("hybrid")) {
     tags.add("hybrid");
     payload.remotePolicyHint = "hybrid";
-  } else if (locationText.includes("on-site") || locationText.includes("onsite") || locationText.includes("on site")) {
+  } else if (
+    locationText.includes("on-site") ||
+    locationText.includes("onsite") ||
+    locationText.includes("on site")
+  ) {
     tags.add("onsite");
     payload.remotePolicyHint = "onsite";
   }
 
-  payload.skills?.forEach((skill) => tags.add(skill.toLowerCase().replace(/\s+/g, "-")));
+  payload.skills?.forEach((skill) =>
+    tags.add(skill.toLowerCase().replace(/\s+/g, "-")),
+  );
   if (payload.jobTypeText) {
     tags.add(payload.jobTypeText.toLowerCase().replace(/\s+/g, "-"));
   }
@@ -370,82 +401,92 @@ const parseIndeedPayload = () => {
   const detailsRoot = findFirstElement(document, [
     "#jobsearch-ViewjobPaneWrapper",
     "[data-testid='jobsearch-JobComponent']",
-    "#viewJobSSRRoot"
+    "#viewJobSSRRoot",
   ]);
 
   const selectedListItem = findFirstElement(document, [
     "[data-jk][aria-current='true']",
     "[data-jk][aria-selected='true']",
-    ".job_seen_beacon[aria-current='true']"
+    ".job_seen_beacon[aria-current='true']",
   ]);
 
   const title = firstText(detailsRoot, [
     "h1[data-testid='jobsearch-JobInfoHeader-title']",
     "h1.jobsearch-JobInfoHeader-title",
-    "h1"
+    "h1",
   ]);
   const company = firstText(detailsRoot, [
     "[data-testid='inlineHeader-companyName']",
     "[data-company-name='true']",
-    ".jobsearch-InlineCompanyRating div:first-child"
+    ".jobsearch-InlineCompanyRating div:first-child",
   ]);
   const location = firstText(detailsRoot, [
     "[data-testid='job-location']",
     "#jobLocationText",
-    ".jobsearch-JobInfoHeader-subtitle div:last-child"
+    ".jobsearch-JobInfoHeader-subtitle div:last-child",
   ]);
 
   const descriptionElement = findFirstElement(detailsRoot || document, [
     "#jobDescriptionText",
     "[data-testid='jobsearch-JobComponent-description']",
-    "[id^='jobDescriptionText']"
+    "[id^='jobDescriptionText']",
   ]);
 
   const description = readPrimaryDescription(detailsRoot || document, [
     "#jobDescriptionText",
     "[data-testid='jobsearch-JobComponent-description']",
     "[id^='jobDescriptionText']",
-    "main"
+    "main",
   ]);
-  const descriptionMultiline = readPrimaryDescriptionMultiline(detailsRoot || document, [
-    "#jobDescriptionText",
-    "[data-testid='jobsearch-JobComponent-description']",
-    "[id^='jobDescriptionText']",
-    "main"
-  ]);
+  const descriptionMultiline = readPrimaryDescriptionMultiline(
+    detailsRoot || document,
+    [
+      "#jobDescriptionText",
+      "[data-testid='jobsearch-JobComponent-description']",
+      "[id^='jobDescriptionText']",
+      "main",
+    ],
+  );
 
   const detailPills = collectTexts(detailsRoot || document, [
     "#jobDetailsSection [data-testid='jobDetailText']",
     "#jobDetailsSection li",
-    "[data-testid='jobsearch-JobDescriptionSection-sectionItem']"
+    "[data-testid='jobsearch-JobDescriptionSection-sectionItem']",
   ]);
   const locationOptions = collectTexts(detailsRoot || document, [
     "[data-testid='job-location']",
     "#jobLocationText",
     ".jobsearch-JobInfoHeader-subtitle div",
-    "[data-testid='inlineHeader-companyLocation']"
+    "[data-testid='inlineHeader-companyLocation']",
   ]);
   const postedHints = collectTexts(detailsRoot || document, [
     "[data-testid='jobsearch-JobMetadataFooter']",
     ".jobsearch-JobMetadataFooter",
-    ".jobsearch-JobDescriptionSection-sectionItem"
+    ".jobsearch-JobDescriptionSection-sectionItem",
   ]).join("\n");
 
-  const companyLogoUrl = firstImageSrc(detailsRoot || selectedListItem || document, [
-    "img[data-testid='inlineHeader-companyLogo']",
-    ".jobsearch-JobInfoHeader-logo img",
-    "img[src*='companylogo']",
-    "img[alt*='logo' i]"
-  ]);
+  const companyLogoUrl = firstImageSrc(
+    detailsRoot || selectedListItem || document,
+    [
+      "img[data-testid='inlineHeader-companyLogo']",
+      ".jobsearch-JobInfoHeader-logo img",
+      "img[src*='companylogo']",
+      "img[alt*='logo' i]",
+    ],
+  );
 
   return {
-    aboutText: extractSectionText(descriptionMultiline, ["about\\s+the\\s+job", "^role"], [
-      "responsibilities",
-      "qualifications",
-      "requirements",
-      "benefits",
-      "job\\s+type"
-    ]),
+    aboutText: extractSectionText(
+      descriptionMultiline,
+      ["about\\s+the\\s+job", "^role"],
+      [
+        "responsibilities",
+        "qualifications",
+        "requirements",
+        "benefits",
+        "job\\s+type",
+      ],
+    ),
     company,
     companyLogoUrl,
     contextHtml: safeOuterHtml(selectedListItem),
@@ -453,22 +494,23 @@ const parseIndeedPayload = () => {
     descriptionMultiline,
     descriptionHtml: safeOuterHtml(descriptionElement),
     detailsHtml: safeOuterHtml(detailsRoot || descriptionElement),
-    eligibilityText: extractSectionText(descriptionMultiline, ["qualifications", "requirements"], [
-      "benefits",
-      "responsibilities",
-      "about\\s+the\\s+job",
-      "location"
-    ]),
-    jobTypeText: inferJobTypeText(`${detailPills.join(" ")}\n${descriptionMultiline}`),
+    eligibilityText: extractSectionText(
+      descriptionMultiline,
+      ["qualifications", "requirements"],
+      ["benefits", "responsibilities", "about\\s+the\\s+job", "location"],
+    ),
+    jobTypeText: inferJobTypeText(
+      `${detailPills.join(" ")}\n${descriptionMultiline}`,
+    ),
     location,
     locationOptions,
     postedAtText: inferPostedAtText(postedHints || descriptionMultiline),
-    responsibilitiesText: extractSectionText(descriptionMultiline, ["responsibilities"], [
-      "qualifications",
-      "benefits",
-      "requirements"
-    ]),
-    title
+    responsibilitiesText: extractSectionText(
+      descriptionMultiline,
+      ["responsibilities"],
+      ["qualifications", "benefits", "requirements"],
+    ),
+    title,
   };
 };
 
@@ -476,37 +518,37 @@ const parseLinkedInPayload = () => {
   const detailsRoot = findFirstElement(document, [
     ".jobs-search__job-details--container",
     ".jobs-details",
-    ".job-view-layout"
+    ".job-view-layout",
   ]);
 
   const selectedListItem =
     findFirstElement(document, [
       ".jobs-search-results__list-item--active",
       ".job-card-container--clickable[aria-current='true']",
-      "[data-job-id][aria-current='true']"
+      "[data-job-id][aria-current='true']",
     ]) || null;
 
   const title = firstText(detailsRoot, [
     ".jobs-unified-top-card__job-title",
     ".job-details-jobs-unified-top-card__job-title",
-    "h1"
+    "h1",
   ]);
   const company = firstText(detailsRoot, [
     ".jobs-unified-top-card__company-name",
     ".job-details-jobs-unified-top-card__company-name",
-    ".topcard__flavor-row a"
+    ".topcard__flavor-row a",
   ]);
   const location = firstText(detailsRoot, [
     ".jobs-unified-top-card__bullet",
     ".job-details-jobs-unified-top-card__primary-description-container",
-    ".topcard__flavor--bullet"
+    ".topcard__flavor--bullet",
   ]);
 
   const descriptionElement = findFirstElement(detailsRoot || document, [
     ".jobs-description-content__text",
     ".jobs-box__html-content",
     ".jobs-description__content",
-    ".jobs-search__job-details--container"
+    ".jobs-search__job-details--container",
   ]);
 
   const description = readPrimaryDescription(detailsRoot || document, [
@@ -514,71 +556,100 @@ const parseLinkedInPayload = () => {
     ".jobs-box__html-content",
     ".jobs-description__content",
     ".jobs-search__job-details--container",
-    "main"
+    "main",
   ]);
-  const descriptionMultiline = readPrimaryDescriptionMultiline(detailsRoot || document, [
-    ".jobs-description-content__text",
-    ".jobs-box__html-content",
-    ".jobs-description__content",
-    ".jobs-search__job-details--container",
-    "main"
-  ]);
+  const descriptionMultiline = readPrimaryDescriptionMultiline(
+    detailsRoot || document,
+    [
+      ".jobs-description-content__text",
+      ".jobs-box__html-content",
+      ".jobs-description__content",
+      ".jobs-search__job-details--container",
+      "main",
+    ],
+  );
 
   const primaryMeta = firstText(detailsRoot, [
     ".jobs-unified-top-card__primary-description-container",
     ".job-details-jobs-unified-top-card__primary-description-container",
-    ".topcard__flavor-row"
+    ".topcard__flavor-row",
   ]);
 
   const detailPills = collectTexts(detailsRoot || document, [
     ".jobs-unified-top-card__job-insight",
     ".jobs-unified-top-card__workplace-type",
     ".description__job-criteria-list li",
-    ".job-details-jobs-unified-top-card__job-insight"
+    ".job-details-jobs-unified-top-card__job-insight",
   ]);
   const locationOptions = collectTexts(detailsRoot || document, [
     ".jobs-unified-top-card__bullet",
     ".job-details-jobs-unified-top-card__primary-description-container",
-    ".topcard__flavor--bullet"
+    ".topcard__flavor--bullet",
   ]);
 
-  const companyLogoUrl = firstImageSrc(detailsRoot || selectedListItem || document, [
-    ".jobs-unified-top-card__company-logo img",
-    ".job-details-jobs-unified-top-card__company-logo img",
-    ".jobs-company__box img",
-    "img[alt*='logo' i]"
-  ]);
+  const companyLogoUrl = firstImageSrc(
+    detailsRoot || selectedListItem || document,
+    [
+      ".jobs-unified-top-card__company-logo img",
+      ".job-details-jobs-unified-top-card__company-logo img",
+      ".jobs-company__box img",
+      "img[alt*='logo' i]",
+    ],
+  );
 
   return {
-    aboutText: extractSectionText(descriptionMultiline, ["about\\s+the\\s+job", "about\\s+the\\s+role"], [
-      "responsibilities",
-      "what\\s+you\\s+will\\s+be\\s+doing",
-      "qualifications",
-      "what\\s+we\\s+need\\s+to\\s+see",
-      "you\\s+might\\s+be\\s+a\\s+good\\s+fit"
-    ]),
+    aboutText: extractSectionText(
+      descriptionMultiline,
+      ["about\\s+the\\s+job", "about\\s+the\\s+role"],
+      [
+        "responsibilities",
+        "what\\s+you\\s+will\\s+be\\s+doing",
+        "qualifications",
+        "what\\s+we\\s+need\\s+to\\s+see",
+        "you\\s+might\\s+be\\s+a\\s+good\\s+fit",
+      ],
+    ),
     company,
     companyLogoUrl,
     contextHtml: safeOuterHtml(selectedListItem),
     description,
     descriptionMultiline,
     descriptionHtml: safeOuterHtml(descriptionElement),
-    detailsHtml: safeOuterHtml(detailsRoot || descriptionElement || selectedListItem),
+    detailsHtml: safeOuterHtml(
+      detailsRoot || descriptionElement || selectedListItem,
+    ),
     eligibilityText: extractSectionText(
       descriptionMultiline,
-      ["what\\s+we\\s+need\\s+to\\s+see", "qualifications", "you\\s+might\\s+be\\s+a\\s+good\\s+fit"],
-      ["how\\s+we\\s+are\\s+different", "benefits", "about\\s+the\\s+company", "come\\s+work\\s+with\\s+us"]
+      [
+        "what\\s+we\\s+need\\s+to\\s+see",
+        "qualifications",
+        "you\\s+might\\s+be\\s+a\\s+good\\s+fit",
+      ],
+      [
+        "how\\s+we\\s+are\\s+different",
+        "benefits",
+        "about\\s+the\\s+company",
+        "come\\s+work\\s+with\\s+us",
+      ],
     ),
-    jobTypeText: inferJobTypeText(`${detailPills.join(" ")}\n${descriptionMultiline}`),
+    jobTypeText: inferJobTypeText(
+      `${detailPills.join(" ")}\n${descriptionMultiline}`,
+    ),
     location,
     locationOptions,
-    postedAtText: inferPostedAtText(`${primaryMeta}\n${detailPills.join("\n")}`),
+    postedAtText: inferPostedAtText(
+      `${primaryMeta}\n${detailPills.join("\n")}`,
+    ),
     responsibilitiesText: extractSectionText(
       descriptionMultiline,
       ["responsibilities", "what\\s+you\\s+will\\s+be\\s+doing"],
-      ["what\\s+we\\s+need\\s+to\\s+see", "qualifications", "you\\s+might\\s+be\\s+a\\s+good\\s+fit"]
+      [
+        "what\\s+we\\s+need\\s+to\\s+see",
+        "qualifications",
+        "you\\s+might\\s+be\\s+a\\s+good\\s+fit",
+      ],
     ),
-    title
+    title,
   };
 };
 
@@ -587,50 +658,53 @@ const parseNaukriPayload = () => {
     ".styles_jd-container__Aupxw",
     ".styles_jd-main-layout__Yc0nA",
     ".job-desc-container",
-    "main"
+    "main",
   ]);
 
   const title = firstText(detailsRoot, [
     ".styles_jd-header-title__rZwM1",
     ".jd-header-title",
-    "h1"
+    "h1",
   ]);
   const company = firstText(detailsRoot, [
     ".styles_jd-header-comp-name__MvqAI",
     ".comp-name",
-    ".jd-header-comp-name"
+    ".jd-header-comp-name",
   ]);
   const location = firstText(detailsRoot, [
     ".styles_jhc__location__W_pVs",
     ".locWdth",
-    ".styles_jhc__location__W_pVs a"
+    ".styles_jhc__location__W_pVs a",
   ]);
 
   const descriptionElement = findFirstElement(detailsRoot || document, [
     ".styles_JDC__dang-inner-html__h0K4t",
     ".dang-inner-html",
-    "#jobDescriptionContainer"
+    "#jobDescriptionContainer",
   ]);
 
   const description = readPrimaryDescription(detailsRoot || document, [
     ".styles_JDC__dang-inner-html__h0K4t",
     ".dang-inner-html",
     "#jobDescriptionContainer",
-    ".job-desc"
-  ]);
-  const descriptionMultiline = readPrimaryDescriptionMultiline(detailsRoot || document, [
-    ".styles_JDC__dang-inner-html__h0K4t",
-    ".dang-inner-html",
-    "#jobDescriptionContainer",
     ".job-desc",
-    "main"
   ]);
+  const descriptionMultiline = readPrimaryDescriptionMultiline(
+    detailsRoot || document,
+    [
+      ".styles_JDC__dang-inner-html__h0K4t",
+      ".dang-inner-html",
+      "#jobDescriptionContainer",
+      ".job-desc",
+      "main",
+    ],
+  );
 
   const companyLogoUrl = firstImageSrc(detailsRoot || document, [
     ".styles_jd-header-comp-name__MvqAI img",
     ".styles_jd-header-comp-logo img",
     ".comp-name img",
-    "img[alt*='logo' i]"
+    "img[alt*='logo' i]",
   ]);
 
   const detailFacts = collectTexts(detailsRoot || document, [
@@ -638,23 +712,22 @@ const parseNaukriPayload = () => {
     ".styles_jhc__jd-top-info__Hf5qN span",
     ".job-details-jobs-unified-top-card__job-insight",
     ".styles_job-desc-container__txpYf li",
-    ".styles_key-skill-wrapper__-Q4oK li"
+    ".styles_key-skill-wrapper__-Q4oK li",
   ]);
   const locationOptions = collectTexts(detailsRoot || document, [
     ".styles_jhc__location__W_pVs",
     ".locWdth",
     ".styles_jhc__location__W_pVs a",
-    ".styles_jd-header-desc__wOp6E"
+    ".styles_jd-header-desc__wOp6E",
   ]);
   const wholeText = `${descriptionMultiline}\n${detailFacts.join("\n")}`;
 
   return {
-    aboutText: extractSectionText(descriptionMultiline, ["job\\s+description"], [
-      "key\\s+skills",
-      "role\\s*:",
-      "industry\\s+type",
-      "education"
-    ]),
+    aboutText: extractSectionText(
+      descriptionMultiline,
+      ["job\\s+description"],
+      ["key\\s+skills", "role\\s*:", "industry\\s+type", "education"],
+    ),
     company,
     companyLogoUrl,
     contextHtml: "",
@@ -662,21 +735,21 @@ const parseNaukriPayload = () => {
     descriptionMultiline,
     descriptionHtml: safeOuterHtml(descriptionElement),
     detailsHtml: safeOuterHtml(detailsRoot || descriptionElement),
-    eligibilityText: extractSectionText(descriptionMultiline, ["qualification", "education", "experience"], [
-      "key\\s+skills",
-      "role\\s*:",
-      "industry\\s+type"
-    ]),
+    eligibilityText: extractSectionText(
+      descriptionMultiline,
+      ["qualification", "education", "experience"],
+      ["key\\s+skills", "role\\s*:", "industry\\s+type"],
+    ),
     jobTypeText: inferJobTypeText(wholeText),
     location,
     locationOptions,
     postedAtText: inferPostedAtText(wholeText),
-    responsibilitiesText: extractSectionText(descriptionMultiline, ["key\\s+responsibilities", "responsibilities"], [
-      "qualification",
-      "education",
-      "key\\s+skills"
-    ]),
-    title
+    responsibilitiesText: extractSectionText(
+      descriptionMultiline,
+      ["key\\s+responsibilities", "responsibilities"],
+      ["qualification", "education", "key\\s+skills"],
+    ),
+    title,
   };
 };
 
@@ -686,9 +759,17 @@ const hasJobSignals = (payload, hostKind) => {
     return false;
   }
 
-  const combinedText = `${payload.title} ${payload.company} ${payload.location} ${payload.description}`.toLowerCase();
-  const hasKeyword = STRONG_JOB_KEYWORDS.some((keyword) => combinedText.includes(keyword));
-  const hasPrimaryMeta = Boolean(payload.company || payload.location || payload.jobTypeText || payload.postedAtText);
+  const combinedText =
+    `${payload.title} ${payload.company} ${payload.location} ${payload.description}`.toLowerCase();
+  const hasKeyword = STRONG_JOB_KEYWORDS.some((keyword) =>
+    combinedText.includes(keyword),
+  );
+  const hasPrimaryMeta = Boolean(
+    payload.company ||
+    payload.location ||
+    payload.jobTypeText ||
+    payload.postedAtText,
+  );
   const hasLongDescription = payload.description.length >= 120;
   const hasMediumDescription = payload.description.length >= 70;
 
@@ -702,13 +783,19 @@ const hasJobSignals = (payload, hostKind) => {
   }
 
   const hasLinkedInDetails = Boolean(
-    document.querySelector(".jobs-search__job-details--container, .jobs-description-content__text, .jobs-unified-top-card__job-title")
+    document.querySelector(
+      ".jobs-search__job-details--container, .jobs-description-content__text, .jobs-unified-top-card__job-title",
+    ),
   );
   const hasIndeedDetails = Boolean(
-    document.querySelector("#jobDescriptionText, [data-testid='jobsearch-JobComponent-description'], [data-testid='jobsearch-JobInfoHeader-title']")
+    document.querySelector(
+      "#jobDescriptionText, [data-testid='jobsearch-JobComponent-description'], [data-testid='jobsearch-JobInfoHeader-title']",
+    ),
   );
   const hasNaukriDetails = Boolean(
-    document.querySelector("#jobDescriptionContainer, .styles_JDC__dang-inner-html__h0K4t, .styles_jd-header-title__rZwM1")
+    document.querySelector(
+      "#jobDescriptionContainer, .styles_JDC__dang-inner-html__h0K4t, .styles_jd-header-title__rZwM1",
+    ),
   );
 
   if (!hasLongDescription && !(hasMediumDescription && hasPrimaryMeta)) {
@@ -730,14 +817,16 @@ const hasJobSignals = (payload, hostKind) => {
   }
 
   if (hostKind === "indeed") {
-    const isIndeedJobUrl = sourceUrl.includes("/viewjob") || sourceUrl.includes("/jobs");
+    const isIndeedJobUrl =
+      sourceUrl.includes("/viewjob") || sourceUrl.includes("/jobs");
     if (!isIndeedJobUrl && !hasIndeedDetails) {
       return false;
     }
   }
 
   if (hostKind === "naukri") {
-    const isLikelyNaukriJobUrl = sourceUrl.includes("/job-listings") || sourceUrl.includes("/job-listing");
+    const isLikelyNaukriJobUrl =
+      sourceUrl.includes("/job-listings") || sourceUrl.includes("/job-listing");
     if (!isLikelyNaukriJobUrl && !hasNaukriDetails) {
       return false;
     }
@@ -774,7 +863,9 @@ const collectJobPayload = () => {
   }
 
   const description = truncateText(parsed.description || "", 20000);
-  const descriptionMultiline = normalizeMultilineText(parsed.descriptionMultiline || parsed.description || "");
+  const descriptionMultiline = normalizeMultilineText(
+    parsed.descriptionMultiline || parsed.description || "",
+  );
   const title = cleanText(parsed.title || "");
   const company = cleanText(parsed.company || "");
   const location = cleanText(parsed.location || "");
@@ -786,34 +877,46 @@ const collectJobPayload = () => {
   const analysisText = `${title}\n${company}\n${location}\n${descriptionMultiline || description}`;
   const locationOptions = Array.from(
     new Set([
-      ...((Array.isArray(parsed.locationOptions) ? parsed.locationOptions : []).map((entry) => cleanText(entry))),
-      ...inferLocationOptions(location, analysisText)
-    ])
+      ...(Array.isArray(parsed.locationOptions)
+        ? parsed.locationOptions
+        : []
+      ).map((entry) => cleanText(entry)),
+      ...inferLocationOptions(location, analysisText),
+    ]),
   ).filter(Boolean);
 
-  const postedAtText = cleanText(parsed.postedAtText || inferPostedAtText(analysisText));
-  const workplaceTypeText = cleanText(parsed.workplaceTypeText || inferWorkplaceTypeText(analysisText));
-  const jobTypeText = cleanText(parsed.jobTypeText || inferJobTypeText(analysisText));
+  const postedAtText = cleanText(
+    parsed.postedAtText || inferPostedAtText(analysisText),
+  );
+  const workplaceTypeText = cleanText(
+    parsed.workplaceTypeText || inferWorkplaceTypeText(analysisText),
+  );
+  const jobTypeText = cleanText(
+    parsed.jobTypeText || inferJobTypeText(analysisText),
+  );
   const responsibilitiesText = cleanText(
-    parsed.responsibilitiesText
-      || extractSectionText(descriptionMultiline, ["responsibilities", "what\\s+you\\s+will\\s+be\\s+doing"], [
-        "qualifications",
-        "requirements",
-        "education",
-        "benefits"
-      ])
+    parsed.responsibilitiesText ||
+    extractSectionText(
+      descriptionMultiline,
+      ["responsibilities", "what\\s+you\\s+will\\s+be\\s+doing"],
+      ["qualifications", "requirements", "education", "benefits"],
+    ),
   );
   const eligibilityText = cleanText(
-    parsed.eligibilityText || extractSectionText(descriptionMultiline, ["qualifications", "requirements", "education"], ["benefits", "about"])
+    parsed.eligibilityText ||
+    extractSectionText(
+      descriptionMultiline,
+      ["qualifications", "requirements", "education"],
+      ["benefits", "about"],
+    ),
   );
   const aboutText = cleanText(
-    parsed.aboutText
-      || extractSectionText(descriptionMultiline, ["about\\s+the\\s+job", "about\\s+the\\s+role", "^role"], [
-        "responsibilities",
-        "requirements",
-        "qualifications",
-        "education"
-      ])
+    parsed.aboutText ||
+    extractSectionText(
+      descriptionMultiline,
+      ["about\\s+the\\s+job", "about\\s+the\\s+role", "^role"],
+      ["responsibilities", "requirements", "qualifications", "education"],
+    ),
   );
 
   const payload = {
@@ -837,7 +940,7 @@ const collectJobPayload = () => {
     experienceText: inferExperienceText(analysisText),
     salaryText: inferSalaryText(analysisText),
     skills: inferSkills(analysisText),
-    tags: []
+    tags: [],
   };
   payload.tags = inferTags(payload);
 
@@ -955,24 +1058,29 @@ const ensurePrompt = () => {
       return;
     }
 
-    chrome.runtime.sendMessage({ type: "CAREEROS_SAVE_JOB", payload }, (response) => {
-      if (chrome.runtime.lastError) {
-        showToast("CareerOS extension could not reach background worker.");
-        return;
-      }
+    chrome.runtime.sendMessage(
+      { type: "CAREEROS_SAVE_JOB", payload },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          showToast("CareerOS extension could not reach background worker.");
+          return;
+        }
 
-      if (response?.ok) {
-        showToast("Saved to CareerOS.");
-        return;
-      }
+        if (response?.ok) {
+          showToast("Saved to CareerOS.");
+          return;
+        }
 
-      if (response?.code === "AUTH_REQUIRED") {
-        showToast("Paste your extension token package in the popup to save jobs.");
-        return;
-      }
+        if (response?.code === "AUTH_REQUIRED") {
+          showToast(
+            "Paste your extension token package in the popup to save jobs.",
+          );
+          return;
+        }
 
-      showToast(response?.error || "Failed to save job.");
-    });
+        showToast(response?.error || "Failed to save job.");
+      },
+    );
   };
 
   saveButton?.addEventListener("click", saveFromPrompt);
@@ -1011,14 +1119,17 @@ const showToast = (text) => {
 
 const reportDetection = (payload) =>
   new Promise((resolve) => {
-    chrome.runtime.sendMessage({ type: "CAREEROS_JOB_DETECTED", payload }, (response) => {
-      if (chrome.runtime.lastError) {
-        resolve({ authenticated: false, ok: false });
-        return;
-      }
+    chrome.runtime.sendMessage(
+      { type: "CAREEROS_JOB_DETECTED", payload },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          resolve({ authenticated: false, ok: false });
+          return;
+        }
 
-      resolve(response || { authenticated: false, ok: false });
-    });
+        resolve(response || { authenticated: false, ok: false });
+      },
+    );
   });
 
 const notifyDetection = () => {
@@ -1035,7 +1146,7 @@ const notifyDetection = () => {
     payload.company,
     payload.location,
     payload.sourceUrl,
-    payload.description?.slice(0, 300)
+    payload.description?.slice(0, 300),
   ]);
 
   lastPayloadSignature = signature;
@@ -1100,11 +1211,13 @@ if (detectHostKind() === "unsupported" || isLocalDevelopmentHost()) {
 
   observer.observe(document.documentElement || document.body, {
     childList: true,
-    subtree: true
+    subtree: true,
   });
 
   if (document.readyState === "loading") {
-    window.addEventListener("DOMContentLoaded", () => notifyDetection(), { once: true });
+    window.addEventListener("DOMContentLoaded", () => notifyDetection(), {
+      once: true,
+    });
   } else {
     notifyDetection();
   }

@@ -1,5 +1,11 @@
-import { ResumeStudioDesktopOnlyCard } from "@/components/ResumeStudioDesktopOnlyCard";
+import { notFound } from "next/navigation";
+import ResumeStudio from "@/components/resume/ResumeStudio";
+import { isDesktopAppEnabled } from "@/lib/desktop-mode";
 
 export default function ResumesPage() {
-  return <ResumeStudioDesktopOnlyCard eyebrow="Resume Studio" title="Available exclusively on CareerOS Desktop" />;
+  if (isDesktopAppEnabled()) {
+    return <ResumeStudio />;
+  }
+
+  notFound();
 }

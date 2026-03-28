@@ -1,5 +1,11 @@
-import { ResumeStudioDesktopOnlyCard } from "@/components/ResumeStudioDesktopOnlyCard";
+import { notFound } from "next/navigation";
+import ResumeStudio from "@/components/resume/ResumeStudio";
+import { isDesktopAppEnabled } from "@/lib/desktop-mode";
 
 export default function NewResumePage() {
-  return <ResumeStudioDesktopOnlyCard eyebrow="Resume Studio Editor" title="Create and edit resumes on Desktop only" />;
+  if (isDesktopAppEnabled()) {
+    return <ResumeStudio />;
+  }
+
+  notFound();
 }

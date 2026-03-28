@@ -4,19 +4,26 @@
 Client-admin initialization and typed collection access helpers for Firestore/Auth.
 
 ## What This Folder Owns
-Session-aware hooks for jobs, reminders, resumes, interview attempts, and core collection constants.
+Session-aware hooks for jobs, reminders, resumes, interview attempts, the `admin` account flag, and core collection
+constants.
 
 ## Integration Points
 Primary persistence boundary for most web routes.
 
 ## Files In This Folder
-- `admin.ts`
+- `admin.ts` - Firebase Admin SDK bootstrap (server-only; despite the name, unrelated to the `admin` user flag).
 - `client.ts`
+- `coding-submission-log.ts` - append-only log of successful coding-arena submissions (`codingSubmissionLogs`
+  collection). No solution content is stored, only who/what/when.
 - `collections.ts`
 - `interview-war-room.ts`
 - `jobs.ts`
 - `reminders.ts`
 - `resumes.ts`
+- `system-design-attempt-log.ts` - same idea as `coding-submission-log.ts` but for completed system-design attempts
+  (`systemDesignAttemptLogs` collection).
+- `user-profile.ts` - `useIsAdmin()` client hook reading `users/{uid}.admin`. UI gating only - API routes must
+  independently verify via `lib/server/require-admin.ts`.
 
 ## Child Folders
 - No direct child folders.

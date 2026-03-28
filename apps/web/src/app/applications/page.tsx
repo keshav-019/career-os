@@ -1,10 +1,12 @@
 "use client";
 
 import type { JobStatus } from "@careeros/shared";
-import { ChevronDown, ChevronUp, ExternalLink, Filter, GripVertical, LayoutGrid, MapPin, Rows3, Tag, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, ExternalLink, Filter, GripVertical, LayoutGrid, MapPin, Rows3, Sparkles, Tag, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useMemo, useState, type ChangeEvent, type DragEvent, type FormEvent } from "react";
 import { CompanyAvatar } from "@/components/CompanyAvatar";
 import { StatusBadge } from "@/components/StatusBadge";
+import { isDesktopAppEnabled } from "@/lib/desktop-mode";
 import { createReminder, removeReminder } from "@/lib/firebase/reminders";
 import { deleteJobRecord, updateJobRecord, useUserJobs, type CareerJob } from "@/lib/firebase/jobs";
 
@@ -43,6 +45,8 @@ const statusTransitions: Record<EditableStatus, EditableStatus[]> = {
   offer: ["interviewing", "offer"],
   rejected: ["rejected"]
 };
+
+const desktopAppEnabled = isDesktopAppEnabled();
 
 function statusLabel(status: EditableStatus): string {
   const selected = statusOptions.find((option) => option.value === status);
@@ -607,8 +611,14 @@ export default function ApplicationsPage() {
                           Source
                         </a>
                       ) : (
-                        <span />
-                      )}
+                          <span />
+                        )}
+                      {desktopAppEnabled ? (
+                        <Link className="ghost-button" href={`/ai-match?jobId=${encodeURIComponent(job.id)}`}>
+                          <Sparkles size={13} />
+                          AI Match
+                        </Link>
+                      ) : null}
                       <button
                         className="ghost-button danger-button"
                         disabled={isMutationBusy || updatingJobId === job.id}
@@ -743,6 +753,12 @@ export default function ApplicationsPage() {
                               <ExternalLink size={13} />
                               Open Source Page
                             </a>
+                          ) : null}
+                          {desktopAppEnabled ? (
+                            <Link className="ghost-button" href={`/ai-match?jobId=${encodeURIComponent(job.id)}`}>
+                              <Sparkles size={13} />
+                              AI Match
+                            </Link>
                           ) : null}
                           <button
                             className="ghost-button danger-button"

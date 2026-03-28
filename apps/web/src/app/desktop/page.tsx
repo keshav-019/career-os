@@ -1,85 +1,100 @@
-import { CheckCircle2, Download, Laptop } from "lucide-react";
-import Link from "next/link";
+"use client";
 
-const DESKTOP_HELPER_ENDPOINT = "http://127.0.0.1:43823";
+import { CheckCircle2, Download, Laptop } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+
+type DesktopPlatform = "linux" | "unsupported" | "windows";
+
+const PLATFORM_LABEL: Record<DesktopPlatform, string> = {
+  windows: "Windows detected",
+  linux: "Linux detected",
+  unsupported: "Pick your platform on the releases page"
+};
+
+function detectDesktopPlatform(): DesktopPlatform {
+  const navigatorWithUaData = navigator as Navigator & {
+    userAgentData?: {
+      platform?: string;
+    };
+  };
+  const platform = [
+    navigatorWithUaData.userAgentData?.platform,
+    navigator.platform,
+    navigator.userAgent
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  if (platform.includes("win")) {
+    return "windows";
+  }
+
+  if (platform.includes("linux") || platform.includes("x11")) {
+    return "linux";
+  }
+
+  return "unsupported";
+}
 
 export default function DesktopSetupPage() {
+  const [platform, setPlatform] = useState<DesktopPlatform>("unsupported");
+  const downloadHref = useMemo(() => {
+    const requestedPlatform = platform === "unsupported" ? "auto" : platform;
+    return `/api/desktop/download?platform=${requestedPlatform}`;
+  }, [platform]);
+  const downloadLabel =
+    platform === "windows"
+      ? "Download Windows EXE"
+      : platform === "linux"
+        ? "Download Linux AppImage"
+        : "Open Desktop Releases";
+
+  useEffect(() => {
+    setPlatform(detectDesktopPlatform());
+  }, []);
+
   return (
     <div className="page-stack">
-      <section className="career-card highlight">
+      <section className="career-card highlight desktop-exclusive-card">
         <div className="card-header">
           <div>
             <p className="eyebrow">CareerOS Desktop</p>
-            <h2>Enable desktop-only features</h2>
+            <h2>Unlock LaTeX Resume Studio and the Coding Arena</h2>
             <p>
-              Resume Studio compile and advanced PDF generation are powered by the CareerOS Desktop app running on your machine.
+              A handful of features need a local compiler and secure on-device execution, so they live in the free
+              CareerOS Desktop companion app instead of the browser.
             </p>
           </div>
           <Laptop size={22} />
         </div>
-        <div className="row-between" style={{ marginTop: 12 }}>
-          <span className="pill success">Desktop helper endpoint: {DESKTOP_HELPER_ENDPOINT}</span>
-          <button
+
+        <div className="desktop-exclusive-benefits">
+          <div className="topic-list">
+            <div className="desktop-exclusive-row">
+              <CheckCircle2 size={15} />
+              <p>Resume Studio&apos;s LaTeX mode, with local compile and instant PDF preview.</p>
+            </div>
+            <div className="desktop-exclusive-row">
+              <CheckCircle2 size={15} />
+              <p>The Coding Arena&apos;s local compiler stack for C, C++, Java, JavaScript, Python, and Rust.</p>
+            </div>
+            <div className="desktop-exclusive-row">
+              <CheckCircle2 size={15} />
+              <p>Everything else - Applications, AI Match, Visual resumes, Interview War Room, and Learning Center - already works on web and mobile.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="desktop-exclusive-actions">
+          <a
             className="primary-button"
-            disabled
-            type="button"
-            title="Desktop installer packaging is ready in apps/desktop. Publish your installer URL here."
+            href={downloadHref}
+            title="Download the latest installer from CareerOS GitHub Releases."
           >
-            <Download size={14} /> Download Desktop App
-          </button>
-        </div>
-      </section>
-
-      <section className="career-card">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Setup</p>
-            <h2>How to get running</h2>
-          </div>
-        </div>
-        <ol className="topic-list" style={{ margin: 0 }}>
-          <li>
-            <strong>Install CareerOS Desktop.</strong>
-            <p>Build and distribute installer from `apps/desktop` (DMG/EXE).</p>
-          </li>
-          <li>
-            <strong>Install local TeX runtime.</strong>
-            <p>Use MacTeX / TeX Live / MiKTeX so desktop app can run `pdflatex`.</p>
-          </li>
-          <li>
-            <strong>Keep Desktop app open.</strong>
-            <p>Resume Studio checks `{DESKTOP_HELPER_ENDPOINT}/health` before compile.</p>
-          </li>
-          <li>
-            <strong>Compile from Resume Studio.</strong>
-            <p>In LaTeX mode, click `Check Desktop` and then `Compile (Desktop)`.</p>
-          </li>
-        </ol>
-      </section>
-
-      <section className="career-card">
-        <div className="card-header">
-          <div>
-            <p className="eyebrow">Developer Notes</p>
-            <h2>Monorepo commands</h2>
-          </div>
-          <CheckCircle2 size={18} />
-        </div>
-        <div className="topic-list">
-          <p>
-            <code>npm run dev --workspace @careeros/desktop</code> starts Electron + local compile API.
-          </p>
-          <p>
-            <code>npm run dist --workspace @careeros/desktop</code> builds installer artifacts under `apps/desktop/dist`.
-          </p>
-          <p>
-            Optional web env override: <code>NEXT_PUBLIC_DESKTOP_HELPER_URL</code>.
-          </p>
-        </div>
-        <div style={{ marginTop: 12 }}>
-          <Link className="ghost-button" href="/resumes">
-            Back to Resume Studio
-          </Link>
+            <Download size={14} /> {downloadLabel}
+          </a>
+          <span className="pill">{PLATFORM_LABEL[platform]}</span>
         </div>
       </section>
     </div>

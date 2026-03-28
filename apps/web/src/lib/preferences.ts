@@ -5,6 +5,7 @@ export const CALENDAR_SYNC_CHANGE_EVENT = "careeros-calendar-sync-change";
 export const PROFILE_STORAGE_KEY = "careeros-profile-v1";
 export const PROFILE_CHANGE_EVENT = "careeros-profile-change";
 export const PROFILE_SAVE_REQUEST_EVENT = "careeros-profile-save-request";
+export const LEARNING_PLAN_REQUEST_EVENT = "careeros-learning-plan-request";
 export const SETTINGS_STORAGE_KEY = "careeros-settings-v1";
 export const CALENDAR_EVENTS_STORAGE_KEY = "careeros-calendar-events-v1";
 

@@ -1,0 +1,2922 @@
+[
+  {
+    "id": "trapping-rain-water",
+    "title": "Trapping Rain Water",
+    "difficulty": "hard",
+    "companies": [
+      "Google",
+      "Amazon"
+    ],
+    "tags": [
+      "Array",
+      "Two Pointers",
+      "Dynamic Programming",
+      "Stack"
+    ],
+    "statement": "You are given an array of non-negative integers representing an elevation map where the width of each bar is 1. Compute how much water it can trap after raining.",
+    "inputFormat": "Line 1: integer n (length of height). Line 2: n space-separated integers height[i].",
+    "outputFormat": "A single integer: the total units of trapped water.",
+    "constraints": [
+      "0 <= n <= 20000",
+      "0 <= height[i] <= 100000"
+    ],
+    "examples": [
+      {
+        "input": "12\n0 1 0 2 1 0 1 3 2 1 2 1",
+        "output": "6",
+        "explanation": "The elevation map traps 6 units of water between the bars."
+      },
+      {
+        "input": "6\n4 2 0 3 2 5",
+        "output": "9",
+        "explanation": "This classic elevation map traps 9 units of water."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "height",
+        "type": "intArray"
+      }
+    ],
+    "outputKind": "int",
+    "referenceBody": "\n  const n = height.length;\n  if (n === 0) return 0;\n  const left = new Array(n), right = new Array(n);\n  left[0] = height[0];\n  for (let i = 1; i < n; i++) left[i] = Math.max(left[i - 1], height[i]);\n  right[n - 1] = height[n - 1];\n  for (let i = n - 2; i >= 0; i--) right[i] = Math.max(right[i + 1], height[i]);\n  let total = 0;\n  for (let i = 0; i < n; i++) total += Math.min(left[i], right[i]) - height[i];\n  return total;",
+    "testCases": [
+      {
+        "values": {
+          "height": [
+            0,
+            1,
+            0,
+            2,
+            1,
+            0,
+            1,
+            3,
+            2,
+            1,
+            2,
+            1
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "height": [
+            4,
+            2,
+            0,
+            3,
+            2,
+            5
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "height": []
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "height": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "height": [
+            5,
+            4,
+            3,
+            2,
+            1
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "height": [
+            3,
+            0,
+            3
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "height": [
+            0,
+            7,
+            1,
+            4,
+            2,
+            0,
+            1,
+            3,
+            0,
+            2,
+            5,
+            0,
+            1,
+            6,
+            0
+          ]
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "trapping-rain-water-ii",
+    "title": "Trapping Rain Water II",
+    "difficulty": "hard",
+    "companies": [
+      "Google",
+      "Amazon"
+    ],
+    "tags": [
+      "Heap",
+      "Matrix",
+      "Breadth-First Search"
+    ],
+    "statement": "Given an m x n integer matrix heightMap representing the height of each unit cell in a 2D elevation map, return the volume of water it can trap after raining.",
+    "inputFormat": "Line 1: rows cols. Next rows lines: cols space-separated integers (one row of the height map each).",
+    "outputFormat": "A single integer: total trapped water volume.",
+    "constraints": [
+      "1 <= rows, cols <= 60",
+      "0 <= heightMap[i][j] <= 20000"
+    ],
+    "examples": [
+      {
+        "input": "3 6\n1 4 3 1 3 2\n3 2 1 3 2 4\n2 3 3 2 3 1",
+        "output": "4",
+        "explanation": "The interior basin traps a total of 4 units of water."
+      },
+      {
+        "input": "5 5\n12 13 1 12 9\n13 4 13 12 13\n13 8 10 12 13\n12 13 12 12 13\n13 13 13 13 13",
+        "output": "14",
+        "explanation": "Classic larger example; total trapped volume is 14."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "heightMap",
+        "type": "grid"
+      }
+    ],
+    "outputKind": "int",
+    "referenceBody": "\n  const rows = heightMap.length;\n  if (!rows) return 0;\n  const cols = heightMap[0].length;\n  if (rows < 3 || cols < 3) return 0;\n  const visited = Array.from({ length: rows }, () => new Array(cols).fill(false));\n  const heap = [];\n  function push(item) {\n    heap.push(item);\n    let i = heap.length - 1;\n    while (i > 0) {\n      const p = (i - 1) >> 1;\n      if (heap[p][0] <= heap[i][0]) break;\n      [heap[p], heap[i]] = [heap[i], heap[p]];\n      i = p;\n    }\n  }\n  function pop() {\n    const top = heap[0];\n    const last = heap.pop();\n    if (heap.length) {\n      heap[0] = last;\n      let i = 0;\n      while (true) {\n        const l = 2 * i + 1, r = 2 * i + 2;\n        let s = i;\n        if (l < heap.length && heap[l][0] < heap[s][0]) s = l;\n        if (r < heap.length && heap[r][0] < heap[s][0]) s = r;\n        if (s === i) break;\n        [heap[s], heap[i]] = [heap[i], heap[s]];\n        i = s;\n      }\n    }\n    return top;\n  }\n  for (let r = 0; r < rows; r++) {\n    for (let c = 0; c < cols; c++) {\n      if (r === 0 || c === 0 || r === rows - 1 || c === cols - 1) {\n        push([heightMap[r][c], r, c]);\n        visited[r][c] = true;\n      }\n    }\n  }\n  let water = 0;\n  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];\n  while (heap.length) {\n    const [h, r, c] = pop();\n    for (const [dr, dc] of dirs) {\n      const nr = r + dr, nc = c + dc;\n      if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && !visited[nr][nc]) {\n        visited[nr][nc] = true;\n        water += Math.max(0, h - heightMap[nr][nc]);\n        push([Math.max(h, heightMap[nr][nc]), nr, nc]);\n      }\n    }\n  }\n  return water;",
+    "testCases": [
+      {
+        "values": {
+          "heightMap": [
+            [
+              1,
+              4,
+              3,
+              1,
+              3,
+              2
+            ],
+            [
+              3,
+              2,
+              1,
+              3,
+              2,
+              4
+            ],
+            [
+              2,
+              3,
+              3,
+              2,
+              3,
+              1
+            ]
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "heightMap": [
+            [
+              12,
+              13,
+              1,
+              12,
+              9
+            ],
+            [
+              13,
+              4,
+              13,
+              12,
+              13
+            ],
+            [
+              13,
+              8,
+              10,
+              12,
+              13
+            ],
+            [
+              12,
+              13,
+              12,
+              12,
+              13
+            ],
+            [
+              13,
+              13,
+              13,
+              13,
+              13
+            ]
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "heightMap": [
+            [
+              3,
+              3,
+              3
+            ],
+            [
+              3,
+              1,
+              3
+            ],
+            [
+              3,
+              3,
+              3
+            ]
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "heightMap": [
+            [
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              1
+            ],
+            [
+              1,
+              1,
+              1
+            ]
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "heightMap": [
+            [
+              5,
+              5,
+              5,
+              5
+            ],
+            [
+              5,
+              1,
+              1,
+              5
+            ],
+            [
+              5,
+              1,
+              1,
+              5
+            ],
+            [
+              5,
+              5,
+              5,
+              5
+            ]
+          ]
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "median-of-two-sorted-arrays",
+    "title": "Median of Two Sorted Arrays",
+    "difficulty": "hard",
+    "companies": [
+      "Google",
+      "Amazon"
+    ],
+    "tags": [
+      "Array",
+      "Binary Search",
+      "Divide and Conquer"
+    ],
+    "statement": "Given two sorted arrays nums1 and nums2, return the median of the two sorted arrays combined.",
+    "inputFormat": "Line 1: n1 (size of nums1). Line 2: n1 integers. Line 3: n2 (size of nums2). Line 4: n2 integers.",
+    "outputFormat": "A single floating-point number: the median, printed with 6 decimal places.",
+    "constraints": [
+      "0 <= n1, n2 <= 2000",
+      "-1e6 <= nums[i] <= 1e6",
+      "nums1 and nums2 are sorted ascending"
+    ],
+    "examples": [
+      {
+        "input": "2\n1 3\n1\n2",
+        "output": "2.000000",
+        "explanation": "Merged array is [1,2,3]; median is 2."
+      },
+      {
+        "input": "2\n1 2\n2\n3 4",
+        "output": "2.500000",
+        "explanation": "Merged array is [1,2,3,4]; median is the average of 2 and 3."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "nums1",
+        "type": "intArray"
+      },
+      {
+        "name": "nums2",
+        "type": "intArray"
+      }
+    ],
+    "outputKind": "double",
+    "referenceBody": "\n  const merged = [...nums1, ...nums2].sort((a, b) => a - b);\n  const n = merged.length;\n  if (n === 0) return 0.0;\n  if (n % 2 === 1) return merged[(n - 1) / 2];\n  return (merged[n / 2 - 1] + merged[n / 2]) / 2.0;",
+    "testCases": [
+      {
+        "values": {
+          "nums1": [
+            1,
+            3
+          ],
+          "nums2": [
+            2
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "nums1": [
+            1,
+            2
+          ],
+          "nums2": [
+            3,
+            4
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "nums1": [],
+          "nums2": [
+            1
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "nums1": [],
+          "nums2": []
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "nums1": [
+            5,
+            6,
+            7,
+            8,
+            9
+          ],
+          "nums2": [
+            1,
+            2,
+            3,
+            4
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "nums1": [
+            -5,
+            -3,
+            -1
+          ],
+          "nums2": [
+            -4,
+            -2,
+            0,
+            2
+          ]
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "first-missing-positive",
+    "title": "First Missing Positive",
+    "difficulty": "hard",
+    "companies": [
+      "Amazon",
+      "Google"
+    ],
+    "tags": [
+      "Array",
+      "Hash Table",
+      "In-place Cyclic Sort"
+    ],
+    "statement": "Given an unsorted integer array nums, return the smallest missing positive integer. Your algorithm should run in O(n) time and use O(1) extra space (beyond the input).",
+    "inputFormat": "Line 1: integer n. Line 2: n space-separated integers.",
+    "outputFormat": "A single integer: the smallest missing positive integer.",
+    "constraints": [
+      "0 <= n <= 100000",
+      "-1000000 <= nums[i] <= 1000000"
+    ],
+    "examples": [
+      {
+        "input": "3\n1 2 0",
+        "output": "3",
+        "explanation": "1 and 2 are present, so the answer is 3."
+      },
+      {
+        "input": "4\n3 4 -1 1",
+        "output": "2",
+        "explanation": "1 is present but 2 is missing."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "nums",
+        "type": "intArray"
+      }
+    ],
+    "outputKind": "int",
+    "referenceBody": "\n  const n = nums.length;\n  const a = nums.slice();\n  for (let i = 0; i < n; i++) {\n    while (a[i] > 0 && a[i] <= n && a[a[i] - 1] !== a[i]) {\n      const target = a[i] - 1;\n      const tmp = a[target];\n      a[target] = a[i];\n      a[i] = tmp;\n    }\n  }\n  for (let i = 0; i < n; i++) if (a[i] !== i + 1) return i + 1;\n  return n + 1;",
+    "testCases": [
+      {
+        "values": {
+          "nums": [
+            1,
+            2,
+            0
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "nums": [
+            3,
+            4,
+            -1,
+            1
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "nums": [
+            7,
+            8,
+            9,
+            11,
+            12
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "nums": []
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "nums": [
+            1
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "nums": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "nums": [
+            -1,
+            -2,
+            -3
+          ]
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "largest-rectangle-histogram",
+    "title": "Largest Rectangle in Histogram",
+    "difficulty": "hard",
+    "companies": [
+      "Google",
+      "Amazon"
+    ],
+    "tags": [
+      "Array",
+      "Stack",
+      "Monotonic Stack"
+    ],
+    "statement": "Given an array of integers heights representing the histogram's bar heights where each bar has width 1, return the area of the largest rectangle that can be formed within the histogram.",
+    "inputFormat": "Line 1: integer n. Line 2: n space-separated integers heights[i].",
+    "outputFormat": "A single integer: the maximum rectangle area.",
+    "constraints": [
+      "1 <= n <= 100000",
+      "0 <= heights[i] <= 1000000000"
+    ],
+    "examples": [
+      {
+        "input": "6\n2 1 5 6 2 3",
+        "output": "10",
+        "explanation": "The largest rectangle has area 10 (bars of height 5 and 6)."
+      },
+      {
+        "input": "2\n2 4",
+        "output": "4",
+        "explanation": "The tallest single bar (height 4) forms the largest rectangle."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "heights",
+        "type": "intArray"
+      }
+    ],
+    "outputKind": "long",
+    "referenceBody": "\n  const h = heights.concat([0]);\n  const stack = [];\n  let max = 0;\n  for (let i = 0; i < h.length; i++) {\n    while (stack.length && h[stack[stack.length - 1]] >= h[i]) {\n      const top = stack.pop();\n      const height = h[top];\n      const width = stack.length ? i - stack[stack.length - 1] - 1 : i;\n      max = Math.max(max, height * width);\n    }\n    stack.push(i);\n  }\n  return max;",
+    "testCases": [
+      {
+        "values": {
+          "heights": [
+            2,
+            1,
+            5,
+            6,
+            2,
+            3
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "heights": [
+            2,
+            4
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "heights": [
+            0
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "heights": [
+            1,
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "heights": [
+            6,
+            5,
+            4,
+            3,
+            2,
+            1
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "heights": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6
+          ]
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "sliding-window-maximum",
+    "title": "Sliding Window Maximum",
+    "difficulty": "hard",
+    "companies": [
+      "Google",
+      "Amazon"
+    ],
+    "tags": [
+      "Array",
+      "Deque",
+      "Monotonic Queue",
+      "Sliding Window"
+    ],
+    "statement": "You are given an array nums and a window size k. A sliding window of size k moves from the left of the array to the right, one position at a time. Return the maximum value in each window position.",
+    "inputFormat": "Line 1: integer n. Line 2: n space-separated integers. Line 3: integer k.",
+    "outputFormat": "Space-separated integers: the maximum of each window, in order.",
+    "constraints": [
+      "1 <= k <= n <= 100000",
+      "-1e9 <= nums[i] <= 1e9"
+    ],
+    "examples": [
+      {
+        "input": "8\n1 3 -1 -3 5 3 6 7\n3",
+        "output": "3 3 5 5 6 7",
+        "explanation": "Sliding a window of size 3 across the array yields these maximums."
+      },
+      {
+        "input": "1\n1\n1",
+        "output": "1",
+        "explanation": "A single-element window is just the element itself."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "nums",
+        "type": "intArray"
+      },
+      {
+        "name": "k",
+        "type": "int"
+      }
+    ],
+    "outputKind": "intArray",
+    "referenceBody": "\n  const deque = [];\n  const res = [];\n  for (let i = 0; i < nums.length; i++) {\n    while (deque.length && deque[0] <= i - k) deque.shift();\n    while (deque.length && nums[deque[deque.length - 1]] <= nums[i]) deque.pop();\n    deque.push(i);\n    if (i >= k - 1) res.push(nums[deque[0]]);\n  }\n  return res;",
+    "testCases": [
+      {
+        "values": {
+          "nums": [
+            1,
+            3,
+            -1,
+            -3,
+            5,
+            3,
+            6,
+            7
+          ],
+          "k": 3
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "nums": [
+            1
+          ],
+          "k": 1
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "nums": [
+            9,
+            8,
+            7,
+            6,
+            5
+          ],
+          "k": 2
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "nums": [
+            4,
+            4,
+            4,
+            4
+          ],
+          "k": 2
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "nums": [
+            1,
+            -1,
+            2,
+            -2,
+            3,
+            -3,
+            4,
+            -4
+          ],
+          "k": 4
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "longest-valid-parentheses",
+    "title": "Longest Valid Parentheses",
+    "difficulty": "hard",
+    "companies": [
+      "Amazon",
+      "Google"
+    ],
+    "tags": [
+      "String",
+      "Stack",
+      "Dynamic Programming"
+    ],
+    "statement": "Given a string s containing only the characters '(' and ')', return the length of the longest valid (well-formed) parentheses substring.",
+    "inputFormat": "Line 1: string s.",
+    "outputFormat": "A single integer: the length of the longest valid parentheses substring.",
+    "constraints": [
+      "0 <= s.length <= 30000"
+    ],
+    "examples": [
+      {
+        "input": "(()",
+        "output": "2",
+        "explanation": "The longest valid substring is \"()\"."
+      },
+      {
+        "input": ")()())",
+        "output": "4",
+        "explanation": "The longest valid substring is \"()()\"."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "s",
+        "type": "string"
+      }
+    ],
+    "outputKind": "int",
+    "referenceBody": "\n  let max = 0;\n  const stack = [-1];\n  for (let i = 0; i < s.length; i++) {\n    if (s[i] === '(') {\n      stack.push(i);\n    } else {\n      stack.pop();\n      if (stack.length === 0) stack.push(i);\n      else max = Math.max(max, i - stack[stack.length - 1]);\n    }\n  }\n  return max;",
+    "testCases": [
+      {
+        "values": {
+          "s": "(()"
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "s": ")()())"
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "s": ""
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "s": "()(())"
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "s": "(((((("
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "s": "()(()"
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "word-search-ii",
+    "title": "Word Search II",
+    "difficulty": "hard",
+    "companies": [
+      "Google",
+      "Amazon"
+    ],
+    "tags": [
+      "Backtracking",
+      "Trie",
+      "Matrix"
+    ],
+    "statement": "Given an m x n grid of characters board and a list of strings words, return all words from the list that can be constructed from letters of sequentially adjacent cells (horizontally or vertically neighboring), where the same cell may not be used more than once in a single word.",
+    "inputFormat": "Line 1: rows cols. Next rows lines: one row of the board each (a string of length cols, no spaces). Next line: number of words w. Next w lines: one word each.",
+    "outputFormat": "First line: the number of words found. Then each found word on its own line, sorted alphabetically.",
+    "constraints": [
+      "1 <= rows, cols <= 12",
+      "1 <= number of words <= 300",
+      "1 <= word length <= 10"
+    ],
+    "examples": [
+      {
+        "input": "4 4\noaan\netae\nihkr\niflv\n4\noath\npea\neat\nrain",
+        "output": "2\neat\noath",
+        "explanation": "\"oath\" and \"eat\" can both be traced through adjacent cells; \"pea\" and \"rain\" cannot."
+      },
+      {
+        "input": "2 2\nab\ncd\n1\nabcd",
+        "output": "0",
+        "explanation": "No path of adjacent cells spells \"abcd\", so nothing is found."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "board",
+        "type": "charGrid"
+      },
+      {
+        "name": "words",
+        "type": "stringArray"
+      }
+    ],
+    "outputKind": "stringArray",
+    "referenceBody": "\n  const rows = board.length, cols = rows ? board[0].length : 0;\n  function existsFrom(word) {\n    const visited = Array.from({ length: rows }, () => new Array(cols).fill(false));\n    function dfs(r, c, idx) {\n      if (idx === word.length) return true;\n      if (r < 0 || c < 0 || r >= rows || c >= cols || visited[r][c] || board[r][c] !== word[idx]) return false;\n      visited[r][c] = true;\n      const found = dfs(r + 1, c, idx + 1) || dfs(r - 1, c, idx + 1) || dfs(r, c + 1, idx + 1) || dfs(r, c - 1, idx + 1);\n      visited[r][c] = false;\n      return found;\n    }\n    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if (dfs(r, c, 0)) return true;\n    return false;\n  }\n  const found = [];\n  const seen = new Set();\n  for (const w of words) {\n    if (!seen.has(w) && existsFrom(w)) {\n      found.push(w);\n      seen.add(w);\n    }\n  }\n  return found;",
+    "testCases": [
+      {
+        "values": {
+          "board": [
+            "oaan",
+            "etae",
+            "ihkr",
+            "iflv"
+          ],
+          "words": [
+            "oath",
+            "pea",
+            "eat",
+            "rain"
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "board": [
+            "ab",
+            "cd"
+          ],
+          "words": [
+            "abcd"
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "board": [
+            "a"
+          ],
+          "words": [
+            "a",
+            "b"
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "board": [
+            "abce",
+            "sfcs",
+            "adee"
+          ],
+          "words": [
+            "abcced",
+            "see",
+            "abcb"
+          ]
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "word-ladder",
+    "title": "Word Ladder",
+    "difficulty": "hard",
+    "companies": [
+      "Google",
+      "Amazon"
+    ],
+    "tags": [
+      "Breadth-First Search",
+      "Graph",
+      "String"
+    ],
+    "statement": "Given beginWord, endWord, and a wordList, return the number of words in the shortest transformation sequence from beginWord to endWord, changing exactly one letter at a time, such that every intermediate word exists in wordList. Return 0 if no such sequence exists.",
+    "inputFormat": "Line 1: beginWord. Line 2: endWord. Line 3: integer n (size of wordList). Next n lines: one word each.",
+    "outputFormat": "A single integer: the length of the shortest transformation sequence (counting both endpoints), or 0.",
+    "constraints": [
+      "1 <= word length <= 10",
+      "1 <= wordList size <= 5000",
+      "all words consist of lowercase letters"
+    ],
+    "examples": [
+      {
+        "input": "hit\ncog\n6\nhot\ndot\ndog\nlot\nlog\ncog",
+        "output": "5",
+        "explanation": "hit -> hot -> dot -> dog -> cog is a shortest sequence of length 5."
+      },
+      {
+        "input": "hit\ncog\n5\nhot\ndot\ndog\nlot\nlog",
+        "output": "0",
+        "explanation": "cog is not in the word list, so no transformation sequence exists."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "beginWord",
+        "type": "string"
+      },
+      {
+        "name": "endWord",
+        "type": "string"
+      },
+      {
+        "name": "wordList",
+        "type": "stringArray"
+      }
+    ],
+    "outputKind": "int",
+    "referenceBody": "\n  const words = new Set(wordList);\n  if (!words.has(endWord)) return 0;\n  words.delete(beginWord);\n  let level = 1;\n  let frontier = new Set([beginWord]);\n  const alphabet = \"abcdefghijklmnopqrstuvwxyz\";\n  while (frontier.size) {\n    const next = new Set();\n    for (const w of frontier) {\n      for (let i = 0; i < w.length; i++) {\n        for (const c of alphabet) {\n          if (c === w[i]) continue;\n          const cand = w.slice(0, i) + c + w.slice(i + 1);\n          if (cand === endWord) return level + 1;\n          if (words.has(cand)) {\n            next.add(cand);\n            words.delete(cand);\n          }\n        }\n      }\n    }\n    frontier = next;\n    level++;\n    if (frontier.size === 0) break;\n  }\n  return 0;",
+    "testCases": [
+      {
+        "values": {
+          "beginWord": "hit",
+          "endWord": "cog",
+          "wordList": [
+            "hot",
+            "dot",
+            "dog",
+            "lot",
+            "log",
+            "cog"
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "beginWord": "hit",
+          "endWord": "cog",
+          "wordList": [
+            "hot",
+            "dot",
+            "dog",
+            "lot",
+            "log"
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "beginWord": "a",
+          "endWord": "c",
+          "wordList": [
+            "a",
+            "b",
+            "c"
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "beginWord": "hot",
+          "endWord": "dog",
+          "wordList": [
+            "hot",
+            "dog"
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "beginWord": "cat",
+          "endWord": "cat",
+          "wordList": [
+            "cat"
+          ]
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "alien-dictionary",
+    "title": "Alien Dictionary",
+    "difficulty": "hard",
+    "companies": [
+      "Amazon",
+      "Google"
+    ],
+    "tags": [
+      "Graph",
+      "Topological Sort",
+      "String"
+    ],
+    "statement": "There is a new alien language that uses the English alphabet, but the order among letters is unknown. You are given a list of words from the alien dictionary, sorted lexicographically by the rules of this new language. Derive a valid ordering of letters. If there are multiple valid orderings, return the lexicographically smallest one (comparing candidate orderings as strings). If no valid ordering exists, return an empty string.",
+    "inputFormat": "Line 1: integer n (number of words). Next n lines: one word each, already alien-sorted.",
+    "outputFormat": "A single string: the derived letter order, or an empty line if none exists.",
+    "constraints": [
+      "1 <= n <= 200",
+      "1 <= word length <= 10",
+      "words contain only lowercase letters"
+    ],
+    "examples": [
+      {
+        "input": "5\nwrt\nwrf\ner\nett\nrftt",
+        "output": "wertf",
+        "explanation": "The only (and lexicographically smallest) consistent ordering is w, e, r, t, f."
+      },
+      {
+        "input": "3\nabc\nab\nb",
+        "output": "",
+        "explanation": "\"abc\" appearing before its own prefix \"ab\" is impossible, so no ordering exists."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "words",
+        "type": "stringArray"
+      }
+    ],
+    "outputKind": "string",
+    "referenceBody": "\n  const nodes = new Set();\n  for (const w of words) for (const c of w) nodes.add(c);\n  const adj = new Map();\n  const indegree = new Map();\n  for (const c of nodes) {\n    adj.set(c, new Set());\n    indegree.set(c, 0);\n  }\n  let valid = true;\n  for (let i = 0; i < words.length - 1; i++) {\n    const w1 = words[i], w2 = words[i + 1];\n    const minLen = Math.min(w1.length, w2.length);\n    let foundDiff = false;\n    for (let j = 0; j < minLen; j++) {\n      if (w1[j] !== w2[j]) {\n        if (!adj.get(w1[j]).has(w2[j])) {\n          adj.get(w1[j]).add(w2[j]);\n          indegree.set(w2[j], indegree.get(w2[j]) + 1);\n        }\n        foundDiff = true;\n        break;\n      }\n    }\n    if (!foundDiff && w1.length > w2.length) valid = false;\n  }\n  if (!valid) return \"\";\n  const result = [];\n  const remaining = new Set(nodes);\n  while (remaining.size) {\n    const candidates = [...remaining].filter((c) => indegree.get(c) === 0).sort();\n    if (candidates.length === 0) return \"\";\n    const pick = candidates[0];\n    result.push(pick);\n    remaining.delete(pick);\n    for (const nxt of adj.get(pick)) {\n      indegree.set(nxt, indegree.get(nxt) - 1);\n    }\n  }\n  return result.join(\"\");",
+    "testCases": [
+      {
+        "values": {
+          "words": [
+            "wrt",
+            "wrf",
+            "er",
+            "ett",
+            "rftt"
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "words": [
+            "abc",
+            "ab",
+            "b"
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "words": [
+            "z",
+            "x"
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "words": [
+            "z",
+            "x",
+            "z"
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "words": [
+            "abc",
+            "abd",
+            "abe"
+          ]
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "minimum-window-substring",
+    "title": "Minimum Window Substring",
+    "difficulty": "hard",
+    "companies": [
+      "Google",
+      "Amazon"
+    ],
+    "tags": [
+      "String",
+      "Sliding Window",
+      "Hash Table"
+    ],
+    "statement": "Given two strings s and t, return the minimum window substring of s such that every character in t (including duplicates) is included in the window. Return an empty string if no such substring exists.",
+    "inputFormat": "Line 1: string s. Line 2: string t.",
+    "outputFormat": "A single string: the minimum window, or an empty line if none exists.",
+    "constraints": [
+      "1 <= s.length, t.length <= 100000"
+    ],
+    "examples": [
+      {
+        "input": "ADOBECODEBANC\nABC",
+        "output": "BANC",
+        "explanation": "\"BANC\" is the smallest window in s containing all of A, B, and C."
+      },
+      {
+        "input": "a\naa",
+        "output": "",
+        "explanation": "s only has one 'a', so it can never contain t = \"aa\"."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "s",
+        "type": "string"
+      },
+      {
+        "name": "t",
+        "type": "string"
+      }
+    ],
+    "outputKind": "string",
+    "referenceBody": "\n  if (t.length === 0 || s.length === 0) return \"\";\n  const need = new Map();\n  for (const c of t) need.set(c, (need.get(c) || 0) + 1);\n  const required = need.size;\n  let formed = 0;\n  const windowCounts = new Map();\n  let l = 0;\n  let bestLen = Infinity, bestL = 0, bestR = 0;\n  for (let r = 0; r < s.length; r++) {\n    const c = s[r];\n    windowCounts.set(c, (windowCounts.get(c) || 0) + 1);\n    if (need.has(c) && windowCounts.get(c) === need.get(c)) formed++;\n    while (l <= r && formed === required) {\n      if (r - l + 1 < bestLen) {\n        bestLen = r - l + 1;\n        bestL = l;\n        bestR = r;\n      }\n      const lc = s[l];\n      windowCounts.set(lc, windowCounts.get(lc) - 1);\n      if (need.has(lc) && windowCounts.get(lc) < need.get(lc)) formed--;\n      l++;\n    }\n  }\n  return bestLen === Infinity ? \"\" : s.slice(bestL, bestR + 1);",
+    "testCases": [
+      {
+        "values": {
+          "s": "ADOBECODEBANC",
+          "t": "ABC"
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "s": "a",
+          "t": "aa"
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "s": "a",
+          "t": "a"
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "s": "ab",
+          "t": "b"
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "s": "aaaaaaaaaaaabbbbbcdd",
+          "t": "abcdd"
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "distinct-subsequences",
+    "title": "Distinct Subsequences",
+    "difficulty": "hard",
+    "companies": [
+      "Google",
+      "Amazon"
+    ],
+    "tags": [
+      "String",
+      "Dynamic Programming"
+    ],
+    "statement": "Given two strings s and t, return the number of distinct subsequences of s which equal t.",
+    "inputFormat": "Line 1: string s. Line 2: string t.",
+    "outputFormat": "A single integer: the number of distinct subsequences.",
+    "constraints": [
+      "0 <= s.length, t.length <= 1000"
+    ],
+    "examples": [
+      {
+        "input": "rabbbit\nrabbit",
+        "output": "3",
+        "explanation": "There are 3 ways to pick letters from s that spell out \"rabbit\"."
+      },
+      {
+        "input": "babgbag\nbag",
+        "output": "5",
+        "explanation": "There are 5 distinct subsequences of s equal to \"bag\"."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "s",
+        "type": "string"
+      },
+      {
+        "name": "t",
+        "type": "string"
+      }
+    ],
+    "outputKind": "long",
+    "referenceBody": "\n  const m = s.length, n = t.length;\n  if (n === 0) return 1;\n  if (m < n) return 0;\n  const dp = new Array(n + 1).fill(0);\n  dp[0] = 1;\n  for (let i = 1; i <= m; i++) {\n    for (let j = n; j >= 1; j--) {\n      if (s[i - 1] === t[j - 1]) dp[j] += dp[j - 1];\n    }\n  }\n  return dp[n];",
+    "testCases": [
+      {
+        "values": {
+          "s": "rabbbit",
+          "t": "rabbit"
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "s": "babgbag",
+          "t": "bag"
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "s": "",
+          "t": ""
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "s": "abc",
+          "t": ""
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "s": "aaaaaaaaaa",
+          "t": "aaa"
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "interleaving-string",
+    "title": "Interleaving String",
+    "difficulty": "hard",
+    "companies": [
+      "Amazon",
+      "Google"
+    ],
+    "tags": [
+      "String",
+      "Dynamic Programming"
+    ],
+    "statement": "Given strings s1, s2, and s3, determine if s3 is formed by an interleaving of s1 and s2 (preserving the relative order of characters within each of s1 and s2).",
+    "inputFormat": "Line 1: string s1. Line 2: string s2. Line 3: string s3.",
+    "outputFormat": "\"true\" if s3 is a valid interleaving, otherwise \"false\".",
+    "constraints": [
+      "0 <= s1.length, s2.length <= 100",
+      "0 <= s3.length <= 200"
+    ],
+    "examples": [
+      {
+        "input": "aabcc\ndbbca\naadbbcbcac",
+        "output": "true",
+        "explanation": "s3 can be formed by interleaving characters from s1 and s2 in order."
+      },
+      {
+        "input": "aabcc\ndbbca\naadbbbaccc",
+        "output": "false",
+        "explanation": "No valid interleaving produces this s3."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "s1",
+        "type": "string"
+      },
+      {
+        "name": "s2",
+        "type": "string"
+      },
+      {
+        "name": "s3",
+        "type": "string"
+      }
+    ],
+    "outputKind": "bool",
+    "referenceBody": "\n  const m = s1.length, n = s2.length;\n  if (m + n !== s3.length) return false;\n  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(false));\n  dp[0][0] = true;\n  for (let i = 0; i <= m; i++) {\n    for (let j = 0; j <= n; j++) {\n      if (i > 0 && dp[i - 1][j] && s1[i - 1] === s3[i + j - 1]) dp[i][j] = true;\n      if (j > 0 && dp[i][j - 1] && s2[j - 1] === s3[i + j - 1]) dp[i][j] = true;\n    }\n  }\n  return dp[m][n];",
+    "testCases": [
+      {
+        "values": {
+          "s1": "aabcc",
+          "s2": "dbbca",
+          "s3": "aadbbcbcac"
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "s1": "aabcc",
+          "s2": "dbbca",
+          "s3": "aadbbbaccc"
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "s1": "",
+          "s2": "",
+          "s3": ""
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "s1": "abc",
+          "s2": "",
+          "s3": "abc"
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "s1": "abc",
+          "s2": "def",
+          "s3": "abdcef"
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "regular-expression-matching",
+    "title": "Regular Expression Matching",
+    "difficulty": "hard",
+    "companies": [
+      "Google",
+      "Amazon"
+    ],
+    "tags": [
+      "String",
+      "Dynamic Programming",
+      "Recursion"
+    ],
+    "statement": "Given an input string s and a pattern p, implement regular expression matching supporting '.' (matches any single character) and '*' (matches zero or more of the preceding element). The match must cover the entire input string.",
+    "inputFormat": "Line 1: string s. Line 2: pattern p.",
+    "outputFormat": "\"true\" if the pattern matches the entire string, otherwise \"false\".",
+    "constraints": [
+      "0 <= s.length <= 20",
+      "0 <= p.length <= 30",
+      "p is a valid pattern for this problem"
+    ],
+    "examples": [
+      {
+        "input": "aa\na",
+        "output": "false",
+        "explanation": "\"a\" does not match the whole of \"aa\"."
+      },
+      {
+        "input": "aa\na*",
+        "output": "true",
+        "explanation": "'*' means zero or more of the preceding 'a', matching \"aa\"."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "s",
+        "type": "string"
+      },
+      {
+        "name": "p",
+        "type": "string"
+      }
+    ],
+    "outputKind": "bool",
+    "referenceBody": "\n  const m = s.length, n = p.length;\n  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(false));\n  dp[0][0] = true;\n  for (let j = 1; j <= n; j++) if (p[j - 1] === \"*\") dp[0][j] = dp[0][j - 2];\n  for (let i = 1; i <= m; i++) {\n    for (let j = 1; j <= n; j++) {\n      if (p[j - 1] === \"*\") {\n        dp[i][j] = dp[i][j - 2] || ((p[j - 2] === \".\" || p[j - 2] === s[i - 1]) && dp[i - 1][j]);\n      } else if (p[j - 1] === \".\" || p[j - 1] === s[i - 1]) {\n        dp[i][j] = dp[i - 1][j - 1];\n      }\n    }\n  }\n  return dp[m][n];",
+    "testCases": [
+      {
+        "values": {
+          "s": "aa",
+          "p": "a"
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "s": "aa",
+          "p": "a*"
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "s": "ab",
+          "p": ".*"
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "s": "mississippi",
+          "p": "mis*is*p*."
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "s": "",
+          "p": "a*b*c*"
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "s": "aab",
+          "p": "c*a*b"
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "wildcard-matching",
+    "title": "Wildcard Matching",
+    "difficulty": "hard",
+    "companies": [
+      "Google",
+      "Amazon"
+    ],
+    "tags": [
+      "String",
+      "Dynamic Programming",
+      "Greedy"
+    ],
+    "statement": "Given an input string s and a pattern p, implement wildcard pattern matching supporting '?' (matches any single character) and '*' (matches any sequence of characters, including the empty sequence). The match must cover the entire input string.",
+    "inputFormat": "Line 1: string s. Line 2: pattern p.",
+    "outputFormat": "\"true\" if the pattern matches the entire string, otherwise \"false\".",
+    "constraints": [
+      "0 <= s.length <= 2000",
+      "0 <= p.length <= 2000"
+    ],
+    "examples": [
+      {
+        "input": "aa\na",
+        "output": "false",
+        "explanation": "\"a\" does not match the whole of \"aa\"."
+      },
+      {
+        "input": "aa\n*",
+        "output": "true",
+        "explanation": "'*' matches any sequence, including \"aa\"."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "s",
+        "type": "string"
+      },
+      {
+        "name": "p",
+        "type": "string"
+      }
+    ],
+    "outputKind": "bool",
+    "referenceBody": "\n  const m = s.length, n = p.length;\n  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(false));\n  dp[0][0] = true;\n  for (let j = 1; j <= n; j++) if (p[j - 1] === \"*\") dp[0][j] = dp[0][j - 1];\n  for (let i = 1; i <= m; i++) {\n    for (let j = 1; j <= n; j++) {\n      if (p[j - 1] === \"*\") dp[i][j] = dp[i - 1][j] || dp[i][j - 1];\n      else if (p[j - 1] === \"?\" || p[j - 1] === s[i - 1]) dp[i][j] = dp[i - 1][j - 1];\n    }\n  }\n  return dp[m][n];",
+    "testCases": [
+      {
+        "values": {
+          "s": "aa",
+          "p": "a"
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "s": "aa",
+          "p": "*"
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "s": "cb",
+          "p": "?a"
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "s": "adceb",
+          "p": "*a*b*"
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "s": "acdcb",
+          "p": "a*c?b"
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "s": "",
+          "p": "*"
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "n-queens-ii",
+    "title": "N-Queens II",
+    "difficulty": "hard",
+    "companies": [
+      "Amazon",
+      "Google"
+    ],
+    "tags": [
+      "Backtracking",
+      "Bit Manipulation"
+    ],
+    "statement": "The n-queens puzzle is the problem of placing n queens on an n x n chessboard such that no two queens attack each other. Given an integer n, return the number of distinct solutions to the n-queens puzzle.",
+    "inputFormat": "Line 1: integer n.",
+    "outputFormat": "A single integer: the number of distinct solutions.",
+    "constraints": [
+      "1 <= n <= 9"
+    ],
+    "examples": [
+      {
+        "input": "4",
+        "output": "2",
+        "explanation": "There are exactly 2 distinct solutions for a 4x4 board."
+      },
+      {
+        "input": "1",
+        "output": "1",
+        "explanation": "A single queen trivially solves the 1x1 board."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "n",
+        "type": "int"
+      }
+    ],
+    "outputKind": "int",
+    "referenceBody": "\n  let count = 0;\n  const cols = new Set(), diag1 = new Set(), diag2 = new Set();\n  function backtrack(row) {\n    if (row === n) {\n      count++;\n      return;\n    }\n    for (let col = 0; col < n; col++) {\n      if (cols.has(col) || diag1.has(row - col) || diag2.has(row + col)) continue;\n      cols.add(col);\n      diag1.add(row - col);\n      diag2.add(row + col);\n      backtrack(row + 1);\n      cols.delete(col);\n      diag1.delete(row - col);\n      diag2.delete(row + col);\n    }\n  }\n  backtrack(0);\n  return count;",
+    "testCases": [
+      {
+        "values": {
+          "n": 4
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "n": 1
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "n": 2
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "n": 6
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "n": 8
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "basic-calculator",
+    "title": "Basic Calculator",
+    "difficulty": "hard",
+    "companies": [
+      "Amazon",
+      "Google"
+    ],
+    "tags": [
+      "String",
+      "Stack",
+      "Math"
+    ],
+    "statement": "Given a string s representing a valid mathematical expression, implement a basic calculator to evaluate it and return the result. The expression may contain '+', '-', parentheses '(' ')', digits, and spaces (no multiplication or division).",
+    "inputFormat": "Line 1: the expression string s (may contain spaces).",
+    "outputFormat": "A single integer: the evaluated result.",
+    "constraints": [
+      "1 <= s.length <= 30000",
+      "s is a valid expression"
+    ],
+    "examples": [
+      {
+        "input": "1 + 1",
+        "output": "2",
+        "explanation": "1 + 1 evaluates to 2."
+      },
+      {
+        "input": "(1+(4+5+2)-3)+(6+8)",
+        "output": "23",
+        "explanation": "Evaluating the nested parentheses gives 23."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "s",
+        "type": "string"
+      }
+    ],
+    "outputKind": "long",
+    "referenceBody": "\n  let result = 0, sign = 1, num = 0;\n  const stack = [];\n  for (let i = 0; i < s.length; i++) {\n    const c = s[i];\n    if (c >= \"0\" && c <= \"9\") {\n      num = num * 10 + (c.charCodeAt(0) - 48);\n    } else if (c === \"+\") {\n      result += sign * num;\n      num = 0;\n      sign = 1;\n    } else if (c === \"-\") {\n      result += sign * num;\n      num = 0;\n      sign = -1;\n    } else if (c === \"(\") {\n      stack.push(result);\n      stack.push(sign);\n      result = 0;\n      sign = 1;\n    } else if (c === \")\") {\n      result += sign * num;\n      num = 0;\n      const signBeforeParen = stack.pop();\n      const resultBeforeParen = stack.pop();\n      result = resultBeforeParen + signBeforeParen * result;\n      sign = 1;\n    }\n  }\n  result += sign * num;\n  return result;",
+    "testCases": [
+      {
+        "values": {
+          "s": "1 + 1"
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "s": "(1+(4+5+2)-3)+(6+8)"
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "s": " 2-1 + 2 "
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "s": "-(2+3)"
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "s": "((10))"
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "longest-increasing-path-matrix",
+    "title": "Longest Increasing Path in a Matrix",
+    "difficulty": "hard",
+    "companies": [
+      "Google",
+      "Amazon"
+    ],
+    "tags": [
+      "Matrix",
+      "Depth-First Search",
+      "Dynamic Programming",
+      "Memoization"
+    ],
+    "statement": "Given an m x n integer matrix, return the length of the longest strictly increasing path, where you may move in any of the four cardinal directions (no wrapping).",
+    "inputFormat": "Line 1: rows cols. Next rows lines: cols space-separated integers each.",
+    "outputFormat": "A single integer: the length of the longest increasing path.",
+    "constraints": [
+      "1 <= rows, cols <= 200",
+      "0 <= matrix[i][j] <= 2^31 - 1"
+    ],
+    "examples": [
+      {
+        "input": "3 3\n9 9 4\n6 6 8\n2 1 1",
+        "output": "4",
+        "explanation": "The path 1 -> 2 -> 6 -> 9 has length 4."
+      },
+      {
+        "input": "3 3\n3 4 5\n3 2 6\n2 2 1",
+        "output": "4",
+        "explanation": "The path 3 -> 4 -> 5 -> 6 has length 4."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "matrix",
+        "type": "grid"
+      }
+    ],
+    "outputKind": "int",
+    "referenceBody": "\n  const rows = matrix.length;\n  if (!rows) return 0;\n  const cols = matrix[0].length;\n  if (!cols) return 0;\n  const memo = Array.from({ length: rows }, () => new Array(cols).fill(0));\n  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];\n  function dfs(r, c) {\n    if (memo[r][c]) return memo[r][c];\n    let best = 1;\n    for (const [dr, dc] of dirs) {\n      const nr = r + dr, nc = c + dc;\n      if (nr >= 0 && nr < rows && nc >= 0 && nc < cols && matrix[nr][nc] > matrix[r][c]) {\n        best = Math.max(best, 1 + dfs(nr, nc));\n      }\n    }\n    memo[r][c] = best;\n    return best;\n  }\n  let ans = 0;\n  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) ans = Math.max(ans, dfs(r, c));\n  return ans;",
+    "testCases": [
+      {
+        "values": {
+          "matrix": [
+            [
+              9,
+              9,
+              4
+            ],
+            [
+              6,
+              6,
+              8
+            ],
+            [
+              2,
+              1,
+              1
+            ]
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "matrix": [
+            [
+              3,
+              4,
+              5
+            ],
+            [
+              3,
+              2,
+              6
+            ],
+            [
+              2,
+              2,
+              1
+            ]
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "matrix": [
+            [
+              1
+            ]
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "matrix": [
+            [
+              1,
+              2,
+              3,
+              4,
+              5
+            ]
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "matrix": [
+            [
+              7,
+              7,
+              7
+            ],
+            [
+              7,
+              7,
+              7
+            ]
+          ]
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "merge-k-sorted-arrays",
+    "title": "Merge k Sorted Arrays",
+    "difficulty": "hard",
+    "companies": [
+      "Google",
+      "Amazon"
+    ],
+    "tags": [
+      "Heap",
+      "Divide and Conquer",
+      "Merge"
+    ],
+    "statement": "You are given k sorted integer arrays. Merge all the arrays into one sorted array and return it. (This is the array-based variant of the classic Merge k Sorted Lists problem.)",
+    "inputFormat": "Line 1: integer k. Then for each of the k arrays: a line with its size, followed by a line with its space-separated elements (omitted if size is 0).",
+    "outputFormat": "Space-separated integers: all elements merged into a single sorted sequence.",
+    "constraints": [
+      "0 <= k <= 10000",
+      "0 <= total elements <= 100000"
+    ],
+    "examples": [
+      {
+        "input": "3\n3\n1 4 5\n3\n1 3 4\n2\n2 6",
+        "output": "1 1 2 3 4 4 5 6",
+        "explanation": "Merging [1,4,5], [1,3,4], and [2,6] yields this fully sorted sequence."
+      },
+      {
+        "input": "0",
+        "output": "",
+        "explanation": "There are no arrays to merge, so the result is empty."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "arrays",
+        "type": "intArrayList"
+      }
+    ],
+    "outputKind": "intArray",
+    "referenceBody": "\n  const merged = [];\n  for (const a of arrays) for (const x of a) merged.push(x);\n  merged.sort((a, b) => a - b);\n  return merged;",
+    "testCases": [
+      {
+        "values": {
+          "arrays": [
+            [
+              1,
+              4,
+              5
+            ],
+            [
+              1,
+              3,
+              4
+            ],
+            [
+              2,
+              6
+            ]
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "arrays": []
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "arrays": [
+            []
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "arrays": [
+            [
+              3,
+              4,
+              5
+            ]
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "arrays": [
+            [
+              1,
+              2
+            ],
+            [],
+            [
+              0,
+              0,
+              3
+            ],
+            [
+              -1
+            ]
+          ]
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "find-median-data-stream",
+    "title": "Find Median from Data Stream",
+    "difficulty": "hard",
+    "companies": [
+      "Google",
+      "Amazon"
+    ],
+    "tags": [
+      "Heap",
+      "Design",
+      "Two Heaps"
+    ],
+    "statement": "You are given a stream of integers arriving one at a time. After each integer is added to the running collection, report the median of all integers seen so far.",
+    "inputFormat": "Line 1: integer n (size of the stream). Line 2: n space-separated integers, in arrival order.",
+    "outputFormat": "n lines, each with the median (formatted with 6 decimal places) after that integer is added.",
+    "constraints": [
+      "1 <= n <= 20000",
+      "-1e5 <= value <= 1e5"
+    ],
+    "examples": [
+      {
+        "input": "3\n5 15 1",
+        "output": "5.000000\n10.000000\n5.000000",
+        "explanation": "Medians after each insertion: 5, then (5+15)/2=10, then 5 (middle of [1,5,15])."
+      },
+      {
+        "input": "1\n42",
+        "output": "42.000000",
+        "explanation": "With a single value, the median is that value."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "stream",
+        "type": "intArray"
+      }
+    ],
+    "outputKind": "doubleArray",
+    "referenceBody": "\n  const sorted = [];\n  const res = [];\n  for (const x of stream) {\n    let lo = 0, hi = sorted.length;\n    while (lo < hi) {\n      const mid = (lo + hi) >> 1;\n      if (sorted[mid] < x) lo = mid + 1;\n      else hi = mid;\n    }\n    sorted.splice(lo, 0, x);\n    const n = sorted.length;\n    res.push(n % 2 === 1 ? sorted[(n - 1) / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2);\n  }\n  return res;",
+    "testCases": [
+      {
+        "values": {
+          "stream": [
+            5,
+            15,
+            1
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "stream": [
+            42
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "stream": [
+            5,
+            15,
+            1,
+            3,
+            8
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "stream": [
+            -5,
+            -1,
+            -3,
+            -2,
+            -4
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "stream": [
+            1,
+            1,
+            1,
+            1
+          ]
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "word-break-ii",
+    "title": "Word Break II",
+    "difficulty": "hard",
+    "companies": [
+      "Google",
+      "Amazon"
+    ],
+    "tags": [
+      "String",
+      "Dynamic Programming",
+      "Backtracking",
+      "Memoization"
+    ],
+    "statement": "Given a string s and a dictionary of strings wordDict, add spaces in s to construct every possible sentence where each word is a valid dictionary word. Return all such sentences.",
+    "inputFormat": "Line 1: string s. Line 2: integer n (size of wordDict). Next n lines: one dictionary word each.",
+    "outputFormat": "First line: the number of valid sentences. Then each sentence on its own line (words separated by single spaces), sorted alphabetically.",
+    "constraints": [
+      "1 <= s.length <= 20",
+      "1 <= wordDict size <= 1000",
+      "all strings are lowercase letters"
+    ],
+    "examples": [
+      {
+        "input": "catsanddog\n5\ncat\ncats\nand\nsand\ndog",
+        "output": "2\ncat sand dog\ncats and dog",
+        "explanation": "Both \"cat sand dog\" and \"cats and dog\" can be built entirely from dictionary words."
+      },
+      {
+        "input": "catsandog\n5\ncats\ndog\nsand\nand\ncat",
+        "output": "0",
+        "explanation": "No combination of dictionary words can spell out the full string, so there are no sentences."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "s",
+        "type": "string"
+      },
+      {
+        "name": "wordDict",
+        "type": "stringArray"
+      }
+    ],
+    "outputKind": "stringArray",
+    "referenceBody": "\n  const dict = new Set(wordDict);\n  const memo = new Map();\n  function backtrack(start) {\n    if (memo.has(start)) return memo.get(start);\n    if (start === s.length) return [\"\"];\n    const sentences = [];\n    for (let end = start + 1; end <= s.length; end++) {\n      const word = s.slice(start, end);\n      if (dict.has(word)) {\n        const rest = backtrack(end);\n        for (const r of rest) {\n          sentences.push(word + (r ? \" \" + r : \"\"));\n        }\n      }\n    }\n    memo.set(start, sentences);\n    return sentences;\n  }\n  return backtrack(0);",
+    "testCases": [
+      {
+        "values": {
+          "s": "catsanddog",
+          "wordDict": [
+            "cat",
+            "cats",
+            "and",
+            "sand",
+            "dog"
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "s": "catsandog",
+          "wordDict": [
+            "cats",
+            "dog",
+            "sand",
+            "and",
+            "cat"
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "s": "pineapplepenapple",
+          "wordDict": [
+            "apple",
+            "pen",
+            "applepen",
+            "pine",
+            "pineapple"
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "s": "a",
+          "wordDict": [
+            "a"
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "s": "abcd",
+          "wordDict": [
+            "a",
+            "b",
+            "c",
+            "d"
+          ]
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "maximal-rectangle",
+    "title": "Maximal Rectangle",
+    "difficulty": "hard",
+    "companies": [
+      "Google",
+      "Amazon"
+    ],
+    "tags": [
+      "Matrix",
+      "Stack",
+      "Dynamic Programming",
+      "Monotonic Stack"
+    ],
+    "statement": "Given a rows x cols binary matrix filled with '0' and '1', find the area of the largest rectangle containing only 1's.",
+    "inputFormat": "Line 1: rows cols. Next rows lines: one row each, a string of '0'/'1' characters of length cols.",
+    "outputFormat": "A single integer: the area of the largest all-1s rectangle.",
+    "constraints": [
+      "1 <= rows, cols <= 200"
+    ],
+    "examples": [
+      {
+        "input": "4 5\n10100\n10111\n11111\n10010",
+        "output": "6",
+        "explanation": "The largest all-1s rectangle (rows 1-2, columns 2-4) has area 6."
+      },
+      {
+        "input": "1 1\n0",
+        "output": "0",
+        "explanation": "There are no 1's, so the largest rectangle has area 0."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "grid",
+        "type": "charGrid"
+      }
+    ],
+    "outputKind": "int",
+    "referenceBody": "\n  const rows = grid.length;\n  if (!rows) return 0;\n  const cols = grid[0].length;\n  const heights = new Array(cols).fill(0);\n  let maxArea = 0;\n  function largestRectangleArea(h) {\n    const stack = [];\n    let max = 0;\n    const hh = h.concat([0]);\n    for (let i = 0; i < hh.length; i++) {\n      while (stack.length && hh[stack[stack.length - 1]] >= hh[i]) {\n        const top = stack.pop();\n        const height = hh[top];\n        const width = stack.length ? i - stack[stack.length - 1] - 1 : i;\n        max = Math.max(max, height * width);\n      }\n      stack.push(i);\n    }\n    return max;\n  }\n  for (let r = 0; r < rows; r++) {\n    for (let c = 0; c < cols; c++) {\n      heights[c] = grid[r][c] === \"1\" ? heights[c] + 1 : 0;\n    }\n    maxArea = Math.max(maxArea, largestRectangleArea(heights.slice()));\n  }\n  return maxArea;",
+    "testCases": [
+      {
+        "values": {
+          "grid": [
+            "10100",
+            "10111",
+            "11111",
+            "10010"
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "grid": [
+            "0"
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "grid": [
+            "1"
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "grid": [
+            "11",
+            "11"
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "grid": [
+            "000",
+            "000",
+            "000"
+          ]
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "count-of-smaller-numbers-after-self",
+    "title": "Count of Smaller Numbers After Self",
+    "difficulty": "hard",
+    "companies": [
+      "Google",
+      "Amazon"
+    ],
+    "tags": [
+      "Array",
+      "Binary Indexed Tree",
+      "Merge Sort",
+      "Divide and Conquer"
+    ],
+    "statement": "Given an integer array nums, return an array counts where counts[i] is the number of elements to the right of index i that are smaller than nums[i].",
+    "inputFormat": "Line 1: integer n. Line 2: n space-separated integers nums[i].",
+    "outputFormat": "Space-separated integers: counts[i] for each index, in order.",
+    "constraints": [
+      "0 <= n <= 5000",
+      "-10000 <= nums[i] <= 10000"
+    ],
+    "examples": [
+      {
+        "input": "4\n5 2 6 1",
+        "output": "2 1 1 0",
+        "explanation": "To the right of 5 there are two smaller values (2, 1); to the right of 6 there is one (1)."
+      },
+      {
+        "input": "3\n-1 -1 -1",
+        "output": "0 0 0",
+        "explanation": "No element has a strictly smaller value to its right."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "nums",
+        "type": "intArray"
+      }
+    ],
+    "outputKind": "intArray",
+    "referenceBody": "\n  const n = nums.length;\n  const res = new Array(n).fill(0);\n  for (let i = 0; i < n; i++) {\n    let count = 0;\n    for (let j = i + 1; j < n; j++) if (nums[j] < nums[i]) count++;\n    res[i] = count;\n  }\n  return res;",
+    "testCases": [
+      {
+        "values": {
+          "nums": [
+            5,
+            2,
+            6,
+            1
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "nums": [
+            -1,
+            -1,
+            -1
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "nums": []
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "nums": [
+            1
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "nums": [
+            5,
+            4,
+            3,
+            2,
+            1
+          ]
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "palindrome-pairs",
+    "title": "Palindrome Pairs",
+    "difficulty": "hard",
+    "companies": [
+      "Google",
+      "Amazon"
+    ],
+    "tags": [
+      "String",
+      "Hash Table",
+      "Trie"
+    ],
+    "statement": "Given a list of unique words, return all pairs of distinct indices (i, j) such that concatenating words[i] + words[j] forms a palindrome.",
+    "inputFormat": "Line 1: integer n. Next n lines: one word each.",
+    "outputFormat": "First line: the number of valid pairs. Then each pair as \"i j\" on its own line (indices are 0-based), sorted alphabetically as strings.",
+    "constraints": [
+      "1 <= n <= 300",
+      "0 <= word length <= 100",
+      "all words are lowercase letters, possibly empty"
+    ],
+    "examples": [
+      {
+        "input": "5\nabcd\ndcba\nlls\ns\nsssll",
+        "output": "4\n0 1\n1 0\n2 4\n3 2",
+        "explanation": "abcd+dcba, dcba+abcd, lls+sssll, and s+lls are all palindromes."
+      },
+      {
+        "input": "3\nbat\ntab\ncat",
+        "output": "2\n0 1\n1 0",
+        "explanation": "bat+tab and tab+bat are palindromes; cat pairs with nothing."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "words",
+        "type": "stringArray"
+      }
+    ],
+    "outputKind": "stringArray",
+    "referenceBody": "\n  function isPalindrome(str) {\n    let l = 0, r = str.length - 1;\n    while (l < r) {\n      if (str[l] !== str[r]) return false;\n      l++;\n      r--;\n    }\n    return true;\n  }\n  const res = [];\n  for (let i = 0; i < words.length; i++) {\n    for (let j = 0; j < words.length; j++) {\n      if (i === j) continue;\n      if (isPalindrome(words[i] + words[j])) res.push(i + \" \" + j);\n    }\n  }\n  return res;",
+    "testCases": [
+      {
+        "values": {
+          "words": [
+            "abcd",
+            "dcba",
+            "lls",
+            "s",
+            "sssll"
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "words": [
+            "bat",
+            "tab",
+            "cat"
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "words": [
+            "a",
+            ""
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "words": [
+            "ab",
+            "ba"
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "words": [
+            "abc",
+            "cba",
+            "xyz"
+          ]
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "shortest-path-visiting-all-nodes",
+    "title": "Shortest Path Visiting All Nodes",
+    "difficulty": "hard",
+    "companies": [
+      "Google",
+      "Amazon"
+    ],
+    "tags": [
+      "Graph",
+      "Breadth-First Search",
+      "Bitmask Dynamic Programming"
+    ],
+    "statement": "You are given an undirected connected graph of n nodes given as an adjacency list. Return the length of the shortest path that visits every node at least once, starting from any node and ending at any node.",
+    "inputFormat": "Line 1: integer n (number of nodes). Next n lines: each node's adjacency list (size, then neighbors).",
+    "outputFormat": "A single integer: the length of the shortest path visiting every node.",
+    "constraints": [
+      "1 <= n <= 12",
+      "the graph is always connected"
+    ],
+    "examples": [
+      {
+        "input": "4\n3\n1 2 3\n1\n0\n1\n0\n1\n0",
+        "output": "4",
+        "explanation": "Starting at node 1, the path 1 -> 0 -> 2 -> 0 -> 3 visits every node in 4 moves."
+      },
+      {
+        "input": "5\n1\n1\n3\n0 2 4\n1\n1\n1\n2\n2\n1 2",
+        "output": "4",
+        "explanation": "A path such as 0 -> 1 -> 4 -> 2 -> 3 visits every node in 4 moves."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "graph",
+        "type": "intArrayList"
+      }
+    ],
+    "outputKind": "int",
+    "referenceBody": "\n  const n = graph.length;\n  if (n === 1) return 0;\n  const target = (1 << n) - 1;\n  const visited = new Set();\n  let queue = [];\n  for (let i = 0; i < n; i++) {\n    queue.push([i, 1 << i, 0]);\n    visited.add(i + \",\" + (1 << i));\n  }\n  while (queue.length) {\n    const next = [];\n    for (const [node, mask, steps] of queue) {\n      if (mask === target) return steps;\n      for (const nei of graph[node]) {\n        const nmask = mask | (1 << nei);\n        const key = nei + \",\" + nmask;\n        if (!visited.has(key)) {\n          visited.add(key);\n          next.push([nei, nmask, steps + 1]);\n        }\n      }\n    }\n    queue = next;\n  }\n  return -1;",
+    "testCases": [
+      {
+        "values": {
+          "graph": [
+            [
+              1,
+              2,
+              3
+            ],
+            [
+              0
+            ],
+            [
+              0
+            ],
+            [
+              0
+            ]
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "graph": [
+            [
+              1
+            ],
+            [
+              0,
+              2,
+              4
+            ],
+            [
+              1,
+              3,
+              4
+            ],
+            [
+              2
+            ],
+            [
+              1,
+              2
+            ]
+          ]
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "graph": [
+            []
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "graph": [
+            [
+              1
+            ],
+            [
+              0
+            ]
+          ]
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "graph": [
+            [
+              1,
+              2
+            ],
+            [
+              0,
+              2
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "race-car",
+    "title": "Race Car",
+    "difficulty": "hard",
+    "companies": [
+      "Google"
+    ],
+    "tags": [
+      "Breadth-First Search",
+      "Dynamic Programming"
+    ],
+    "statement": "Your car starts at position 0 with speed +1 on an infinite number line. The car can accelerate (position += speed, speed *= 2) or reverse (speed becomes -1 if positive, or 1 if negative, position unchanged). Given a target position, return the minimum number of instructions to reach it.",
+    "inputFormat": "Line 1: integer target.",
+    "outputFormat": "A single integer: the minimum number of instructions needed to reach target.",
+    "constraints": [
+      "1 <= target <= 10000"
+    ],
+    "examples": [
+      {
+        "input": "3",
+        "output": "2",
+        "explanation": "Accelerate twice: position goes 0 -> 1 -> 3 (speed 1 then 2), reaching the target in 2 moves."
+      },
+      {
+        "input": "6",
+        "output": "5",
+        "explanation": "The shortest known instruction sequence for target 6 takes 5 moves."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "target",
+        "type": "int"
+      }
+    ],
+    "outputKind": "int",
+    "referenceBody": "\n  const visited = new Set([\"0,1\"]);\n  let queue = [[0, 1]];\n  let steps = 0;\n  const limit = 2 * Math.abs(target) + 1;\n  while (queue.length) {\n    const next = [];\n    for (const [pos, speed] of queue) {\n      if (pos === target) return steps;\n      const p1 = pos + speed, s1 = speed * 2;\n      if (Math.abs(p1) <= limit) {\n        const key1 = p1 + \",\" + s1;\n        if (!visited.has(key1)) {\n          visited.add(key1);\n          next.push([p1, s1]);\n        }\n      }\n      const s2 = speed > 0 ? -1 : 1;\n      const key2 = pos + \",\" + s2;\n      if (!visited.has(key2)) {\n        visited.add(key2);\n        next.push([pos, s2]);\n      }\n    }\n    queue = next;\n    steps++;\n  }\n  return -1;",
+    "testCases": [
+      {
+        "values": {
+          "target": 3
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "target": 6
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "target": 1
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "target": 2
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "target": 11
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "bus-routes",
+    "title": "Bus Routes",
+    "difficulty": "hard",
+    "companies": [
+      "Google",
+      "Amazon"
+    ],
+    "tags": [
+      "Graph",
+      "Breadth-First Search",
+      "Hash Table"
+    ],
+    "statement": "Given a list of bus routes (each a list of stops it visits, in order of operation, and any stop can be boarded in any order along the route) and a source and target stop, return the minimum number of buses a rider must take to reach target from source. Return -1 if it is not possible.",
+    "inputFormat": "Line 1: integer k (number of routes). For each route: a line with its stop count, then a line with its space-separated stops. Final two lines: source and target.",
+    "outputFormat": "A single integer: the minimum number of buses needed, or -1 if unreachable.",
+    "constraints": [
+      "1 <= k <= 500",
+      "0 <= stops per route <= 100000",
+      "all stop ids fit in a 32-bit integer"
+    ],
+    "examples": [
+      {
+        "input": "2\n3\n1 2 7\n3\n3 6 7\n1\n6",
+        "output": "2",
+        "explanation": "Take the first route from stop 1 to stop 7, then the second route from stop 7 to stop 6."
+      },
+      {
+        "input": "2\n2\n7 12\n3\n4 5 15\n15\n12",
+        "output": "-1",
+        "explanation": "No sequence of routes connects stop 15 to stop 12."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "routes",
+        "type": "intArrayList"
+      },
+      {
+        "name": "source",
+        "type": "int"
+      },
+      {
+        "name": "target",
+        "type": "int"
+      }
+    ],
+    "outputKind": "int",
+    "referenceBody": "\n  if (source === target) return 0;\n  const stopToRoutes = new Map();\n  for (let r = 0; r < routes.length; r++) {\n    for (const stop of routes[r]) {\n      if (!stopToRoutes.has(stop)) stopToRoutes.set(stop, []);\n      stopToRoutes.get(stop).push(r);\n    }\n  }\n  const visitedRoutes = new Set();\n  const visitedStops = new Set([source]);\n  let queue = [source];\n  let buses = 0;\n  while (queue.length) {\n    const next = [];\n    for (const stop of queue) {\n      if (stop === target) return buses;\n      const routesHere = stopToRoutes.get(stop) || [];\n      for (const r of routesHere) {\n        if (visitedRoutes.has(r)) continue;\n        visitedRoutes.add(r);\n        for (const s of routes[r]) {\n          if (!visitedStops.has(s)) {\n            visitedStops.add(s);\n            next.push(s);\n          }\n        }\n      }\n    }\n    queue = next;\n    buses++;\n  }\n  return -1;",
+    "testCases": [
+      {
+        "values": {
+          "routes": [
+            [
+              1,
+              2,
+              7
+            ],
+            [
+              3,
+              6,
+              7
+            ]
+          ],
+          "source": 1,
+          "target": 6
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "routes": [
+            [
+              7,
+              12
+            ],
+            [
+              4,
+              5,
+              15
+            ]
+          ],
+          "source": 15,
+          "target": 12
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "routes": [
+            [
+              1,
+              2,
+              3
+            ]
+          ],
+          "source": 1,
+          "target": 1
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "routes": [
+            [
+              1,
+              2,
+              3
+            ]
+          ],
+          "source": 1,
+          "target": 5
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "routes": [
+            [
+              1,
+              5
+            ],
+            [
+              5,
+              9
+            ],
+            [
+              9,
+              12
+            ]
+          ],
+          "source": 1,
+          "target": 12
+        },
+        "visible": false
+      }
+    ]
+  },
+  {
+    "id": "split-array-largest-sum",
+    "title": "Split Array Largest Sum",
+    "difficulty": "hard",
+    "companies": [
+      "Google",
+      "Amazon"
+    ],
+    "tags": [
+      "Array",
+      "Binary Search",
+      "Greedy",
+      "Dynamic Programming"
+    ],
+    "statement": "Given an integer array nums and an integer m, split nums into m non-empty contiguous subarrays so that the largest sum among these subarrays is minimized. Return that minimized largest sum.",
+    "inputFormat": "Line 1: integer n. Line 2: n space-separated integers nums[i]. Line 3: integer m.",
+    "outputFormat": "A single integer: the minimized largest subarray sum.",
+    "constraints": [
+      "1 <= n <= 1000",
+      "0 <= nums[i] <= 1000000",
+      "1 <= m <= min(50, n)"
+    ],
+    "examples": [
+      {
+        "input": "5\n7 2 5 10 8\n2",
+        "output": "18",
+        "explanation": "Splitting into [7,2,5] and [10,8] gives the smallest possible largest sum, 18."
+      },
+      {
+        "input": "5\n1 2 3 4 5\n2",
+        "output": "9",
+        "explanation": "Splitting into [1,2,3,4] and [5] (sums 10 and 5) is worse than [1,2,3] and [4,5] (sums 6 and 9)."
+      }
+    ],
+    "paramSpec": [
+      {
+        "name": "nums",
+        "type": "intArray"
+      },
+      {
+        "name": "m",
+        "type": "int"
+      }
+    ],
+    "outputKind": "long",
+    "referenceBody": "\n  let lo = Math.max(...nums, 0);\n  let hi = nums.reduce((a, b) => a + b, 0);\n  function canSplit(maxSum) {\n    let pieces = 1, curSum = 0;\n    for (const x of nums) {\n      if (curSum + x > maxSum) {\n        pieces++;\n        curSum = x;\n        if (pieces > m) return false;\n      } else {\n        curSum += x;\n      }\n    }\n    return pieces <= m;\n  }\n  while (lo < hi) {\n    const mid = Math.floor((lo + hi) / 2);\n    if (canSplit(mid)) hi = mid;\n    else lo = mid + 1;\n  }\n  return lo;",
+    "testCases": [
+      {
+        "values": {
+          "nums": [
+            7,
+            2,
+            5,
+            10,
+            8
+          ],
+          "m": 2
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "nums": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "m": 2
+        },
+        "visible": true
+      },
+      {
+        "values": {
+          "nums": [
+            1,
+            4,
+            4
+          ],
+          "m": 3
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "nums": [
+            10
+          ],
+          "m": 1
+        },
+        "visible": false
+      },
+      {
+        "values": {
+          "nums": [
+            2,
+            3,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "m": 3
+        },
+        "visible": false
+      }
+    ]
+  }
+]

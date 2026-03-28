@@ -16,10 +16,14 @@ Route components depend on firebase hooks and interview/question utilities in sr
 - `page.tsx`
 
 ## Child Folders
+- `admin` - admin-only tools gated on the `users/{uid}.admin` Firestore flag (see `lib/firebase/user-profile.ts` and
+  `lib/server/require-admin.ts`). Not linked in navigation for non-admins.
+- `ai-match`
 - `analytics`
 - `api`
 - `applications`
 - `calendar`
+- `coding-room`
 - `dashboard`
 - `desktop`
 - `integrations`
@@ -31,6 +35,7 @@ Route components depend on firebase hooks and interview/question utilities in sr
 - `profile`
 - `resumes`
 - `settings`
+- `system-design`
 - `test-room`
 - `war-room`
 

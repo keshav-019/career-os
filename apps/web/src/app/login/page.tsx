@@ -1,6 +1,7 @@
 "use client";
 
-import { GitBranch, Mail, Sparkles } from "lucide-react";
+import { GitBranch, Mail } from "lucide-react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
@@ -17,11 +18,18 @@ import {
   type User
 } from "firebase/auth";
 import { auth, isFirebaseClientConfigured } from "@/lib/firebase/client";
+import { THEME_CHANGE_EVENT, readThemePreference } from "@/lib/preferences";
 import {
   clearStoredTwoFactorSessionToken,
   setStoredTwoFactorSessionToken
 } from "@/lib/two-factor-session";
 import { writeLocalAdminSession } from "@/lib/local-admin-session";
+
+// Same brand-mark convention as AppShell.tsx: dark mode is the default, and this only swaps when the user has
+// previously toggled to light mode elsewhere in the app (their preference persists across the signed-out login
+// screen too, even though there's no toggle control on this page).
+const DARK_MODE_LOGO_SRC = "/careeros-dark-mode.png";
+const LIGHT_MODE_LOGO_SRC = "/careeros-light-mode.png";
 
 type AuthMethod = "email" | "google" | "github" | "mfa" | null;
 
@@ -145,10 +153,31 @@ export default function LoginPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [requiresTwoFactor, setRequiresTwoFactor] = useState(false);
   const [twoFactorCode, setTwoFactorCode] = useState("");
+  const [lightMode, setLightMode] = useState(false);
   const submitLabel = useMemo(
     () => (mode === "signin" ? "Sign in with email" : "Create account"),
     [mode]
   );
+  const logoSrc = lightMode ? LIGHT_MODE_LOGO_SRC : DARK_MODE_LOGO_SRC;
+
+  useEffect(() => {
+    const applyThemePreference = (preference: string | null) => {
+      if (preference === "light") {
+        setLightMode(true);
+      } else if (preference === "dark") {
+        setLightMode(false);
+      }
+    };
+
+    applyThemePreference(readThemePreference());
+
+    const onThemePreferenceChange = (event: Event) => {
+      applyThemePreference((event as CustomEvent<string>).detail ?? null);
+    };
+
+    window.addEventListener(THEME_CHANGE_EVENT, onThemePreferenceChange as EventListener);
+    return () => window.removeEventListener(THEME_CHANGE_EVENT, onThemePreferenceChange as EventListener);
+  }, []);
 
   const handlePostSignInRouting = useCallback(async () => {
     clearStoredTwoFactorSessionToken();
@@ -433,7 +462,7 @@ export default function LoginPage() {
         <section className="auth-card" aria-labelledby="login-heading">
           <div className="auth-brand">
             <span className="career-brand-mark">
-              <Sparkles size={18} />
+              <Image alt="CareerOS" className="career-brand-logo" height={40} src={logoSrc} width={40} />
             </span>
             <div>
               <p className="eyebrow">CareerOS</p>
@@ -454,7 +483,7 @@ export default function LoginPage() {
       <section className="auth-card" aria-labelledby="login-heading">
         <div className="auth-brand">
           <span className="career-brand-mark">
-            <Sparkles size={18} />
+            <Image alt="CareerOS" className="career-brand-logo" height={40} src={logoSrc} width={40} />
           </span>
           <div>
             <p className="eyebrow">CareerOS</p>

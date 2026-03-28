@@ -15,14 +15,23 @@ export function calculateJobFit(input: JobFitInput): JobFitScore {
   const niceToHaveKeywords = input.niceToHaveKeywords ?? [];
 
   const matchedMustHaves = input.mustHaveKeywords.filter(
-    (keyword) => includesKeyword(jobTokens, keyword) && includesKeyword(resumeTokens, keyword)
+    (keyword) =>
+      includesKeyword(jobTokens, keyword) &&
+      includesKeyword(resumeTokens, keyword),
   );
   const matchedNiceToHaves = niceToHaveKeywords.filter(
-    (keyword) => includesKeyword(jobTokens, keyword) && includesKeyword(resumeTokens, keyword)
+    (keyword) =>
+      includesKeyword(jobTokens, keyword) &&
+      includesKeyword(resumeTokens, keyword),
   );
 
-  const missingKeywords = [...input.mustHaveKeywords, ...niceToHaveKeywords].filter(
-    (keyword) => includesKeyword(jobTokens, keyword) && !includesKeyword(resumeTokens, keyword)
+  const missingKeywords = [
+    ...input.mustHaveKeywords,
+    ...niceToHaveKeywords,
+  ].filter(
+    (keyword) =>
+      includesKeyword(jobTokens, keyword) &&
+      !includesKeyword(resumeTokens, keyword),
   );
 
   const mustHaveScore =
@@ -34,7 +43,9 @@ export function calculateJobFit(input: JobFitInput): JobFitScore {
       ? 25
       : (matchedNiceToHaves.length / niceToHaveKeywords.length) * 25;
   const coverageBonus = Math.min(15, Math.max(0, resumeTokens.size / 10));
-  const score = Math.round(Math.min(100, mustHaveScore + niceToHaveScore + coverageBonus));
+  const score = Math.round(
+    Math.min(100, mustHaveScore + niceToHaveScore + coverageBonus),
+  );
 
   return {
     score,
@@ -45,6 +56,6 @@ export function calculateJobFit(input: JobFitInput): JobFitScore {
         ? "Strong role alignment with only small keyword gaps."
         : score >= 60
           ? "Promising role fit with a few resume targeting opportunities."
-          : "Needs stronger resume alignment before applying."
+          : "Needs stronger resume alignment before applying.",
   };
 }

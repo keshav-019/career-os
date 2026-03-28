@@ -10,8 +10,13 @@ Icons, favicon, war-room art, aptitude media diagrams, and browser TeX runtime a
 Referenced by route UIs, interview question metadata, and resume tooling.
 
 ## Files In This Folder
-- `careeros-logo-128.png`
-- `favicon.ico`
+- `careeros-dark-mode.png` - default brand mark (favicon, Electron taskbar/packaged icon, and the sidebar logo when the
+  app is in dark mode). This is the default everywhere outside the app; see `AppShell.tsx` for the in-app light-mode
+  swap.
+- `careeros-light-mode.png` - sidebar logo shown only when the in-app theme toggle is set to light mode.
+- `careeros-logo-128.png` - superseded by the two files above; kept only because nothing currently deletes it.
+- `favicon.ico` - superseded by the PNG favicon declared in `app/layout.tsx` metadata; browsers that ignore the
+  `<link rel="icon">` tag fall back to this.
 
 ## Child Folders
 - `aptitude-media`

@@ -50,6 +50,7 @@ type ExperienceRecord = {
   endDate: string;
   isCurrent: boolean;
   description: string;
+  skillsGained: string;
 };
 
 type ProjectRecord = {
@@ -60,6 +61,7 @@ type ProjectRecord = {
   endDate: string;
   description: string;
   techStack: string;
+  skillsGained: string;
 };
 
 type CertificationRecord = {
@@ -146,7 +148,8 @@ function createEmptyExperience(): ExperienceRecord {
     startDate: "",
     endDate: "",
     isCurrent: false,
-    description: ""
+    description: "",
+    skillsGained: ""
   };
 }
 
@@ -158,7 +161,8 @@ function createEmptyProject(): ProjectRecord {
     startDate: "",
     endDate: "",
     description: "",
-    techStack: ""
+    techStack: "",
+    skillsGained: ""
   };
 }
 
@@ -1302,6 +1306,23 @@ export default function ProfilePage() {
                         />
                       </label>
 
+                      <label className="profile-field span-2">
+                        Skills gained
+                        <textarea
+                          onChange={(event) =>
+                            updateProfileField(
+                              "internships",
+                              profile.internships.map((item) =>
+                                item.id === record.id ? { ...item, skillsGained: event.target.value } : item
+                              )
+                            )
+                          }
+                          placeholder="What skills did you actually build or sharpen here? e.g. REST API design, SQL query optimization, team code reviews"
+                          rows={2}
+                          value={record.skillsGained}
+                        />
+                      </label>
+
                       <button
                         className="ghost-button profile-remove"
                         onClick={() =>
@@ -1442,6 +1463,23 @@ export default function ProfilePage() {
                         />
                       </label>
 
+                      <label className="profile-field span-2">
+                        Skills gained
+                        <textarea
+                          onChange={(event) =>
+                            updateProfileField(
+                              "employmentHistory",
+                              profile.employmentHistory.map((item) =>
+                                item.id === record.id ? { ...item, skillsGained: event.target.value } : item
+                              )
+                            )
+                          }
+                          placeholder="What skills did you actually build or sharpen here? e.g. REST API design, SQL query optimization, team code reviews"
+                          rows={2}
+                          value={record.skillsGained}
+                        />
+                      </label>
+
                       <button
                         className="ghost-button profile-remove"
                         onClick={() =>
@@ -1579,6 +1617,23 @@ export default function ProfilePage() {
                       }
                       rows={3}
                       value={project.description}
+                    />
+                  </label>
+
+                  <label className="profile-field span-2">
+                    Skills gained
+                    <textarea
+                      onChange={(event) =>
+                        updateProfileField(
+                          "projects",
+                          profile.projects.map((item) =>
+                            item.id === project.id ? { ...item, skillsGained: event.target.value } : item
+                          )
+                        )
+                      }
+                      placeholder="What skills did you actually build or sharpen here? e.g. state management, API integration, performance profiling"
+                      rows={2}
+                      value={project.skillsGained}
                     />
                   </label>
 
@@ -2168,6 +2223,18 @@ export default function ProfilePage() {
                 />
               </label>
 
+              <label className="profile-field span-2">
+                Skills gained
+                <textarea
+                  onChange={(event) =>
+                    setExperienceDraft((current) => ({ ...current, skillsGained: event.target.value }))
+                  }
+                  placeholder="What skills did you actually build or sharpen here? e.g. REST API design, SQL query optimization, team code reviews"
+                  rows={2}
+                  value={experienceDraft.skillsGained}
+                />
+              </label>
+
               <div className="modal-actions span-2">
                 <button
                   className="ghost-button"
@@ -2258,6 +2325,18 @@ export default function ProfilePage() {
                   }
                   rows={4}
                   value={projectDraft.description}
+                />
+              </label>
+
+              <label className="profile-field span-2">
+                Skills gained
+                <textarea
+                  onChange={(event) =>
+                    setProjectDraft((current) => ({ ...current, skillsGained: event.target.value }))
+                  }
+                  placeholder="What skills did you actually build or sharpen here? e.g. state management, API integration, performance profiling"
+                  rows={2}
+                  value={projectDraft.skillsGained}
                 />
               </label>
 

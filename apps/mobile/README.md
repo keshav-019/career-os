@@ -1,25 +1,162 @@
-# Mobile Planning Lane
+# CareerOS Mobile
 
 ## Purpose
-Placeholder workspace for future mobile app work.
 
-## What This Folder Owns
-Planning notes and eventual React Native-Expo implementation runway.
+React Native / Expo Android app for CareerOS. This is the full app now, not a shell: Dashboard, Applications,
+AI Match, Resume (Visual Mode), Interview War Room (Aptitude / Computer Science / AI tests, System Design, and a
+desktop-only gate for the Coding track), Learning Center, Analytics, Calendar, Profile, and Settings all work here,
+talking to the same deployed CareerOS backend and Firebase project the web app uses.
 
-## Integration Points
-Will reuse shared types and Firebase collections once implementation starts.
+## What's different from web (on purpose)
 
-## Files In This Folder
-- No direct files. This folder is currently a structural container.
+- **CareerOS Desktop** section and the **Browser Extension** don't apply to a phone, so neither exists here.
+- **Resume** is Visual Mode only - no LaTeX editor (needs a local LaTeX compiler, desktop-only).
+- **Interview War Room's Coding track** shows the problem list and lets you read prompts/keep notes, but actual
+  code execution stays desktop-only (needs local compilers). Aptitude, Computer Science, AI, and System Design are
+  fully interactive here.
+- **Sign-in** is email/password only. Web also offers Google/GitHub OAuth popups, which don't have a clean
+  equivalent in a bare React Native app without extra native auth libraries - out of scope for this pass. Any
+  account can still set/reset a password from "Forgot password" regardless of how it was originally created.
+- **Settings** skips 2FA setup, Google Calendar account linking, and Chrome extension token pairing - none of those
+  translate to a phone. Theme toggle, notification toggles, calendar sync (boolean, no OAuth), profile visibility,
+  and password reset all work.
+- Resume's Visual Mode saves to its own Firestore collection (`mobileResumes`) since web's Visual Mode has no
+  persistence of its own to reuse (see `src/lib/mobileResumes.ts` for why).
 
-## Child Folders
-- No direct child folders.
+## Backend configuration
 
-## Maintenance Notes
-Use this folder for architecture decisions and scope tracking until codebase is scaffolded.
+The app talks to the **deployed production CareerOS web app** for every server-only feature (AI resume review/job
+match, learning plan generation, learning materials, system design validation, interview test templates), and
+talks to **Firebase directly** for everything else (jobs, reminders, practice attempts, resumes), exactly like the
+web app does. Both are already configured in `src/config/env.ts` - there is nothing to fill in before running the
+app. If you ever redeploy the web app to a different URL, update `API_BASE_URL` in that file.
 
-## Contributor Checklist
-1. Keep changes scoped to this folder responsibility before reaching into adjacent modules.
-2. If contracts change (types, payloads, route behavior), update dependent folders in the same PR.
-3. Prefer additive changes over breaking renames, and document any migration impact clearly.
-4. Run lint/typecheck for affected workspaces after edits and capture known gaps in PR notes.
+## One-time setup (do this before the first run)
+
+1. Use the repo Node version:
+
+```powershell
+nvm install 20.20.2
+nvm use 20.20.2
+```
+
+2. Install workspace dependencies from the repo root:
+
+```powershell
+npm install
+```
+
+3. **Install the mobile-only native dependencies.** These weren't safe to hand-pin in this session (their exact
+   versions need to match whatever Expo SDK is on your machine), so install them with Expo's own resolver instead
+   of plain `npm install`. From `apps/mobile`:
+
+```powershell
+npx expo install @react-navigation/native @react-navigation/drawer @react-navigation/native-stack react-native-gesture-handler react-native-reanimated react-native-screens @react-native-async-storage/async-storage firebase lucide-react-native react-native-svg expo-print expo-sharing expo-image-picker expo-clipboard @react-native-community/datetimepicker
+```
+
+   `npx expo install` picks versions compatible with your installed Expo SDK automatically - if it prompts you to
+   upgrade/downgrade a package, accept its recommendation.
+
+4. Install Android Studio, and in it install:
+
+- Android SDK Platform
+- Android SDK Platform-Tools
+- Android SDK Build-Tools
+- Android Emulator, optional if you only use a real phone
+
+5. Add Android SDK environment variables. A common Windows path is:
+
+```powershell
+$env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+$env:ANDROID_SDK_ROOT = "$env:LOCALAPPDATA\Android\Sdk"
+$env:Path = "$env:ANDROID_HOME\platform-tools;$env:ANDROID_HOME\emulator;$env:Path"
+```
+
+Add the same values permanently in Windows Environment Variables after confirming the path exists.
+
+6. Enable USB debugging on the phone:
+
+- Settings
+- About phone
+- Tap Build number seven times
+- Developer options
+- Enable USB debugging
+
+7. Connect the phone by USB and approve the debugging prompt on the phone.
+
+8. Confirm the device is visible:
+
+```powershell
+adb devices
+```
+
+The device should show as `device`, not `unauthorized`.
+
+## Running the app on your phone
+
+From the repo root:
+
+```powershell
+npm run mobile:android
+```
+
+That builds the development app, installs it on the connected Android device, and starts Metro. The very first
+run takes longer than usual - Expo has to generate the native `android/` project and Gradle has to download its
+toolchain. Sign in with the same CareerOS account you use on web (or create one) - your jobs, reminders, practice
+attempts, and saved resumes all sync live through the same Firebase project.
+
+If you'd rather use an emulator instead of a physical phone:
+
+```powershell
+npm run mobile:android:emulator
+```
+
+## Useful scripts
+
+Run from the repo root:
+
+```powershell
+npm run mobile:start
+npm run mobile:android
+npm run mobile:android:emulator
+npm run mobile:typecheck
+```
+
+Run directly inside this workspace:
+
+```powershell
+npm run start
+npm run android
+npm run android:emulator
+npm run typecheck
+```
+
+## Troubleshooting
+
+If `adb` is not recognized, Android Platform-Tools is not on `PATH`.
+
+If no device appears in `adb devices`, reconnect the phone, choose File Transfer / USB mode if needed, and approve
+the USB debugging prompt.
+
+If the build cannot find Java, install Android Studio's bundled JDK or a compatible JDK and set `JAVA_HOME`.
+
+If Metro complains about a missing native module right after the dependency install step, double check step 3 ran
+successfully - a couple of these packages (`react-native-reanimated`, `react-native-screens`, `react-native-svg`)
+need a native rebuild (`npm run mobile:android` again) after installing, not just a Metro restart.
+
+If sign-in or any screen that talks to the backend shows a network error, confirm the phone has internet access -
+everything here calls the deployed production CareerOS URL and Firebase directly, there is no local server to run.
+
+## Project layout
+
+```
+src/
+  config/        Firebase + Cloudinary + backend API base URL
+  theme/         Dark/light color tokens and ThemeContext
+  contexts/      AuthContext (email/password Firebase auth)
+  lib/           Firestore hooks, API client, per-feature data helpers
+  types/         TypeScript types mirroring the web app's data models
+  components/    Shared UI primitives (Card, Pill, PickerField, DateTimeField, ...)
+  navigation/    Drawer (top-level sections) + a nested stack for Interview War Room
+  screens/       One folder per top-level section
+```

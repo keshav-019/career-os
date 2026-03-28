@@ -6,12 +6,66 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // The root users/{userId} document carries account-level flags such as
+    // `admin`. Clients may read and update their own document, but they can
+    // never introduce or change the `admin` field themselves - it can only be
+    // set through the Firebase console or the Admin SDK, both of which bypass
+    // these rules entirely. This is what makes the "admin" gate trustworthy.
+    // `non_admin` has no such restriction - it's meant to be hand-set/removed
+    // via the Firebase console as a temporary local dev toggle (see above).
     match /users/{userId} {
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
+      allow read: if isSignedIn() && request.auth.uid == userId;
+
+      allow create: if isSignedIn() && request.auth.uid == userId
+        && request.resource.data.get('admin', false) == false;
+
+      allow update: if isSignedIn() && request.auth.uid == userId
+        && request.resource.data.get('admin', false) == resource.data.get('admin', false);
     }
 
     match /users/{userId}/{document=**} {
       allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Coding-arena problems. The admin editor UI (app/admin/coding-problems) and the
+    // server-side requireAdmin() check are what actually gate who's allowed to reach the
+    // save API route in the first place - these rules are the fallback layer for when the
+    // Firebase Admin SDK isn't configured (see lib/firebase/admin.ts), so the same API routes
+    // can fall back to a plain authenticated Firestore REST write instead. Any signed-in user
+    // can write here; this is intentionally permissive (no extra flag required) since this is a
+    // single-admin personal project, not a multi-tenant product with untrusted end users.
+    match /codingProblems/{problemId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // Mirrors codingProblems above, for the system-design catalog's admin editor.
+    match /systemDesignProblems/{problemId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // Mirrors codingProblems above, for the aptitude/computer-science/AI technical test-paper admin editor
+    // (app/admin/test-papers). Read access is needed by any signed-in user, not just admins, since these are
+    // merged into the public /api/interview/templates* results that both web and mobile fetch to take a test.
+    match /customTestPapers/{paperId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // Submission/attempt logs are append-only, per-user event logs (no
+    // solution content). Users can read and write only their own log
+    // entries; nothing here is ever editable after creation from the client.
+    match /codingSubmissionLogs/{logId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /systemDesignAttemptLogs/{logId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
     }
   }
 }
