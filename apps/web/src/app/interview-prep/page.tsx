@@ -18,7 +18,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CodingArenaBrowser from "@/components/CodingArenaBrowser";
 import SystemDesignBrowser from "@/components/SystemDesignBrowser";
 import { isDesktopAppEnabled } from "@/lib/desktop-mode";
@@ -147,7 +147,7 @@ function hasAttemptStarted(attempt: PracticeAttemptRecord): boolean {
   return Boolean(attempt.startedAt);
 }
 
-export default function InterviewPrepPage() {
+function InterviewPrepPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { attempts, error: attemptsError, loading: attemptsLoading, user } = useUserPracticeAttempts();
@@ -1077,5 +1077,15 @@ export default function InterviewPrepPage() {
         </aside>
       </section>
     </div>
+  );
+}
+
+// useSearchParams() opts this page out of static generation unless wrapped in Suspense - this only surfaces
+// under the desktop build's standalone output mode (CAREEROS_DESKTOP_BUILD=1), not the default web build.
+export default function InterviewPrepPage() {
+  return (
+    <Suspense fallback={null}>
+      <InterviewPrepPageInner />
+    </Suspense>
   );
 }
