@@ -6,6 +6,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "CareerOS",
   description: "A career command center for applications, resumes, interviews, learning, and analytics.",
+  verification: {
+    google: "vP4YTtwACHxzj41UdbZX3dlzZCi1frv5Ah0-Td1-BtI"
+  },
   icons: {
     // The favicon is always the dark-mode mark by default, regardless of OS/browser theme - only the in-app
     // sidebar logo swaps with the in-app theme toggle (see AppShell.tsx). Browser tabs can't react to that toggle
