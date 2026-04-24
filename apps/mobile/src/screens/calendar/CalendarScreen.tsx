@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { AlarmClock, ChevronLeft, ChevronRight, Trash2 } from "lucide-react-native";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../theme/ThemeContext";
 import { useUserJobs } from "../../lib/jobs";
 import { useUserReminders, createReminder, removeReminder } from "../../lib/reminders";
-import { loadSettings } from "../../lib/settings";
 import type { ReminderType } from "../../types/reminder";
 import { Card, EmptyState, ErrorText, GhostButton, Pill, PrimaryButton, Screen, SectionHeader, SuccessText, TextField } from "../../components/ui/Primitives";
 import { PickerField } from "../../components/ui/PickerField";
@@ -63,7 +62,6 @@ export default function CalendarScreen() {
   const { jobs } = useUserJobs(user?.uid);
   const { reminders } = useUserReminders(user?.uid);
 
-  const [calendarSyncEnabled, setCalendarSyncEnabled] = useState(false);
   const [viewDate, setViewDate] = useState(() => {
     const today = new Date();
     return new Date(today.getFullYear(), today.getMonth(), 1);
@@ -77,10 +75,6 @@ export default function CalendarScreen() {
   const [actionNotice, setActionNotice] = useState<string | null>(null);
   const [busyEventId, setBusyEventId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    loadSettings().then((s) => setCalendarSyncEnabled(s.calendarSyncEnabled));
-  }, []);
 
   const allEvents = useMemo<CalendarEvent[]>(() => {
     const reminderEvents: CalendarEvent[] = reminders.map((r) => ({ id: r.id, title: r.title, notes: r.notes, startsAt: r.startsAt, type: r.type, origin: "reminder" }));
@@ -158,7 +152,7 @@ export default function CalendarScreen() {
         eyebrow="Calendar"
         title="CareerOS private calendar"
         subtitle="Track interviews, prep, and deadlines with real account data."
-        right={<Pill label={calendarSyncEnabled ? "Google sync enabled" : "Google sync optional"} tone={calendarSyncEnabled ? "success" : "muted"} />}
+        right={<Pill label="Google sync coming soon" tone="muted" />}
       />
 
       <Card>

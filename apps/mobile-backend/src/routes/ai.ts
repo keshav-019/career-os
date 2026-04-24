@@ -9,6 +9,7 @@ import {
   type LearningPlanWeakRowInput
 } from "@/lib/ai/career-ai";
 import { sanitizeProfileData } from "@/lib/profile-data";
+import { requireAuthAndRateLimit } from "../lib/require-auth-rate-limit";
 
 /**
  * Express port of apps/web/src/app/api/ai/{job-match,resume-review,generate-resume,learning-plan}/route.ts.
@@ -20,6 +21,9 @@ import { sanitizeProfileData } from "@/lib/profile-data";
 const router = Router();
 
 router.post("/job-match", async (req, res) => {
+  const auth = await requireAuthAndRateLimit(req, res, "ai-job-match");
+  if (!auth) return;
+
   try {
     const body = req.body as { job?: Partial<JobRecord> & Record<string, unknown>; resumes?: ResumeVersion[] };
 
@@ -38,6 +42,9 @@ router.post("/job-match", async (req, res) => {
 });
 
 router.post("/resume-review", async (req, res) => {
+  const auth = await requireAuthAndRateLimit(req, res, "ai-resume-review");
+  if (!auth) return;
+
   try {
     const body = req.body as { resume?: ResumeVersion };
 
@@ -53,6 +60,9 @@ router.post("/resume-review", async (req, res) => {
 });
 
 router.post("/generate-resume", async (req, res) => {
+  const auth = await requireAuthAndRateLimit(req, res, "ai-generate-resume");
+  if (!auth) return;
+
   try {
     const body = req.body as { job?: Partial<JobRecord> & Record<string, unknown>; profile?: unknown };
 
@@ -73,6 +83,9 @@ router.post("/generate-resume", async (req, res) => {
 });
 
 router.post("/learning-plan", async (req, res) => {
+  const auth = await requireAuthAndRateLimit(req, res, "ai-learning-plan");
+  if (!auth) return;
+
   try {
     const body = req.body as { tracks?: LearningPlanTrackInput[]; weakRows?: LearningPlanWeakRowInput[] };
 

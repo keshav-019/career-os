@@ -25,7 +25,8 @@ Consumed by browser toolbar, extension management UI, and prompts.
 
 ## Maintenance Notes
 
-Maintain consistent visual identity across all required dimensions.
+Maintain consistent visual identity across all required dimensions. Icons are generated from
+`apps/web/public/careeros-dark-mode.png` by `tools/create-chrome-store-assets.mjs`.
 
 ## Contributor Checklist
 

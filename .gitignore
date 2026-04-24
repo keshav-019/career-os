@@ -6,11 +6,17 @@ env.ts
 !.env.local.example
 .firebase/
 .codex/
+.secrets/
 .next/
 .next-desktop/
 apps/web/public/texlive/
 coverage/
 dist/
+apps/desktop/dist/
+apps/extension.crx
+apps/extension.pem
+apps/extension.zip
+release-assets/
 logs/
 node_modules/
 npm-debug.log*

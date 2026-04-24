@@ -13,6 +13,15 @@ const EXTENSION_DIRECTORY = path.resolve(process.cwd(), "../extension");
 const CHROME_ZIP_FILE_NAME = "careeros-capture-chrome.zip";
 const FIREFOX_XPI_FILE_NAME = "careeros-capture-firefox.xpi";
 const FIREFOX_EXTENSION_ID = "capture@careeros.app";
+const FIREFOX_MIN_VERSION = "140.0";
+const FIREFOX_DATA_COLLECTION_PERMISSIONS = {
+  required: [
+    "authenticationInfo",
+    "browsingActivity",
+    "websiteActivity",
+    "websiteContent"
+  ]
+};
 
 let crcTable: Uint32Array | null = null;
 
@@ -54,26 +63,61 @@ function toDosDateTime(date: Date) {
 
 type ExtensionBrowser = "chrome" | "firefox";
 
+function buildFirefoxManifest(manifest: Record<string, any>) {
+  const {
+    action,
+    content_security_policy: _chromeContentSecurityPolicy,
+    host_permissions: hostPermissions = [],
+    key: _devOnlyKey,
+    ...baseManifest
+  } = manifest;
+  const serviceWorker =
+    typeof baseManifest.background?.service_worker === "string"
+      ? baseManifest.background.service_worker
+      : "";
+  const apiPermissions = Array.isArray(baseManifest.permissions)
+    ? baseManifest.permissions
+    : [];
+  const permissions = Array.from(
+    new Set([...apiPermissions, ...hostPermissions])
+  );
+
+  return {
+    ...baseManifest,
+    manifest_version: 2,
+    permissions,
+    background: serviceWorker
+      ? {
+          scripts: [serviceWorker]
+        }
+      : baseManifest.background,
+    browser_action: action,
+    content_security_policy:
+      "script-src 'self'; object-src 'self'; connect-src 'self' http://localhost:3000 http://127.0.0.1:3000 https://*.vercel.app https://*.careeros.app https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://oauth2.googleapis.com https://github.com",
+    browser_specific_settings: {
+      gecko: {
+        id: FIREFOX_EXTENSION_ID,
+        data_collection_permissions: FIREFOX_DATA_COLLECTION_PERMISSIONS,
+        strict_min_version: FIREFOX_MIN_VERSION
+      }
+    }
+  };
+}
+
 function maybeTransformManifest(data: Buffer, zipPath: string, browser: ExtensionBrowser) {
-  if (browser !== "firefox" || zipPath !== "manifest.json") {
+  if (zipPath !== "manifest.json") {
     return data;
   }
 
   const manifest = JSON.parse(data.toString("utf8"));
+  const { key: _devOnlyKey, ...storeSafeManifest } = manifest;
+  const nextManifest =
+    browser === "firefox"
+      ? buildFirefoxManifest(manifest)
+      : storeSafeManifest;
+
   return Buffer.from(
-    `${JSON.stringify(
-      {
-        ...manifest,
-        browser_specific_settings: {
-          gecko: {
-            id: FIREFOX_EXTENSION_ID,
-            strict_min_version: "109.0"
-          }
-        }
-      },
-      null,
-      2
-    )}\n`,
+    `${JSON.stringify(nextManifest, null, 2)}\n`,
     "utf8"
   );
 }

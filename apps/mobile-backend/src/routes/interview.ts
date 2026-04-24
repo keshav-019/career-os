@@ -14,6 +14,7 @@ import {
   listCustomTestPaperRecordsSafe,
   parseCustomQuestionId
 } from "@/lib/interview/custom-test-papers";
+import { requireAuthAndRateLimit } from "../lib/require-auth-rate-limit";
 
 /**
  * Express port of apps/web/src/app/api/interview/{templates,templates/[templateId],ai-roles,mcq-review}/route.ts.
@@ -31,6 +32,9 @@ function isTestType(value: string): value is InterviewTestType {
 }
 
 router.get("/templates", async (req, res) => {
+  const auth = await requireAuthAndRateLimit(req, res, "interview-templates", { maxRequests: 60 });
+  if (!auth) return;
+
   try {
     const testType = String(req.query.testType ?? "");
     const roleId = req.query.roleId ? String(req.query.roleId) : undefined;
@@ -42,7 +46,7 @@ router.get("/templates", async (req, res) => {
         .json({ ok: false, error: "Missing or invalid testType. Expected coding, aptitude, computer-science, or ai." });
     }
 
-    const compiledTemplates = listInterviewTestTemplates(testType, limitParam, roleId);
+    const compiledTemplates = await listInterviewTestTemplates(testType, limitParam, roleId);
 
     let customTemplates: InterviewTestTemplate[] = [];
     if (testType !== "coding") {
@@ -73,6 +77,9 @@ router.get("/templates", async (req, res) => {
 });
 
 router.get("/templates/:templateId", async (req, res) => {
+  const auth = await requireAuthAndRateLimit(req, res, "interview-template-detail", { maxRequests: 60 });
+  if (!auth) return;
+
   try {
     const { templateId } = req.params;
     const testType = String(req.query.testType ?? "");
@@ -118,21 +125,24 @@ router.get("/templates/:templateId", async (req, res) => {
       }
     }
 
-    const template = getInterviewTestTemplate(testType, templateId);
+    const template = await getInterviewTestTemplate(testType, templateId);
     if (!template) {
       return res.status(404).json({ ok: false, error: "Template not found." });
     }
 
-    const seed = buildPracticeAttemptSeed(testType, templateId);
+    const seed = await buildPracticeAttemptSeed(testType, templateId);
     res.json({ ok: true, template, questions: seed.questions });
   } catch (error) {
     res.status(500).json({ ok: false, error: error instanceof Error ? error.message : "Unable to load this template." });
   }
 });
 
-router.get("/ai-roles", (_req, res) => {
+router.get("/ai-roles", async (req, res) => {
+  const auth = await requireAuthAndRateLimit(req, res, "interview-ai-roles", { maxRequests: 60 });
+  if (!auth) return;
+
   try {
-    const roles = listAiInterviewRoles();
+    const roles = await listAiInterviewRoles();
     res.json({ ok: true, roles });
   } catch (error) {
     res.status(500).json({ ok: false, error: error instanceof Error ? error.message : "Unable to list AI roles." });
@@ -140,6 +150,9 @@ router.get("/ai-roles", (_req, res) => {
 });
 
 router.post("/mcq-review", async (req, res) => {
+  const auth = await requireAuthAndRateLimit(req, res, "interview-mcq-review", { maxRequests: 120 });
+  if (!auth) return;
+
   try {
     const body = req.body as { mcqAnswers?: Record<string, string>; questionIds?: string[] } | null;
     const questionIds = Array.isArray(body?.questionIds) ? body!.questionIds : [];
@@ -153,7 +166,7 @@ router.post("/mcq-review", async (req, res) => {
     for (const questionId of questionIds) {
       let canonical: { correctOptionId: string; explanation: string } | null = null;
 
-      const compiled = getMcqQuestionById(questionId);
+      const compiled = await getMcqQuestionById(questionId);
       if (compiled) {
         canonical = { correctOptionId: compiled.correctOptionId, explanation: compiled.explanation };
       } else {

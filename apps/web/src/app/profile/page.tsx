@@ -2,24 +2,51 @@
 
 import {
   Briefcase,
+  Building2,
+  CheckCircle2,
   CirclePlus,
   FileUp,
   GraduationCap,
   Languages,
+  Loader2,
+  MapPin,
+  Paperclip,
   Pencil,
+  Save,
   ShieldCheck,
   Trash2,
   UserRound
 } from "lucide-react";
 import { onAuthStateChanged, updateProfile as updateAuthProfile } from "firebase/auth";
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
-import { auth } from "@/lib/firebase/client";
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent, type ReactNode } from "react";
+import { auth, db } from "@/lib/firebase/client";
+import { createUploadedResumeRecord } from "@/lib/firebase/resumes";
 import { PROFILE_CHANGE_EVENT, PROFILE_SAVE_REQUEST_EVENT, PROFILE_STORAGE_KEY } from "@/lib/preferences";
 import { sanitizeExternalUrl } from "@/lib/url-safety";
 
 type CareerPreference = "job" | "internship" | "both";
 type ProjectType = "hobby" | "company";
 type GradingType = "GPA" | "CGPA" | "Percentage";
+
+type ProfileFileAttachment = {
+  id: string;
+  contentType: string;
+  kind: string;
+  name: string;
+  r2Key: string;
+  signedUrl?: string;
+  size: number;
+  uploadedAt: string;
+};
+
+type Suggestion = {
+  domain?: string;
+  id: string;
+  label: string;
+  logo?: string;
+  source: string;
+};
 
 type LanguageRecord = {
   id: string;
@@ -40,6 +67,8 @@ type EducationRecord = {
   isPursuing: boolean;
   gradingType: GradingType;
   score: string;
+  summary: string;
+  certificates: ProfileFileAttachment[];
 };
 
 type ExperienceRecord = {
@@ -51,6 +80,8 @@ type ExperienceRecord = {
   isCurrent: boolean;
   description: string;
   skillsGained: string;
+  achievements: string[];
+  certificates: ProfileFileAttachment[];
 };
 
 type ProjectRecord = {
@@ -62,6 +93,7 @@ type ProjectRecord = {
   description: string;
   techStack: string;
   skillsGained: string;
+  media: ProfileFileAttachment[];
 };
 
 type CertificationRecord = {
@@ -69,7 +101,9 @@ type CertificationRecord = {
   title: string;
   issuer: string;
   issueDate: string;
+  credentialUrl: string;
   fileName: string;
+  certificates: ProfileFileAttachment[];
 };
 
 type CompetitiveExamRecord = {
@@ -136,7 +170,9 @@ function createEmptyEducation(): EducationRecord {
     endDate: "",
     isPursuing: false,
     gradingType: "CGPA",
-    score: ""
+    score: "",
+    summary: "",
+    certificates: []
   };
 }
 
@@ -149,7 +185,9 @@ function createEmptyExperience(): ExperienceRecord {
     endDate: "",
     isCurrent: false,
     description: "",
-    skillsGained: ""
+    skillsGained: "",
+    achievements: [],
+    certificates: []
   };
 }
 
@@ -162,7 +200,8 @@ function createEmptyProject(): ProjectRecord {
     endDate: "",
     description: "",
     techStack: "",
-    skillsGained: ""
+    skillsGained: "",
+    media: []
   };
 }
 
@@ -172,7 +211,9 @@ function createEmptyCertification(): CertificationRecord {
     title: "",
     issuer: "",
     issueDate: "",
-    fileName: ""
+    credentialUrl: "",
+    fileName: "",
+    certificates: []
   };
 }
 
@@ -243,6 +284,68 @@ function safeStringArray(value: unknown): string[] {
   return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
 }
 
+function toList(value: string): string[] {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function toListText(items: string[]): string {
+  return Array.from(new Set(items.map((item) => item.trim()).filter(Boolean))).join(", ");
+}
+
+function asAttachmentArray(value: unknown): ProfileFileAttachment[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item): ProfileFileAttachment | null => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const record = item as Partial<ProfileFileAttachment>;
+      const id = safeString(record.id) || createId();
+      const name = safeString(record.name);
+      const r2Key = safeString(record.r2Key);
+      if (!name || !r2Key) {
+        return null;
+      }
+
+      const attachment: ProfileFileAttachment = {
+        id,
+        contentType: safeString(record.contentType, "application/octet-stream"),
+        kind: safeString(record.kind, "document"),
+        name,
+        r2Key,
+        size: typeof record.size === "number" && Number.isFinite(record.size) ? record.size : 0,
+        uploadedAt: safeString(record.uploadedAt)
+      };
+
+      const signedUrl = safeString(record.signedUrl);
+      if (signedUrl) {
+        attachment.signedUrl = signedUrl;
+      }
+
+      return attachment;
+    })
+    .filter((item): item is ProfileFileAttachment => Boolean(item));
+}
+
+function shortFileSize(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "";
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  }
+
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function hydrateProfile(raw: unknown, seed?: { name?: string | null; email?: string | null }): ProfileData {
   const base = buildDefaultProfile(seed);
 
@@ -260,38 +363,63 @@ function hydrateProfile(raw: unknown, seed?: { name?: string | null; email?: str
     : base.languages;
 
   const education = Array.isArray(candidate.education)
-    ? candidate.education.map((record) => ({
-        ...createEmptyEducation(),
-        ...(typeof record === "object" && record !== null ? record : {})
-      }))
+    ? candidate.education.map((record) => {
+        const source = typeof record === "object" && record !== null ? (record as Partial<EducationRecord>) : {};
+        return {
+          ...createEmptyEducation(),
+          ...source,
+          certificates: asAttachmentArray(source.certificates),
+          summary: safeString(source.summary)
+        };
+      })
     : base.education;
 
   const internships = Array.isArray(candidate.internships)
-    ? candidate.internships.map((record) => ({
-        ...createEmptyExperience(),
-        ...(typeof record === "object" && record !== null ? record : {})
-      }))
+    ? candidate.internships.map((record) => {
+        const source = typeof record === "object" && record !== null ? (record as Partial<ExperienceRecord>) : {};
+        return {
+          ...createEmptyExperience(),
+          ...source,
+          achievements: safeStringArray(source.achievements),
+          certificates: asAttachmentArray(source.certificates)
+        };
+      })
     : base.internships;
 
   const employmentHistory = Array.isArray(candidate.employmentHistory)
-    ? candidate.employmentHistory.map((record) => ({
-        ...createEmptyExperience(),
-        ...(typeof record === "object" && record !== null ? record : {})
-      }))
+    ? candidate.employmentHistory.map((record) => {
+        const source = typeof record === "object" && record !== null ? (record as Partial<ExperienceRecord>) : {};
+        return {
+          ...createEmptyExperience(),
+          ...source,
+          achievements: safeStringArray(source.achievements),
+          certificates: asAttachmentArray(source.certificates)
+        };
+      })
     : base.employmentHistory;
 
   const projects = Array.isArray(candidate.projects)
-    ? candidate.projects.map((record) => ({
-        ...createEmptyProject(),
-        ...(typeof record === "object" && record !== null ? record : {})
-      }))
+    ? candidate.projects.map((record) => {
+        const source = typeof record === "object" && record !== null ? (record as Partial<ProjectRecord>) : {};
+        return {
+          ...createEmptyProject(),
+          ...source,
+          media: asAttachmentArray(source.media)
+        };
+      })
     : base.projects;
 
   const certifications = Array.isArray(candidate.certifications)
-    ? candidate.certifications.map((record) => ({
-        ...createEmptyCertification(),
-        ...(typeof record === "object" && record !== null ? record : {})
-      }))
+    ? candidate.certifications.map((record) => {
+        const source = typeof record === "object" && record !== null ? (record as Partial<CertificationRecord>) : {};
+        return {
+          ...createEmptyCertification(),
+          ...source,
+          certificates: asAttachmentArray(source.certificates),
+          credentialUrl: safeString(source.credentialUrl),
+          fileName: safeString(source.fileName)
+        };
+      })
     : base.certifications;
 
   const competitiveExams = Array.isArray(candidate.competitiveExams)
@@ -374,6 +502,123 @@ function readCloudinaryErrorMessage(payload: unknown): string {
   return "Failed to upload profile picture.";
 }
 
+function RichTextEditor({
+  label,
+  onChange,
+  placeholder,
+  value
+}: {
+  label: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  value: string;
+}) {
+  const editorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (editorRef.current && document.activeElement !== editorRef.current && editorRef.current.innerHTML !== value) {
+      editorRef.current.innerHTML = value;
+    }
+  }, [value]);
+
+  const applyCommand = (command: "bold" | "insertOrderedList" | "insertUnorderedList" | "italic") => {
+    editorRef.current?.focus();
+    document.execCommand(command);
+    onChange(editorRef.current?.innerHTML ?? "");
+  };
+
+  return (
+    <div className="profile-field span-2">
+      <span>{label}</span>
+      <div className="profile-rich-editor-toolbar" aria-label={`${label} formatting`}>
+        <button onClick={() => applyCommand("bold")} type="button">
+          B
+        </button>
+        <button onClick={() => applyCommand("italic")} type="button">
+          I
+        </button>
+        <button onClick={() => applyCommand("insertUnorderedList")} type="button">
+          Bullets
+        </button>
+        <button onClick={() => applyCommand("insertOrderedList")} type="button">
+          Numbers
+        </button>
+      </div>
+      <div
+        className="profile-rich-editor"
+        contentEditable
+        data-placeholder={placeholder}
+        onInput={(event) => onChange(event.currentTarget.innerHTML)}
+        ref={editorRef}
+        role="textbox"
+        suppressContentEditableWarning
+      />
+    </div>
+  );
+}
+
+function AttachmentList({
+  attachments,
+  emptyLabel,
+  onRemove
+}: {
+  attachments: ProfileFileAttachment[];
+  emptyLabel?: string;
+  onRemove: (attachmentId: string) => void;
+}) {
+  if (attachments.length === 0) {
+    return emptyLabel ? <p className="muted span-2">{emptyLabel}</p> : null;
+  }
+
+  return (
+    <div className="profile-attachment-list span-2">
+      {attachments.map((attachment) => (
+        <div className="profile-attachment-chip" key={attachment.id}>
+          <Paperclip size={13} />
+          {attachment.signedUrl ? (
+            <a href={attachment.signedUrl} rel="noreferrer" target="_blank">
+              {attachment.name}
+            </a>
+          ) : (
+            <span>{attachment.name}</span>
+          )}
+          {attachment.size ? <small>{shortFileSize(attachment.size)}</small> : null}
+          <button aria-label={`Remove ${attachment.name}`} onClick={() => onRemove(attachment.id)} type="button">
+            <Trash2 size={12} />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function SuggestionBox({
+  emptyText,
+  icon,
+  onAdd,
+  suggestions
+}: {
+  emptyText: string;
+  icon: ReactNode;
+  onAdd: (label: string) => void;
+  suggestions: Suggestion[];
+}) {
+  if (suggestions.length === 0) {
+    return <p className="muted">{emptyText}</p>;
+  }
+
+  return (
+    <div className="profile-suggestion-list">
+      {suggestions.map((suggestion) => (
+        <button key={`${suggestion.source}-${suggestion.id}`} onClick={() => onAdd(suggestion.label.replace(/^Other:\s*/i, ""))} type="button">
+          {icon}
+          <span>{suggestion.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function ProfilePage() {
   const [profile, setProfile] = useState<ProfileData>(() => buildDefaultProfile());
   const [educationModalOpen, setEducationModalOpen] = useState(false);
@@ -391,11 +636,22 @@ export default function ProfilePage() {
   const [awardDraft, setAwardDraft] = useState("");
   const [clubDraft, setClubDraft] = useState("");
   const [achievementDraft, setAchievementDraft] = useState("");
+  const [experienceAchievementDrafts, setExperienceAchievementDrafts] = useState<Record<string, string>>({});
+  const [activeUserId, setActiveUserId] = useState<string | null>(auth?.currentUser?.uid ?? null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileSaveNotice, setProfileSaveNotice] = useState<string | null>(null);
+  const [profileSaveError, setProfileSaveError] = useState<string | null>(null);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+  const [uploadingFileKey, setUploadingFileKey] = useState<string | null>(null);
   const [profilePhotoError, setProfilePhotoError] = useState<string | null>(null);
   const [profilePhotoNotice, setProfilePhotoNotice] = useState<string | null>(null);
+  const [locationQuery, setLocationQuery] = useState("");
+  const [locationSuggestions, setLocationSuggestions] = useState<Suggestion[]>([]);
+  const [companyQuery, setCompanyQuery] = useState("");
+  const [companySuggestions, setCompanySuggestions] = useState<Suggestion[]>([]);
   const profilePhotoInputRef = useRef<HTMLInputElement>(null);
+  const preferredLocationList = useMemo(() => toList(profile.preferredLocations), [profile.preferredLocations]);
+  const blockedCompanyList = useMemo(() => toList(profile.blockedCompanies), [profile.blockedCompanies]);
   const lastSavedAt = useMemo(
     () => (profile.updatedAt ? new Date(profile.updatedAt).toLocaleString() : ""),
     [profile.updatedAt]
@@ -451,7 +707,16 @@ export default function ProfilePage() {
       return;
     }
 
+    let unsubscribeProfile: (() => void) | null = null;
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (unsubscribeProfile) {
+        unsubscribeProfile();
+        unsubscribeProfile = null;
+      }
+
+      setActiveUserId(user?.uid ?? null);
+
       setProfile((current) => {
         const fullName = current.fullName || user?.displayName || "";
         const email = current.email || user?.email || "";
@@ -468,10 +733,93 @@ export default function ProfilePage() {
           photoURL
         };
       });
+
+      if (!user || !db) {
+        return;
+      }
+
+      unsubscribeProfile = onSnapshot(
+        doc(db, "users", user.uid),
+        (snapshot) => {
+          const data = snapshot.data() as { profile?: unknown } | undefined;
+          if (!data?.profile) {
+            return;
+          }
+
+          const hydratedProfile = hydrateProfile(data.profile, {
+            email: user.email,
+            name: user.displayName
+          });
+          setProfile(hydratedProfile);
+
+          if (typeof window !== "undefined") {
+            window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(hydratedProfile));
+            window.dispatchEvent(new Event(PROFILE_CHANGE_EVENT));
+          }
+        },
+        (error) => {
+          setProfileSaveError(error.message || "Unable to load saved profile from Firebase.");
+        }
+      );
     });
 
-    return unsubscribe;
+    return () => {
+      if (unsubscribeProfile) {
+        unsubscribeProfile();
+      }
+      unsubscribe();
+    };
   }, []);
+
+  useEffect(() => {
+    const query = locationQuery.trim();
+    if (query.length < 2) {
+      setLocationSuggestions([]);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const idToken = await auth?.currentUser?.getIdToken().catch(() => null);
+          const response = await fetch(`/api/profile/locations?q=${encodeURIComponent(query)}`, {
+            headers: idToken ? { authorization: `Bearer ${idToken}` } : undefined
+          });
+          const payload = (await response.json()) as { results?: Suggestion[] };
+          setLocationSuggestions(Array.isArray(payload.results) ? payload.results : []);
+        } catch {
+          setLocationSuggestions([]);
+        }
+      })();
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [locationQuery]);
+
+  useEffect(() => {
+    const query = companyQuery.trim();
+    if (query.length < 2) {
+      setCompanySuggestions([]);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const idToken = await auth?.currentUser?.getIdToken().catch(() => null);
+          const response = await fetch(`/api/profile/companies?q=${encodeURIComponent(query)}`, {
+            headers: idToken ? { authorization: `Bearer ${idToken}` } : undefined
+          });
+          const payload = (await response.json()) as { results?: Suggestion[] };
+          setCompanySuggestions(Array.isArray(payload.results) ? payload.results : []);
+        } catch {
+          setCompanySuggestions([]);
+        }
+      })();
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [companyQuery]);
 
   const handleOpenProfilePhotoPicker = () => {
     if (isUploadingPhoto) {
@@ -575,6 +923,8 @@ export default function ProfilePage() {
     };
 
     setIsSavingProfile(true);
+    setProfileSaveNotice(null);
+    setProfileSaveError(null);
 
     try {
       setProfile(nextProfile);
@@ -585,25 +935,42 @@ export default function ProfilePage() {
       }
 
       const activeAuth = auth;
-      if (activeAuth?.currentUser) {
-        const nextAuthProfile: { displayName?: string | null; photoURL?: string | null } = {};
-        const currentDisplayName = activeAuth.currentUser.displayName?.trim() ?? "";
-        const currentPhotoURL = sanitizeExternalUrl(activeAuth.currentUser.photoURL) ?? "";
-
-        if (normalizedFullName && currentDisplayName !== normalizedFullName) {
-          nextAuthProfile.displayName = normalizedFullName;
-        }
-
-        if (currentPhotoURL !== normalizedPhotoURL) {
-          nextAuthProfile.photoURL = normalizedPhotoURL || null;
-        }
-
-        if (Object.keys(nextAuthProfile).length > 0) {
-          await updateAuthProfile(activeAuth.currentUser, nextAuthProfile);
-        }
+      if (!activeAuth?.currentUser || !db) {
+        throw new Error("Sign in with Firebase before saving your profile.");
       }
+
+      const nextAuthProfile: { displayName?: string | null; photoURL?: string | null } = {};
+      const currentDisplayName = activeAuth.currentUser.displayName?.trim() ?? "";
+      const currentPhotoURL = sanitizeExternalUrl(activeAuth.currentUser.photoURL) ?? "";
+
+      if (normalizedFullName && currentDisplayName !== normalizedFullName) {
+        nextAuthProfile.displayName = normalizedFullName;
+      }
+
+      if (currentPhotoURL !== normalizedPhotoURL) {
+        nextAuthProfile.photoURL = normalizedPhotoURL || null;
+      }
+
+      if (Object.keys(nextAuthProfile).length > 0) {
+        await updateAuthProfile(activeAuth.currentUser, nextAuthProfile);
+      }
+
+      await setDoc(
+        doc(db, "users", activeAuth.currentUser.uid),
+        {
+          displayName: normalizedFullName,
+          email: normalizedEmail,
+          photoURL: normalizedPhotoURL,
+          profile: nextProfile,
+          profileUpdatedAt: nextProfile.updatedAt,
+          updatedAt: nextProfile.updatedAt
+        },
+        { merge: true }
+      );
+      setProfileSaveNotice("Profile updated successfully.");
     } catch (error) {
       console.error("Failed to save profile:", error);
+      setProfileSaveError(error instanceof Error ? error.message : "Failed to save profile.");
     } finally {
       setIsSavingProfile(false);
     }
@@ -627,6 +994,100 @@ export default function ProfilePage() {
       ...current,
       [key]: value
     }));
+  };
+
+  const addPreferredLocation = (label: string) => {
+    const trimmed = label.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    updateProfileField("preferredLocations", toListText([...preferredLocationList, trimmed]));
+    setLocationQuery("");
+    setLocationSuggestions([]);
+  };
+
+  const removePreferredLocation = (label: string) => {
+    updateProfileField(
+      "preferredLocations",
+      toListText(preferredLocationList.filter((item) => item !== label))
+    );
+  };
+
+  const addBlockedCompany = (label: string) => {
+    const trimmed = label.trim().replace(/^Other:\s*/i, "");
+    if (!trimmed) {
+      return;
+    }
+
+    updateProfileField("blockedCompanies", toListText([...blockedCompanyList, trimmed]));
+    setCompanyQuery("");
+    setCompanySuggestions([]);
+  };
+
+  const removeBlockedCompany = (label: string) => {
+    updateProfileField(
+      "blockedCompanies",
+      toListText(blockedCompanyList.filter((item) => item !== label))
+    );
+  };
+
+  const uploadProfileFile = async (file: File, kind: string): Promise<ProfileFileAttachment> => {
+    const activeAuth = auth;
+    const currentUser = activeAuth?.currentUser;
+    if (!currentUser) {
+      throw new Error("Sign in before uploading profile documents.");
+    }
+
+    const idToken = await currentUser.getIdToken();
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("kind", kind);
+
+    const response = await fetch("/api/profile/files", {
+      body: formData,
+      headers: { authorization: `Bearer ${idToken}` },
+      method: "POST"
+    });
+    const payload = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      file?: ProfileFileAttachment;
+    };
+
+    if (!response.ok || !payload.file) {
+      throw new Error(payload.error || "Unable to upload file.");
+    }
+
+    return payload.file;
+  };
+
+  const handleProfileDocumentUpload = async (
+    event: ChangeEvent<HTMLInputElement>,
+    options: {
+      kind: string;
+      onUploaded: (attachment: ProfileFileAttachment) => void;
+      uploadingKey: string;
+    }
+  ) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) {
+      return;
+    }
+
+    setUploadingFileKey(options.uploadingKey);
+    setProfileSaveError(null);
+    setProfileSaveNotice(null);
+
+    try {
+      const attachment = await uploadProfileFile(file, options.kind);
+      options.onUploaded(attachment);
+      setProfileSaveNotice(`${attachment.name} uploaded. Click Update Profile to save the attachment metadata.`);
+    } catch (error) {
+      setProfileSaveError(error instanceof Error ? error.message : "File upload failed.");
+    } finally {
+      setUploadingFileKey(null);
+    }
   };
 
   const openAddEducationModal = () => {
@@ -669,14 +1130,39 @@ export default function ProfilePage() {
     setEducationDraft(createEmptyEducation());
   };
 
-  const handleResumeFile = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleResumeFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    event.target.value = "";
     if (!file) {
       return;
     }
 
-    updateProfileField("resumeFileName", file.name);
-    event.target.value = "";
+    setUploadingFileKey("resume-upload");
+    setProfileSaveError(null);
+    setProfileSaveNotice(null);
+
+    try {
+      const attachment = await uploadProfileFile(file, "resume");
+      updateProfileField("resumeFileName", attachment.name);
+
+      const userId = activeUserId ?? auth?.currentUser?.uid;
+      if (userId) {
+        await createUploadedResumeRecord(userId, {
+          contentType: attachment.contentType,
+          fileName: attachment.name,
+          fileR2Key: attachment.r2Key,
+          fileSize: attachment.size,
+          fileUrl: attachment.signedUrl,
+          label: attachment.name.replace(/\.[^.]+$/, "")
+        });
+      }
+
+      setProfileSaveNotice(`${attachment.name} uploaded and added to Resume Gallery. Click Update Profile to save the profile link.`);
+    } catch (error) {
+      setProfileSaveError(error instanceof Error ? error.message : "Resume upload failed.");
+    } finally {
+      setUploadingFileKey(null);
+    }
   };
 
   const addLanguage = () => {
@@ -771,6 +1257,82 @@ export default function ProfilePage() {
     clear();
   };
 
+  const addExperienceAchievement = (key: "internships" | "employmentHistory", recordId: string, value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return;
+    }
+
+    updateProfileField(
+      key,
+      profile[key].map((item) =>
+        item.id === recordId ? { ...item, achievements: [...item.achievements, trimmed] } : item
+      )
+    );
+    setExperienceAchievementDrafts((current) => ({ ...current, [recordId]: "" }));
+  };
+
+  const removeExperienceAchievement = (
+    key: "internships" | "employmentHistory",
+    recordId: string,
+    achievement: string
+  ) => {
+    updateProfileField(
+      key,
+      profile[key].map((item) =>
+        item.id === recordId
+          ? { ...item, achievements: item.achievements.filter((entry) => entry !== achievement) }
+          : item
+      )
+    );
+  };
+
+  const removeEducationAttachment = (recordId: string, attachmentId: string) => {
+    updateProfileField(
+      "education",
+      profile.education.map((item) =>
+        item.id === recordId
+          ? { ...item, certificates: item.certificates.filter((attachment) => attachment.id !== attachmentId) }
+          : item
+      )
+    );
+  };
+
+  const removeExperienceAttachment = (
+    key: "internships" | "employmentHistory",
+    recordId: string,
+    attachmentId: string
+  ) => {
+    updateProfileField(
+      key,
+      profile[key].map((item) =>
+        item.id === recordId
+          ? { ...item, certificates: item.certificates.filter((attachment) => attachment.id !== attachmentId) }
+          : item
+      )
+    );
+  };
+
+  const removeProjectMedia = (recordId: string, attachmentId: string) => {
+    updateProfileField(
+      "projects",
+      profile.projects.map((item) =>
+        item.id === recordId ? { ...item, media: item.media.filter((attachment) => attachment.id !== attachmentId) } : item
+      )
+    );
+  };
+
+  const removeCertificationAttachment = (recordId: string, attachmentId: string) => {
+    updateProfileField(
+      "certifications",
+      profile.certifications.map((item) =>
+        item.id === recordId
+          ? { ...item, certificates: item.certificates.filter((attachment) => attachment.id !== attachmentId) }
+          : item
+      )
+    );
+  };
+
   return (
     <div className="page-stack profile-page-stack">
       <section className="career-card profile-hero-card">
@@ -782,10 +1344,34 @@ export default function ProfilePage() {
           </div>
           <div className="profile-status-badges">
             <span className="pill brand">Manual save</span>
-            <span className="pill">{isSavingProfile ? "Saving profile..." : "Click Update Profile to save"}</span>
+            <span className={isSavingProfile ? "pill brand" : "pill"}>
+              {isSavingProfile ? (
+                <>
+                  <Loader2 className="spin" size={12} /> Saving profile...
+                </>
+              ) : (
+                "Click Update Profile to save"
+              )}
+            </span>
             <span className="pill">{lastSavedAt ? `Last saved ${lastSavedAt}` : "Not saved yet"}</span>
+            <button className="primary-button" disabled={isSavingProfile} onClick={() => void handleSaveProfile()} type="button">
+              {isSavingProfile ? <Loader2 className="spin" size={14} /> : <Save size={14} />}
+              Update Profile
+            </button>
           </div>
         </div>
+        {profileSaveNotice ? (
+          <div className="settings-feedback success profile-save-banner">
+            <CheckCircle2 size={14} />
+            {profileSaveNotice}
+          </div>
+        ) : null}
+        {profileSaveError ? (
+          <div className="settings-feedback error profile-save-banner">
+            <ShieldCheck size={14} />
+            {profileSaveError}
+          </div>
+        ) : null}
       </section>
 
       <section className="career-card">
@@ -966,15 +1552,39 @@ export default function ProfilePage() {
             />
           </label>
 
-          <label className="profile-field">
-            Preferred locations
-            <textarea
-              onChange={(event) => updateProfileField("preferredLocations", event.target.value)}
-              placeholder="Bengaluru, Pune, Hyderabad, Remote"
-              rows={2}
-              value={profile.preferredLocations}
+          <div className="profile-field">
+            <span>Preferred locations</span>
+            <div className="profile-suggest-field">
+              <input
+                onChange={(event) => setLocationQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    addPreferredLocation(locationQuery);
+                  }
+                }}
+                placeholder="Search Indian city or add Remote"
+                type="text"
+                value={locationQuery}
+              />
+              <button className="ghost-button" onClick={() => addPreferredLocation(locationQuery)} type="button">
+                Add
+              </button>
+            </div>
+            <SuggestionBox
+              emptyText="Type at least two characters to search Indian locations."
+              icon={<MapPin size={13} />}
+              onAdd={addPreferredLocation}
+              suggestions={locationSuggestions}
             />
-          </label>
+            <div className="tag-cloud profile-tag-list">
+              {preferredLocationList.map((location) => (
+                <button className="profile-tag-chip" key={location} onClick={() => removePreferredLocation(location)} type="button">
+                  {location} <Trash2 size={12} />
+                </button>
+              ))}
+            </div>
+          </div>
 
           <label className="profile-field">
             Key skills
@@ -986,15 +1596,39 @@ export default function ProfilePage() {
             />
           </label>
 
-          <label className="profile-field">
-            Blocked companies
-            <textarea
-              onChange={(event) => updateProfileField("blockedCompanies", event.target.value)}
-              placeholder="Companies you do not want to receive opportunities from"
-              rows={2}
-              value={profile.blockedCompanies}
+          <div className="profile-field">
+            <span>Blocked companies</span>
+            <div className="profile-suggest-field">
+              <input
+                onChange={(event) => setCompanyQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    addBlockedCompany(companyQuery);
+                  }
+                }}
+                placeholder="Search company or type a custom name"
+                type="text"
+                value={companyQuery}
+              />
+              <button className="ghost-button" onClick={() => addBlockedCompany(companyQuery)} type="button">
+                Add
+              </button>
+            </div>
+            <SuggestionBox
+              emptyText="Type at least two characters to search companies."
+              icon={<Building2 size={13} />}
+              onAdd={addBlockedCompany}
+              suggestions={companySuggestions}
             />
-          </label>
+            <div className="tag-cloud profile-tag-list">
+              {blockedCompanyList.map((company) => (
+                <button className="profile-tag-chip" key={company} onClick={() => removeBlockedCompany(company)} type="button">
+                  {company} <Trash2 size={12} />
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
@@ -1052,6 +1686,11 @@ export default function ProfilePage() {
                     {record.gradingType}: {record.score || "Not added"}
                   </span>
                 </div>
+                {record.summary ? <p>{record.summary}</p> : null}
+                <AttachmentList
+                  attachments={record.certificates}
+                  onRemove={(attachmentId) => removeEducationAttachment(record.id, attachmentId)}
+                />
               </article>
             ))}
           </div>
@@ -1290,21 +1929,19 @@ export default function ProfilePage() {
                         <span>Currently active</span>
                       </label>
 
-                      <label className="profile-field span-2">
-                        Description
-                        <textarea
-                          onChange={(event) =>
-                            updateProfileField(
-                              "internships",
-                              profile.internships.map((item) =>
-                                item.id === record.id ? { ...item, description: event.target.value } : item
-                              )
+                      <RichTextEditor
+                        label="Summary"
+                        onChange={(value) =>
+                          updateProfileField(
+                            "internships",
+                            profile.internships.map((item) =>
+                              item.id === record.id ? { ...item, description: value } : item
                             )
-                          }
-                          rows={3}
-                          value={record.description}
-                        />
-                      </label>
+                          )
+                        }
+                        placeholder="Add bullet points for responsibilities, impact, and outcomes."
+                        value={record.description}
+                      />
 
                       <label className="profile-field span-2">
                         Skills gained
@@ -1322,6 +1959,78 @@ export default function ProfilePage() {
                           value={record.skillsGained}
                         />
                       </label>
+
+                      <div className="profile-field span-2">
+                        <span>Achievements</span>
+                        <div className="profile-quick-add-row">
+                          <input
+                            onChange={(event) =>
+                              setExperienceAchievementDrafts((current) => ({
+                                ...current,
+                                [record.id]: event.target.value
+                              }))
+                            }
+                            placeholder="Add an achievement from this internship"
+                            type="text"
+                            value={experienceAchievementDrafts[record.id] ?? ""}
+                          />
+                          <button
+                            className="ghost-button"
+                            onClick={() =>
+                              addExperienceAchievement("internships", record.id, experienceAchievementDrafts[record.id] ?? "")
+                            }
+                            type="button"
+                          >
+                            Add
+                          </button>
+                        </div>
+                        <div className="tag-cloud profile-tag-list">
+                          {record.achievements.map((achievement) => (
+                            <button
+                              className="profile-tag-chip"
+                              key={achievement}
+                              onClick={() => removeExperienceAchievement("internships", record.id, achievement)}
+                              type="button"
+                            >
+                              {achievement} <Trash2 size={12} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <label className="profile-field span-2">
+                        Certificates
+                        <input
+                          accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp"
+                          disabled={uploadingFileKey === `internship-${record.id}`}
+                          onChange={(event) =>
+                            void handleProfileDocumentUpload(event, {
+                              kind: "internship-certificate",
+                              onUploaded: (attachment) =>
+                                updateProfileField(
+                                  "internships",
+                                  profile.internships.map((item) =>
+                                    item.id === record.id
+                                      ? { ...item, certificates: [...item.certificates, attachment] }
+                                      : item
+                                  )
+                                ),
+                              uploadingKey: `internship-${record.id}`
+                            })
+                          }
+                          type="file"
+                        />
+                      </label>
+                      {uploadingFileKey === `internship-${record.id}` ? (
+                        <p className="muted span-2">
+                          <Loader2 className="spin" size={13} /> Uploading certificate...
+                        </p>
+                      ) : null}
+                      <AttachmentList
+                        attachments={record.certificates}
+                        emptyLabel="No internship certificates attached yet."
+                        onRemove={(attachmentId) => removeExperienceAttachment("internships", record.id, attachmentId)}
+                      />
 
                       <button
                         className="ghost-button profile-remove"
@@ -1447,21 +2156,19 @@ export default function ProfilePage() {
                         <span>Current company</span>
                       </label>
 
-                      <label className="profile-field span-2">
-                        Description
-                        <textarea
-                          onChange={(event) =>
-                            updateProfileField(
-                              "employmentHistory",
-                              profile.employmentHistory.map((item) =>
-                                item.id === record.id ? { ...item, description: event.target.value } : item
-                              )
+                      <RichTextEditor
+                        label="Summary"
+                        onChange={(value) =>
+                          updateProfileField(
+                            "employmentHistory",
+                            profile.employmentHistory.map((item) =>
+                              item.id === record.id ? { ...item, description: value } : item
                             )
-                          }
-                          rows={3}
-                          value={record.description}
-                        />
-                      </label>
+                          )
+                        }
+                        placeholder="Add bullet points for responsibilities, impact, and outcomes."
+                        value={record.description}
+                      />
 
                       <label className="profile-field span-2">
                         Skills gained
@@ -1479,6 +2186,84 @@ export default function ProfilePage() {
                           value={record.skillsGained}
                         />
                       </label>
+
+                      <div className="profile-field span-2">
+                        <span>Achievements</span>
+                        <div className="profile-quick-add-row">
+                          <input
+                            onChange={(event) =>
+                              setExperienceAchievementDrafts((current) => ({
+                                ...current,
+                                [record.id]: event.target.value
+                              }))
+                            }
+                            placeholder="Add an achievement from this role"
+                            type="text"
+                            value={experienceAchievementDrafts[record.id] ?? ""}
+                          />
+                          <button
+                            className="ghost-button"
+                            onClick={() =>
+                              addExperienceAchievement(
+                                "employmentHistory",
+                                record.id,
+                                experienceAchievementDrafts[record.id] ?? ""
+                              )
+                            }
+                            type="button"
+                          >
+                            Add
+                          </button>
+                        </div>
+                        <div className="tag-cloud profile-tag-list">
+                          {record.achievements.map((achievement) => (
+                            <button
+                              className="profile-tag-chip"
+                              key={achievement}
+                              onClick={() => removeExperienceAchievement("employmentHistory", record.id, achievement)}
+                              type="button"
+                            >
+                              {achievement} <Trash2 size={12} />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <label className="profile-field span-2">
+                        Certificates
+                        <input
+                          accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp"
+                          disabled={uploadingFileKey === `employment-${record.id}`}
+                          onChange={(event) =>
+                            void handleProfileDocumentUpload(event, {
+                              kind: "employment-certificate",
+                              onUploaded: (attachment) =>
+                                updateProfileField(
+                                  "employmentHistory",
+                                  profile.employmentHistory.map((item) =>
+                                    item.id === record.id
+                                      ? { ...item, certificates: [...item.certificates, attachment] }
+                                      : item
+                                  )
+                                ),
+                              uploadingKey: `employment-${record.id}`
+                            })
+                          }
+                          type="file"
+                        />
+                      </label>
+                      {uploadingFileKey === `employment-${record.id}` ? (
+                        <p className="muted span-2">
+                          <Loader2 className="spin" size={13} /> Uploading certificate...
+                        </p>
+                      ) : null}
+                      <AttachmentList
+                        attachments={record.certificates}
+                        emptyLabel="No employment certificates attached yet."
+                        onRemove={(attachmentId) =>
+                          removeExperienceAttachment("employmentHistory", record.id, attachmentId)
+                        }
+                      />
 
                       <button
                         className="ghost-button profile-remove"
@@ -1637,6 +2422,38 @@ export default function ProfilePage() {
                     />
                   </label>
 
+                  <label className="profile-field span-2">
+                    Project media
+                    <input
+                      accept=".pdf,.png,.jpg,.jpeg,.webp"
+                      disabled={uploadingFileKey === `project-${project.id}`}
+                      onChange={(event) =>
+                        void handleProfileDocumentUpload(event, {
+                          kind: "project-media",
+                          onUploaded: (attachment) =>
+                            updateProfileField(
+                              "projects",
+                              profile.projects.map((item) =>
+                                item.id === project.id ? { ...item, media: [...item.media, attachment] } : item
+                              )
+                            ),
+                          uploadingKey: `project-${project.id}`
+                        })
+                      }
+                      type="file"
+                    />
+                  </label>
+                  {uploadingFileKey === `project-${project.id}` ? (
+                    <p className="muted span-2">
+                      <Loader2 className="spin" size={13} /> Uploading project media...
+                    </p>
+                  ) : null}
+                  <AttachmentList
+                    attachments={project.media}
+                    emptyLabel="No project media attached yet."
+                    onRemove={(attachmentId) => removeProjectMedia(project.id, attachmentId)}
+                  />
+
                   <button
                     className="ghost-button profile-remove"
                     onClick={() =>
@@ -1732,25 +2549,64 @@ export default function ProfilePage() {
                     </label>
 
                     <label className="profile-field">
-                      Certificate file
+                      Certificate link
                       <input
-                        onChange={(event) => {
-                          const fileName = event.target.files?.[0]?.name ?? "";
+                        onChange={(event) =>
                           updateProfileField(
                             "certifications",
                             profile.certifications.map((item) =>
-                              item.id === certification.id ? { ...item, fileName } : item
+                              item.id === certification.id ? { ...item, credentialUrl: event.target.value } : item
                             )
-                          );
-                          event.target.value = "";
-                        }}
+                          )
+                        }
+                        placeholder="https://..."
+                        type="url"
+                        value={certification.credentialUrl}
+                      />
+                    </label>
+
+                    <label className="profile-field span-2">
+                      Certificate file
+                      <input
+                        accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp"
+                        disabled={uploadingFileKey === `certification-${certification.id}`}
+                        onChange={(event) =>
+                          void handleProfileDocumentUpload(event, {
+                            kind: "certification-certificate",
+                            onUploaded: (attachment) =>
+                              updateProfileField(
+                                "certifications",
+                                profile.certifications.map((item) =>
+                                  item.id === certification.id
+                                    ? {
+                                        ...item,
+                                        certificates: [...item.certificates, attachment],
+                                        fileName: attachment.name
+                                      }
+                                    : item
+                                )
+                              ),
+                            uploadingKey: `certification-${certification.id}`
+                          })
+                        }
                         type="file"
                       />
                     </label>
 
-                    <p className="muted span-2">
-                      {certification.fileName ? `Attached file: ${certification.fileName}` : "No file attached yet."}
-                    </p>
+                    {uploadingFileKey === `certification-${certification.id}` ? (
+                      <p className="muted span-2">
+                        <Loader2 className="spin" size={13} /> Uploading certificate...
+                      </p>
+                    ) : null}
+                    <AttachmentList
+                      attachments={certification.certificates}
+                      emptyLabel={
+                        certification.credentialUrl
+                          ? `Certificate link saved: ${certification.credentialUrl}`
+                          : "No certificate file or link attached yet."
+                      }
+                      onRemove={(attachmentId) => removeCertificationAttachment(certification.id, attachmentId)}
+                    />
 
                     <button
                       className="ghost-button profile-remove"
@@ -2016,12 +2872,23 @@ export default function ProfilePage() {
         <div className="profile-form-grid">
           <label className="profile-field span-2">
             Upload latest resume
-            <input accept=".pdf,.doc,.docx" onChange={handleResumeFile} type="file" />
+            <input
+              accept=".pdf,.doc,.docx,.txt,.md,.markdown"
+              disabled={uploadingFileKey === "resume-upload"}
+              onChange={(event) => void handleResumeFile(event)}
+              type="file"
+            />
           </label>
 
           <div className="upload-note span-2">
-            <FileUp size={16} />
-            <p>{profile.resumeFileName ? `Current resume: ${profile.resumeFileName}` : "No resume uploaded yet."}</p>
+            {uploadingFileKey === "resume-upload" ? <Loader2 className="spin" size={16} /> : <FileUp size={16} />}
+            <p>
+              {uploadingFileKey === "resume-upload"
+                ? "Uploading resume to protected storage..."
+                : profile.resumeFileName
+                  ? `Current resume: ${profile.resumeFileName}. It also appears in Resume Gallery.`
+                  : "No resume uploaded yet."}
+            </p>
           </div>
         </div>
       </section>
@@ -2124,6 +2991,51 @@ export default function ProfilePage() {
                 />
               </label>
 
+              <label className="profile-field span-2">
+                Education summary
+                <textarea
+                  onChange={(event) => setEducationDraft((current) => ({ ...current, summary: event.target.value }))}
+                  placeholder="Summarize what you studied, major academic work, thesis, specialization, or relevant coursework."
+                  rows={6}
+                  value={educationDraft.summary}
+                />
+              </label>
+
+              <label className="profile-field span-2">
+                Certificates or transcripts
+                <input
+                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp"
+                  disabled={uploadingFileKey === `education-draft-${educationDraft.id}`}
+                  onChange={(event) =>
+                    void handleProfileDocumentUpload(event, {
+                      kind: "education-certificate",
+                      onUploaded: (attachment) =>
+                        setEducationDraft((current) => ({
+                          ...current,
+                          certificates: [...current.certificates, attachment]
+                        })),
+                      uploadingKey: `education-draft-${educationDraft.id}`
+                    })
+                  }
+                  type="file"
+                />
+              </label>
+              {uploadingFileKey === `education-draft-${educationDraft.id}` ? (
+                <p className="muted span-2">
+                  <Loader2 className="spin" size={13} /> Uploading education document...
+                </p>
+              ) : null}
+              <AttachmentList
+                attachments={educationDraft.certificates}
+                emptyLabel="No education certificates attached yet."
+                onRemove={(attachmentId) =>
+                  setEducationDraft((current) => ({
+                    ...current,
+                    certificates: current.certificates.filter((attachment) => attachment.id !== attachmentId)
+                  }))
+                }
+              />
+
               <div className="modal-actions span-2">
                 <button
                   className="ghost-button"
@@ -2212,16 +3124,12 @@ export default function ProfilePage() {
                 <span>Currently active</span>
               </label>
 
-              <label className="profile-field span-2">
-                Description
-                <textarea
-                  onChange={(event) =>
-                    setExperienceDraft((current) => ({ ...current, description: event.target.value }))
-                  }
-                  rows={4}
-                  value={experienceDraft.description}
-                />
-              </label>
+              <RichTextEditor
+                label="Summary"
+                onChange={(value) => setExperienceDraft((current) => ({ ...current, description: value }))}
+                placeholder="Add bullet points for responsibilities, impact, and outcomes."
+                value={experienceDraft.description}
+              />
 
               <label className="profile-field span-2">
                 Skills gained
@@ -2234,6 +3142,41 @@ export default function ProfilePage() {
                   value={experienceDraft.skillsGained}
                 />
               </label>
+
+              <label className="profile-field span-2">
+                Certificates
+                <input
+                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp"
+                  disabled={uploadingFileKey === `experience-draft-${experienceDraft.id}`}
+                  onChange={(event) =>
+                    void handleProfileDocumentUpload(event, {
+                      kind: `${experienceModalType}-certificate`,
+                      onUploaded: (attachment) =>
+                        setExperienceDraft((current) => ({
+                          ...current,
+                          certificates: [...current.certificates, attachment]
+                        })),
+                      uploadingKey: `experience-draft-${experienceDraft.id}`
+                    })
+                  }
+                  type="file"
+                />
+              </label>
+              {uploadingFileKey === `experience-draft-${experienceDraft.id}` ? (
+                <p className="muted span-2">
+                  <Loader2 className="spin" size={13} /> Uploading certificate...
+                </p>
+              ) : null}
+              <AttachmentList
+                attachments={experienceDraft.certificates}
+                emptyLabel="No certificates attached yet."
+                onRemove={(attachmentId) =>
+                  setExperienceDraft((current) => ({
+                    ...current,
+                    certificates: current.certificates.filter((attachment) => attachment.id !== attachmentId)
+                  }))
+                }
+              />
 
               <div className="modal-actions span-2">
                 <button
@@ -2340,6 +3283,38 @@ export default function ProfilePage() {
                 />
               </label>
 
+              <label className="profile-field span-2">
+                Project media
+                <input
+                  accept=".pdf,.png,.jpg,.jpeg,.webp"
+                  disabled={uploadingFileKey === `project-draft-${projectDraft.id}`}
+                  onChange={(event) =>
+                    void handleProfileDocumentUpload(event, {
+                      kind: "project-media",
+                      onUploaded: (attachment) =>
+                        setProjectDraft((current) => ({ ...current, media: [...current.media, attachment] })),
+                      uploadingKey: `project-draft-${projectDraft.id}`
+                    })
+                  }
+                  type="file"
+                />
+              </label>
+              {uploadingFileKey === `project-draft-${projectDraft.id}` ? (
+                <p className="muted span-2">
+                  <Loader2 className="spin" size={13} /> Uploading project media...
+                </p>
+              ) : null}
+              <AttachmentList
+                attachments={projectDraft.media}
+                emptyLabel="No project media attached yet."
+                onRemove={(attachmentId) =>
+                  setProjectDraft((current) => ({
+                    ...current,
+                    media: current.media.filter((attachment) => attachment.id !== attachmentId)
+                  }))
+                }
+              />
+
               <div className="modal-actions span-2">
                 <button
                   className="ghost-button"
@@ -2402,23 +3377,55 @@ export default function ProfilePage() {
               </label>
 
               <label className="profile-field">
-                Certificate file
+                Certificate link
                 <input
                   onChange={(event) =>
-                    setCertificationDraft((current) => ({
-                      ...current,
-                      fileName: event.target.files?.[0]?.name ?? ""
-                    }))
+                    setCertificationDraft((current) => ({ ...current, credentialUrl: event.target.value }))
+                  }
+                  placeholder="https://..."
+                  type="url"
+                  value={certificationDraft.credentialUrl}
+                />
+              </label>
+
+              <label className="profile-field span-2">
+                Certificate file
+                <input
+                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.webp"
+                  disabled={uploadingFileKey === `certification-draft-${certificationDraft.id}`}
+                  onChange={(event) =>
+                    void handleProfileDocumentUpload(event, {
+                      kind: "certification-certificate",
+                      onUploaded: (attachment) =>
+                        setCertificationDraft((current) => ({
+                          ...current,
+                          certificates: [...current.certificates, attachment],
+                          fileName: attachment.name
+                        })),
+                      uploadingKey: `certification-draft-${certificationDraft.id}`
+                    })
                   }
                   type="file"
                 />
               </label>
 
-              <p className="muted span-2">
-                {certificationDraft.fileName
-                  ? `Attached file: ${certificationDraft.fileName}`
-                  : "No file attached yet."}
-              </p>
+              {uploadingFileKey === `certification-draft-${certificationDraft.id}` ? (
+                <p className="muted span-2">
+                  <Loader2 className="spin" size={13} /> Uploading certificate...
+                </p>
+              ) : null}
+              <AttachmentList
+                attachments={certificationDraft.certificates}
+                emptyLabel="No certificate file attached yet."
+                onRemove={(attachmentId) =>
+                  setCertificationDraft((current) => ({
+                    ...current,
+                    certificates: current.certificates.filter((attachment) => attachment.id !== attachmentId),
+                    fileName:
+                      current.certificates.filter((attachment) => attachment.id !== attachmentId).at(-1)?.name ?? ""
+                  }))
+                }
+              />
 
               <div className="modal-actions span-2">
                 <button

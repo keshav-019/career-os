@@ -9,7 +9,7 @@ import { useMobileResumes, saveMobileResume, deleteMobileResume } from "../../li
 import { buildResumeHtml } from "../../lib/resumeHtml";
 import { useUserJobs } from "../../lib/jobs";
 import { loadProfile } from "../../lib/profile";
-import { generateAtsResumeForJob, hasMeaningfulProfileContent } from "../../lib/resumeGeneration";
+import { generateAtsResumeForJob, hasMeaningfulProfileContent, profileToResumeData } from "../../lib/resumeGeneration";
 import {
   createEmptyResumeData,
   DEFAULT_RESUME_TEMPLATE_ID,
@@ -50,6 +50,8 @@ export default function ResumeScreen() {
   const [templateId, setTemplateId] = useState<ResumeTemplateId>(DEFAULT_RESUME_TEMPLATE_ID);
   const [data, setData] = useState<ResumeData>(createEmptyResumeData());
   const [createdAt, setCreatedAt] = useState<string | undefined>(undefined);
+  const [generatedForJobId, setGeneratedForJobId] = useState<string | undefined>(undefined);
+  const [generatedForJobLabel, setGeneratedForJobLabel] = useState<string | undefined>(undefined);
 
   const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -67,13 +69,25 @@ export default function ResumeScreen() {
 
   const activeTemplateMeta = useMemo(() => RESUME_VISUAL_TEMPLATES.find((t) => t.id === templateId), [templateId]);
 
-  function startNew() {
+  async function startNew() {
     setActiveId(null);
     setLabel("Untitled resume");
     setTemplateId(DEFAULT_RESUME_TEMPLATE_ID);
-    setData(createEmptyResumeData());
     setCreatedAt(undefined);
+    setGeneratedForJobId(undefined);
+    setGeneratedForJobLabel(undefined);
     setError(null);
+
+    // Prepopulate from Profile so the user isn't retyping everything they already entered there - falls back to
+    // a blank resume if Profile has nothing meaningful yet (hasMeaningfulProfileContent mirrors the same check
+    // handleGenerateForJob uses).
+    try {
+      const profile = await loadProfile();
+      setData(hasMeaningfulProfileContent(profile) ? profileToResumeData(profile) : createEmptyResumeData());
+    } catch {
+      setData(createEmptyResumeData());
+    }
+
     setMode("templates");
   }
 
@@ -83,6 +97,8 @@ export default function ResumeScreen() {
     setTemplateId(resume.templateId);
     setData(resume.data);
     setCreatedAt(resume.createdAt);
+    setGeneratedForJobId(resume.jobId);
+    setGeneratedForJobLabel(resume.jobLabel);
     setError(null);
     setMode("editor");
   }
@@ -98,7 +114,7 @@ export default function ResumeScreen() {
     setSaving(true);
     try {
       const id = activeId ?? `resume-${Date.now()}`;
-      await saveMobileResume(user.uid, id, label.trim() || "Untitled resume", templateId, data, createdAt);
+      await saveMobileResume(user.uid, id, label.trim() || "Untitled resume", templateId, data, createdAt, generatedForJobId, generatedForJobLabel);
       setActiveId(id);
       setMode("list");
     } catch (err) {
@@ -149,7 +165,9 @@ export default function ResumeScreen() {
           portfolio: current.personal.portfolio
         }
       }));
-      setGenerateNotice(`Resume tailored for ${selectedJob.role || "this role"}. Review it below, then export.`);
+      setGeneratedForJobId(selectedJob.id);
+      setGeneratedForJobLabel(`${selectedJob.role || "Untitled role"}${selectedJob.company ? ` @ ${selectedJob.company}` : ""}`);
+      setGenerateNotice(`Resume tailored for ${selectedJob.role || "this role"}. Review it below, then save or export.`);
     } catch (err) {
       setGenerateError(err instanceof Error ? err.message : "Unable to generate a tailored resume.");
     } finally {
@@ -197,8 +215,9 @@ export default function ResumeScreen() {
 
         <Card>
           <TextField label="Resume label" value={label} onChangeText={setLabel} placeholder="Untitled resume" />
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
             <Pill label={activeTemplateMeta?.name ?? "Template"} tone="brand" />
+            {generatedForJobLabel ? <Pill label={`Tailored for: ${generatedForJobLabel}`} tone="success" /> : null}
             <GhostButton label="Change template" icon={<Pencil color={colors.text} size={13} />} onPress={() => setMode("templates")} />
           </View>
         </Card>
@@ -265,7 +284,7 @@ export default function ResumeScreen() {
         eyebrow="Resume Studio"
         title="Visual Mode resumes"
         subtitle="Build and export resumes on your phone. LaTeX mode stays on CareerOS Desktop."
-        right={<GhostButton label="New" icon={<FilePlus color={colors.text} size={14} />} onPress={startNew} />}
+        right={<GhostButton label="New" icon={<FilePlus color={colors.text} size={14} />} onPress={() => void startNew()} />}
       />
 
       {loading ? <LoadingView label="Loading your resumes..." /> : null}
@@ -298,6 +317,9 @@ export default function ResumeScreen() {
               <Text style={{ color: colors.muted, fontSize: fontSize.sm }}>
                 {meta?.name ?? resume.templateId} - updated {new Date(resume.updatedAt).toLocaleDateString()}
               </Text>
+              {resume.jobLabel ? (
+                <Text style={{ color: colors.brand, fontSize: fontSize.sm, fontWeight: "600" }}>Tailored for: {resume.jobLabel}</Text>
+              ) : null}
             </View>
             <GhostButton label="" icon={<Trash2 color={colors.danger} size={16} />} onPress={() => handleDelete(resume)} />
           </Pressable>

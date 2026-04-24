@@ -24,12 +24,13 @@ import {
   submitPracticeAttempt,
   usePracticeAttempt
 } from "@/lib/firebase/interview-war-room";
+import { fetchMcqReview, type McqReviewEntry } from "@/lib/interview/client";
 import {
   formatInterviewTestType,
-  getMcqQuestionById,
   hasDesktopOnlyExecution,
   type PracticeQuestion
 } from "@/lib/interview/question-bank";
+import { learningAssetUrl } from "@/lib/learning/asset-url";
 import { sanitizeExternalUrl } from "@/lib/url-safety";
 
 function formatRemainingTime(totalSeconds: number): string {
@@ -126,11 +127,12 @@ function scoreQuestionOutcome(
   question: PracticeQuestion,
   mcqAnswers: Record<string, string>,
   codingCompletion: Record<string, boolean>,
-  codingNotes: Record<string, string>
+  codingNotes: Record<string, string>,
+  mcqReviews: Record<string, McqReviewEntry>
 ): QuestionOutcome {
   if (question.kind === "mcq") {
     const selected = (mcqAnswers[question.id] ?? "").trim().toLowerCase();
-    const canonical = getMcqQuestionById(question.id);
+    const canonical = mcqReviews[question.id];
     const answered = selected.length > 0;
     const earned = canonical && answered && selected === canonical.correctOptionId ? 1 : 0;
 
@@ -196,9 +198,38 @@ export default function TestRoomAttemptPage() {
   }, [attempt]);
 
   const questions = useMemo(() => attempt?.questions ?? [], [attempt]);
+
+  const [mcqReviews, setMcqReviews] = useState<Record<string, McqReviewEntry>>({});
+
+  // getMcqQuestionById() used to run in-browser to score/review MCQ answers live in this room - that function is
+  // now async (question content is fetched from R2 server-side), so the canonical answer key for this attempt's
+  // MCQ questions is fetched up front via /api/interview/mcq-review instead (see scoreQuestionOutcome() and the
+  // review-list render further below).
+  useEffect(() => {
+    const mcqQuestionIds = questions.filter((question) => question.kind === "mcq").map((question) => question.id);
+
+    if (mcqQuestionIds.length === 0) {
+      setMcqReviews({});
+      return;
+    }
+
+    let cancelled = false;
+    fetchMcqReview(mcqQuestionIds)
+      .then((result) => {
+        if (!cancelled) setMcqReviews(result.reviews);
+      })
+      .catch(() => {
+        if (!cancelled) setMcqReviews({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [questions]);
   const questionCount = questions.length;
   const currentQuestion = questions[Math.max(0, Math.min(currentIndex, questionCount - 1))] ?? null;
-  const currentQuestionImageUrl = currentQuestion ? sanitizeExternalUrl(currentQuestion.imageUrl) : null;
+  const currentQuestionImageUrl = currentQuestion
+    ? sanitizeExternalUrl(learningAssetUrl(currentQuestion.imageUrl ?? ""))
+    : null;
   const currentQuestionImageSourceUrl = currentQuestion ? sanitizeExternalUrl(currentQuestion.imageSourceUrl) : null;
   const hasStarted = attempt ? attempt.status !== "ready" : false;
   const isSubmitted = attempt ? attempt.status === "submitted" || attempt.status === "timed_out" : false;
@@ -263,7 +294,7 @@ export default function TestRoomAttemptPage() {
 
     const scored = questions.reduce(
       (aggregate, question) => {
-        const outcome = scoreQuestionOutcome(question, mcqAnswers, codingCompletion, codingNotes);
+        const outcome = scoreQuestionOutcome(question, mcqAnswers, codingCompletion, codingNotes, mcqReviews);
         aggregate.answered += outcome.answered ? 1 : 0;
         aggregate.earned += outcome.earned;
         aggregate.total += outcome.total;
@@ -280,7 +311,7 @@ export default function TestRoomAttemptPage() {
       ...scored,
       percentage: percentageFromMarks(scored.earned, scored.total)
     };
-  }, [attempt, codingCompletion, codingNotes, mcqAnswers, questions]);
+  }, [attempt, codingCompletion, codingNotes, mcqAnswers, mcqReviews, questions]);
 
   const topicSubtopicRows = useMemo(() => {
     if (!attempt) {
@@ -293,7 +324,7 @@ export default function TestRoomAttemptPage() {
     questions.forEach((question) => {
       const subtopic = question.category || "General";
       const key = `${topic}::${subtopic}`;
-      const outcome = scoreQuestionOutcome(question, mcqAnswers, codingCompletion, codingNotes);
+      const outcome = scoreQuestionOutcome(question, mcqAnswers, codingCompletion, codingNotes, mcqReviews);
       const tracked = tracker.get(key) ?? {
         key,
         topic,
@@ -324,7 +355,7 @@ export default function TestRoomAttemptPage() {
 
         return first.subtopic.localeCompare(second.subtopic);
       });
-  }, [attempt, codingCompletion, codingNotes, mcqAnswers, questions]);
+  }, [attempt, codingCompletion, codingNotes, mcqAnswers, mcqReviews, questions]);
 
   useEffect(() => {
     if (!attempt?.deadlineAt || !hasStarted || isSubmitted) {
@@ -706,7 +737,7 @@ export default function TestRoomAttemptPage() {
               <ul className="test-room-review-list">
                 {questions.map((question, index) => {
                   if (question.kind === "mcq") {
-                    const canonical = getMcqQuestionById(question.id);
+                    const canonical = mcqReviews[question.id];
                     const selected = (mcqAnswers[question.id] ?? "").toLowerCase();
                     const correctOption = canonical?.correctOptionId ?? "";
                     const isCorrect = selected !== "" && selected === correctOption;

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.careeros.CareerOS</id>
+  <name>CareerOS</name>
+  <summary>Career workspace for resumes, jobs, interviews, and applications</summary>
+  <developer id="com.careeros">
+    <name>CareerOS</name>
+  </developer>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>LicenseRef-proprietary</project_license>
+  <description>
+    <p>
+      CareerOS is a desktop career workspace for managing job applications, resumes, interview preparation,
+      coding practice, learning plans, and AI-assisted application workflows.
+    </p>
+    <p>
+      The Flatpak build uses the Flathub TeX Live extension for local LaTeX resume compilation, so users do not
+      need to install a host LaTeX compiler.
+    </p>
+  </description>
+  <launchable type="desktop-id">com.careeros.CareerOS.desktop</launchable>
+  <url type="homepage">https://github.com/keshav-019/career-os</url>
+  <url type="bugtracker">https://github.com/keshav-019/career-os/issues</url>
+  <url type="vcs-browser">https://github.com/keshav-019/career-os</url>
+  <categories>
+    <category>Office</category>
+  </categories>
+  <releases>
+    <release version="1.0.0" date="2026-07-23">
+      <description>
+        <p>Initial Flatpak packaging draft for CareerOS Desktop.</p>
+      </description>
+    </release>
+  </releases>
+  <content_rating type="oars-1.1" />
+</component>

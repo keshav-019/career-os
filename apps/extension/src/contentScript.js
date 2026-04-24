@@ -39,6 +39,7 @@ const STRONG_JOB_KEYWORDS = [
 
 let lastPayloadSignature = "";
 let scheduledScan = null;
+let lastLocationHref = window.location.href;
 
 const cleanText = (value) => (value || "").replace(/\s+/g, " ").trim();
 
@@ -67,15 +68,15 @@ const isLocalDevelopmentHost = () => {
 
 const detectHostKind = () => {
   const hostname = window.location.hostname.toLowerCase();
-  if (hostname.includes("linkedin.")) {
+  if (hostname === "linkedin.com" || hostname.endsWith(".linkedin.com")) {
     return "linkedin";
   }
 
-  if (hostname.includes("indeed.")) {
+  if (hostname === "indeed.com" || hostname.endsWith(".indeed.com")) {
     return "indeed";
   }
 
-  if (hostname.includes("naukri.")) {
+  if (hostname === "naukri.com" || hostname.endsWith(".naukri.com")) {
     return "naukri";
   }
 
@@ -163,6 +164,25 @@ const firstImageSrc = (scope, selectors) => {
       } catch {
         return candidate;
       }
+    }
+  }
+
+  return "";
+};
+
+const firstHref = (scope, selectors) => {
+  const root = scope || document;
+  for (const selector of selectors) {
+    const link = root.querySelector(selector);
+    const href = cleanText(link?.getAttribute("href") || "");
+    if (!href) {
+      continue;
+    }
+
+    try {
+      return new URL(href, window.location.href).toString();
+    } catch {
+      return href;
     }
   }
 
@@ -517,54 +537,133 @@ const parseIndeedPayload = () => {
 const parseLinkedInPayload = () => {
   const detailsRoot = findFirstElement(document, [
     ".jobs-search__job-details--container",
+    ".jobs-search__job-details",
+    ".jobs-search__job-details--wrapper",
+    ".jobs-details__main-content",
+    ".jobs-details__main-content--single-pane",
+    ".jobs-details__container",
     ".jobs-details",
+    ".scaffold-layout__detail",
     ".job-view-layout",
+    ".jobs-details-job-summary",
+    "main[role='main']",
+    "main",
   ]);
 
   const selectedListItem =
     findFirstElement(document, [
       ".jobs-search-results__list-item--active",
+      ".jobs-search-results-list__list-item--active",
       ".job-card-container--clickable[aria-current='true']",
+      "[data-view-name='job-card'][aria-current='true']",
       "[data-job-id][aria-current='true']",
+      "div[data-job-id][aria-current='true']",
+      "li[data-occludable-job-id][aria-current='true']",
+      "li[data-occludable-job-id].jobs-search-results__list-item--active",
+      "li[data-occludable-job-id]",
+      ".jobs-search-results__list-item",
+      ".jobs-search-results-list__list-item",
+      "[data-view-name='job-card']",
+      "div[data-job-id]",
+      ".job-card-container",
     ]) || null;
 
   const title = firstText(detailsRoot, [
+    "[data-test-job-title]",
     ".jobs-unified-top-card__job-title",
+    ".jobs-unified-top-card__job-title h1",
+    ".jobs-unified-top-card__job-title a",
     ".job-details-jobs-unified-top-card__job-title",
+    ".job-details-jobs-unified-top-card__job-title h1",
+    ".job-details-jobs-unified-top-card__job-title a",
+    ".job-details-jobs-unified-top-card__job-title-link",
+    ".job-details-jobs-unified-top-card__job-title-link h1",
+    ".job-details-jobs-unified-top-card__job-title-link a",
+    "h1.t-24",
+    "h1.t-24 a",
     "h1",
+  ]) || firstText(selectedListItem, [
+    "[data-test-job-title]",
+    ".job-card-list__title",
+    ".job-card-list__title--link",
+    ".job-card-list__title--link strong",
+    ".job-card-container__link",
+    ".job-card-container__link strong",
+    ".job-card-container__title",
+    ".job-card-container__title strong",
+    "a[href*='/jobs/view/'] span[aria-hidden='true']",
+    "a[href*='/jobs/view/']",
   ]);
   const company = firstText(detailsRoot, [
+    "[data-test-job-company-name]",
     ".jobs-unified-top-card__company-name",
+    ".jobs-unified-top-card__company-name a",
     ".job-details-jobs-unified-top-card__company-name",
+    ".job-details-jobs-unified-top-card__company-name a",
+    ".job-details-jobs-unified-top-card__company-name-link",
+    ".job-details-jobs-unified-top-card__company-name-link a",
     ".topcard__flavor-row a",
+  ]) || firstText(selectedListItem, [
+    "[data-test-job-company-name]",
+    ".job-card-container__primary-description",
+    ".job-card-container__company-name",
+    ".artdeco-entity-lockup__subtitle",
   ]);
   const location = firstText(detailsRoot, [
+    "[data-test-job-location]",
     ".jobs-unified-top-card__bullet",
     ".job-details-jobs-unified-top-card__primary-description-container",
+    ".job-details-jobs-unified-top-card__primary-description-container span",
+    ".job-details-jobs-unified-top-card__tertiary-description-container",
     ".topcard__flavor--bullet",
+  ]) || firstText(selectedListItem, [
+    "[data-test-job-location]",
+    ".job-card-container__metadata-item",
+    ".job-card-container__metadata-wrapper",
   ]);
 
   const descriptionElement = findFirstElement(detailsRoot || document, [
+    "#job-details",
+    ".jobs-description",
+    ".jobs-description__container",
     ".jobs-description-content__text",
+    ".jobs-description-content__text--stretch",
     ".jobs-box__html-content",
+    ".jobs-description__content .jobs-box__html-content",
     ".jobs-description__content",
+    "[class*='jobs-description']",
     ".jobs-search__job-details--container",
+    ".jobs-search__job-details",
   ]);
 
   const description = readPrimaryDescription(detailsRoot || document, [
+    "#job-details",
+    ".jobs-description",
+    ".jobs-description__container",
     ".jobs-description-content__text",
+    ".jobs-description-content__text--stretch",
     ".jobs-box__html-content",
+    ".jobs-description__content .jobs-box__html-content",
     ".jobs-description__content",
+    "[class*='jobs-description']",
     ".jobs-search__job-details--container",
+    ".jobs-search__job-details",
     "main",
   ]);
   const descriptionMultiline = readPrimaryDescriptionMultiline(
     detailsRoot || document,
     [
+      "#job-details",
+      ".jobs-description",
+      ".jobs-description__container",
       ".jobs-description-content__text",
+      ".jobs-description-content__text--stretch",
       ".jobs-box__html-content",
+      ".jobs-description__content .jobs-box__html-content",
       ".jobs-description__content",
+      "[class*='jobs-description']",
       ".jobs-search__job-details--container",
+      ".jobs-search__job-details",
       "main",
     ],
   );
@@ -572,6 +671,7 @@ const parseLinkedInPayload = () => {
   const primaryMeta = firstText(detailsRoot, [
     ".jobs-unified-top-card__primary-description-container",
     ".job-details-jobs-unified-top-card__primary-description-container",
+    ".job-details-jobs-unified-top-card__tertiary-description-container",
     ".topcard__flavor-row",
   ]);
 
@@ -580,10 +680,14 @@ const parseLinkedInPayload = () => {
     ".jobs-unified-top-card__workplace-type",
     ".description__job-criteria-list li",
     ".job-details-jobs-unified-top-card__job-insight",
+    ".job-details-jobs-unified-top-card__job-insight-view-model-secondary",
+    "[class*='job-insight']",
   ]);
   const locationOptions = collectTexts(detailsRoot || document, [
+    "[data-test-job-location]",
     ".jobs-unified-top-card__bullet",
     ".job-details-jobs-unified-top-card__primary-description-container",
+    ".job-details-jobs-unified-top-card__tertiary-description-container",
     ".topcard__flavor--bullet",
   ]);
 
@@ -596,6 +700,12 @@ const parseLinkedInPayload = () => {
       "img[alt*='logo' i]",
     ],
   );
+  const sourceUrl = firstHref(detailsRoot || selectedListItem || document, [
+    "a[href*='/jobs/view/']",
+    "a[href*='currentJobId=']",
+    "a[href*='/jobs/search/']",
+    "a[href*='/jobs/collections/']",
+  ]);
 
   return {
     aboutText: extractSectionText(
@@ -649,6 +759,7 @@ const parseLinkedInPayload = () => {
         "you\\s+might\\s+be\\s+a\\s+good\\s+fit",
       ],
     ),
+    sourceUrl,
     title,
   };
 };
@@ -784,7 +895,12 @@ const hasJobSignals = (payload, hostKind) => {
 
   const hasLinkedInDetails = Boolean(
     document.querySelector(
-      ".jobs-search__job-details--container, .jobs-description-content__text, .jobs-unified-top-card__job-title",
+      ".jobs-search__job-details--container, .jobs-details__main-content, .jobs-details__container, .jobs-description, #job-details, .jobs-description-content__text, .jobs-unified-top-card__job-title, .job-details-jobs-unified-top-card__job-title",
+    ),
+  );
+  const hasLinkedInCard = Boolean(
+    document.querySelector(
+      "li[data-occludable-job-id], .job-card-container, a[href*='/jobs/view/']",
     ),
   );
   const hasIndeedDetails = Boolean(
@@ -799,7 +915,10 @@ const hasJobSignals = (payload, hostKind) => {
   );
 
   if (!hasLongDescription && !(hasMediumDescription && hasPrimaryMeta)) {
-    if (hostKind === "linkedin" && !(hasLinkedInDetails && hasPrimaryMeta)) {
+    if (
+      hostKind === "linkedin" &&
+      !((hasLinkedInDetails || hasLinkedInCard) && hasPrimaryMeta)
+    ) {
       return false;
     }
 
@@ -812,7 +931,7 @@ const hasJobSignals = (payload, hostKind) => {
     }
   }
 
-  if (hostKind === "linkedin" && !hasLinkedInDetails) {
+  if (hostKind === "linkedin" && !hasLinkedInDetails && !hasLinkedInCard) {
     return false;
   }
 
@@ -926,7 +1045,7 @@ const collectJobPayload = () => {
     location,
     locationOptions,
     source: getHostSource(hostKind),
-    sourceUrl: window.location.href,
+    sourceUrl: cleanText(parsed.sourceUrl || "") || window.location.href,
     description,
     descriptionHtml: parsed.descriptionHtml || "",
     selectedJobHtml: parsed.detailsHtml || parsed.contextHtml || "",
@@ -1205,6 +1324,26 @@ if (detectHostKind() === "unsupported" || isLocalDevelopmentHost()) {
   hidePrompt();
   chrome.runtime.sendMessage({ type: "CAREEROS_JOB_DETECTED", payload: null });
 } else {
+  const wrapHistoryMethod = (methodName) => {
+    const original = window.history?.[methodName];
+    if (typeof original !== "function") {
+      return;
+    }
+
+    window.history[methodName] = function patchedHistoryMethod(...args) {
+      const result = original.apply(this, args);
+      if (window.location.href !== lastLocationHref) {
+        lastLocationHref = window.location.href;
+        schedulePageScan();
+      }
+
+      return result;
+    };
+  };
+
+  wrapHistoryMethod("pushState");
+  wrapHistoryMethod("replaceState");
+
   const observer = new MutationObserver(() => {
     schedulePageScan();
   });
@@ -1224,4 +1363,21 @@ if (detectHostKind() === "unsupported" || isLocalDevelopmentHost()) {
 
   window.addEventListener("popstate", schedulePageScan);
   window.addEventListener("hashchange", schedulePageScan);
+  window.addEventListener("pageshow", schedulePageScan);
+  window.addEventListener("focus", schedulePageScan);
+  document.addEventListener("click", schedulePageScan, true);
+  window.setInterval(() => {
+    if (window.location.href !== lastLocationHref) {
+      lastLocationHref = window.location.href;
+      schedulePageScan();
+      return;
+    }
+
+    if (detectHostKind() === "linkedin") {
+      schedulePageScan();
+    }
+  }, 3000);
+  [1500, 3500, 7000, 12000].forEach((delay) => {
+    window.setTimeout(schedulePageScan, delay);
+  });
 }

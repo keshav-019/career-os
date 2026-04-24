@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import * as Clipboard from "expo-clipboard";
 import { Pressable, Text, View } from "react-native";
-import { Check, Copy, Sparkles, Target } from "lucide-react-native";
+import { Check, Copy, Sparkles, Target, Upload } from "lucide-react-native";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../theme/ThemeContext";
 import { useUserJobs } from "../../lib/jobs";
 import { useUserResumes } from "../../lib/resumes";
+import { pickAndUploadResume, ResumeUploadCancelledError } from "../../lib/resumeUpload";
 import { apiPost } from "../../lib/apiClient";
 import type { JobMatch, ResumeReview } from "../../types/aiMatch";
 import {
@@ -58,6 +59,22 @@ export default function AiMatchScreen() {
   const [matchResult, setMatchResult] = useState<JobMatch | null>(null);
   const [reviewResult, setReviewResult] = useState<ResumeReview | null>(null);
   const [copiedCoverLetter, setCopiedCoverLetter] = useState(false);
+  const [uploadingResume, setUploadingResume] = useState(false);
+
+  async function handleUploadResume() {
+    if (!user) return;
+    setError(null);
+    setUploadingResume(true);
+    try {
+      await pickAndUploadResume(user.uid);
+    } catch (err) {
+      if (!(err instanceof ResumeUploadCancelledError)) {
+        setError(err instanceof Error ? err.message : "Could not upload this resume.");
+      }
+    } finally {
+      setUploadingResume(false);
+    }
+  }
 
   const jobOptions = useMemo(() => jobs.map((j) => ({ value: j.id, label: `${j.company} / ${j.role}` })), [jobs]);
 
@@ -169,8 +186,14 @@ export default function AiMatchScreen() {
             </View>
           }
         />
+        <GhostButton
+          label={uploadingResume ? "Uploading..." : "Upload a resume"}
+          icon={<Upload color={colors.text} size={14} />}
+          onPress={() => void handleUploadResume()}
+          disabled={uploadingResume}
+        />
         {resumes.length === 0 ? (
-          <EmptyState text="No saved resumes yet. Resumes created in CareerOS Desktop or synced to your account will show up here." />
+          <EmptyState text="No resumes yet. Upload one above, or add one in CareerOS Desktop / Resume Studio." />
         ) : (
           resumes.map((resume) => {
             const isSelected = selectedResumeIds.includes(resume.id);

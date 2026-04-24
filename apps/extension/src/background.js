@@ -5,12 +5,79 @@ const STORAGE_KEYS = {
 };
 
 const TOKEN_REFRESH_MARGIN_MS = 30 * 1000;
+const TWO_FACTOR_SESSION_HEADER = "x-2fa-session";
 const detectionByTab = new Map();
-const DEFAULT_API_BASE_URL = "http://localhost:3000";
+const pendingPasswordAuthById = new Map();
+const LOCAL_API_BASE_URLS = ["http://127.0.0.1:3000", "http://localhost:3000"];
+const DEFAULT_API_BASE_URL = LOCAL_API_BASE_URLS[0];
 const TRUSTED_HTTPS_HOST_PATTERNS = [
   /(^|\.)careeros\.app$/i,
   /^career-os(?:[-.][a-z0-9-]+)*\.vercel\.app$/i,
 ];
+const browserApi =
+  typeof globalThis.browser === "object" ? globalThis.browser : null;
+const callbackLastError = () => chrome.runtime?.lastError || null;
+const callbackApi = (fn, context, args = []) =>
+  new Promise((resolve, reject) => {
+    let settled = false;
+    const finish = (result) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      resolve(result);
+    };
+    const fail = (error) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      reject(error instanceof Error ? error : new Error(String(error)));
+    };
+    const maybePromise = fn.call(context, ...args, (result) => {
+      const error = callbackLastError();
+      if (error) {
+        fail(new Error(error.message));
+        return;
+      }
+
+      finish(result);
+    });
+    if (maybePromise && typeof maybePromise.then === "function") {
+      maybePromise.then(finish).catch(fail);
+    }
+  });
+const storageGet = (keys) =>
+  browserApi?.storage?.local?.get
+    ? browserApi.storage.local.get(keys)
+    : callbackApi(chrome.storage.local.get, chrome.storage.local, [keys]);
+const storageSet = (values) =>
+  browserApi?.storage?.local?.set
+    ? browserApi.storage.local.set(values)
+    : callbackApi(chrome.storage.local.set, chrome.storage.local, [values]);
+const tabsQuery = (queryInfo) =>
+  browserApi?.tabs?.query
+    ? browserApi.tabs.query(queryInfo)
+    : callbackApi(chrome.tabs.query, chrome.tabs, [queryInfo]);
+const actionApi =
+  browserApi?.action ||
+  browserApi?.browserAction ||
+  chrome.action ||
+  chrome.browserAction;
+const actionCall = (methodName, args) => {
+  const method = actionApi?.[methodName];
+  if (!method) {
+    return Promise.resolve();
+  }
+
+  if (browserApi?.action || browserApi?.browserAction) {
+    return method.call(actionApi, args);
+  }
+
+  return callbackApi(method, actionApi, [args]);
+};
 
 const isTrustedHttpsHost = (hostname) =>
   TRUSTED_HTTPS_HOST_PATTERNS.some((pattern) => pattern.test(hostname));
@@ -40,6 +107,11 @@ const normalizeApiBaseUrl = (value) => {
 
   const normalized = raw.replace(/\/+$/, "");
   return isAllowedApiBaseUrl(normalized) ? normalized : DEFAULT_API_BASE_URL;
+};
+
+const readFallbackApiBaseUrls = (primaryUrl) => {
+  const values = [normalizeApiBaseUrl(primaryUrl), ...LOCAL_API_BASE_URLS];
+  return Array.from(new Set(values));
 };
 
 const decodeTokenExpiryMs = (idToken) => {
@@ -84,6 +156,14 @@ const normalizeAuthState = (input) => {
     typeof candidate.email === "string" ? candidate.email.trim() : "";
   const providerId =
     typeof candidate.providerId === "string" ? candidate.providerId.trim() : "";
+  const twoFactorSessionToken =
+    typeof candidate.twoFactorSessionToken === "string"
+      ? candidate.twoFactorSessionToken.trim()
+      : "";
+  const twoFactorSessionExpiresAt =
+    typeof candidate.twoFactorSessionExpiresAt === "string"
+      ? candidate.twoFactorSessionExpiresAt.trim()
+      : "";
   const userId =
     typeof candidate.userId === "string" ? candidate.userId.trim() : "";
   const expiresAtMs =
@@ -103,6 +183,8 @@ const normalizeAuthState = (input) => {
     idToken,
     providerId,
     refreshToken,
+    twoFactorSessionExpiresAt,
+    twoFactorSessionToken,
     userId,
   };
 };
@@ -136,11 +218,11 @@ const parseAuthInput = (rawValue) => {
 };
 
 const readSettings = async () => {
-  const stored = await chrome.storage.local.get([
+  const stored = await storageGet([
     STORAGE_KEYS.apiBaseUrl,
     STORAGE_KEYS.authRaw,
     STORAGE_KEYS.authState,
-  ]);
+  ]) || {};
 
   const legacyRaw = String(stored[STORAGE_KEYS.authRaw] || "").trim();
   const authState =
@@ -151,6 +233,15 @@ const readSettings = async () => {
     apiBaseUrl: normalizeApiBaseUrl(stored[STORAGE_KEYS.apiBaseUrl]),
     authState,
   };
+};
+
+const rememberApiBaseUrl = async (apiBaseUrl) => {
+  const normalizedApiBaseUrl = normalizeApiBaseUrl(apiBaseUrl);
+  await storageSet({
+    [STORAGE_KEYS.apiBaseUrl]: normalizedApiBaseUrl,
+  });
+
+  return normalizedApiBaseUrl;
 };
 
 const hasUsableAuthState = (authState) => {
@@ -206,16 +297,17 @@ const toAuthSummary = (authState, authenticated) => ({
     typeof authState?.expiresAtMs === "number" ? authState.expiresAtMs : null,
   providerId: normalizeProviderId(authState?.providerId),
   providerLabel: mapProviderLabel(authState?.providerId),
+  twoFactorVerified: Boolean(authState?.twoFactorSessionToken),
   userId: authState?.userId || "",
 });
 
 const writeSettings = async (nextSettings) => {
-  await chrome.storage.local.set(nextSettings);
+  await storageSet(nextSettings);
   if (
     Object.prototype.hasOwnProperty.call(nextSettings, STORAGE_KEYS.authState)
   ) {
     // Clear legacy/raw token payloads once parsed to reduce secret duplication in extension storage.
-    await chrome.storage.local.set({
+    await storageSet({
       [STORAGE_KEYS.authRaw]: "",
     });
   }
@@ -228,15 +320,15 @@ const setBadgeForTab = async (tabId, detected) => {
     return;
   }
 
-  await chrome.action.setBadgeBackgroundColor({
+  await actionCall("setBadgeBackgroundColor", {
     color: detected ? "#14916f" : "#4e5b70",
     tabId,
   });
-  await chrome.action.setBadgeText({
+  await actionCall("setBadgeText", {
     text: detected ? "JOB" : "",
     tabId,
   });
-  await chrome.action.setTitle({
+  await actionCall("setTitle", {
     title: detected
       ? "CareerOS job detected. Click to save."
       : "CareerOS Capture",
@@ -279,6 +371,8 @@ const refreshIdToken = async (authState) => {
     idToken: payload.id_token,
     providerId: authState.providerId,
     refreshToken: payload.refresh_token || authState.refreshToken,
+    twoFactorSessionExpiresAt: authState.twoFactorSessionExpiresAt,
+    twoFactorSessionToken: authState.twoFactorSessionToken,
     userId: payload.user_id || authState.userId,
   });
 
@@ -286,7 +380,7 @@ const refreshIdToken = async (authState) => {
     return null;
   }
 
-  await chrome.storage.local.set({
+  await storageSet({
     [STORAGE_KEYS.authState]: nextState,
   });
 
@@ -312,14 +406,68 @@ const getValidAuthToken = async () => {
   return refreshedToken || authState.idToken;
 };
 
+const validateAuthState = async (apiBaseUrl, authState) => {
+  if (!authState?.idToken) {
+    return {
+      apiBaseUrl: normalizeApiBaseUrl(apiBaseUrl),
+      valid: false,
+    };
+  }
+
+  const idToken =
+    authState.expiresAtMs &&
+    authState.expiresAtMs - TOKEN_REFRESH_MARGIN_MS <= Date.now()
+      ? await refreshIdToken(authState)
+      : authState.idToken;
+
+  let lastError = null;
+  for (const baseUrl of readFallbackApiBaseUrls(apiBaseUrl)) {
+    try {
+      const response = await fetch(`${baseUrl}/api/2fa/session`, {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${idToken || authState.idToken}`,
+        },
+      });
+      const payload = await response.json().catch(() => ({}));
+
+      if (response.ok) {
+        return {
+          apiBaseUrl: baseUrl,
+          valid: true,
+        };
+      }
+
+      if (response.status === 401 && Boolean(payload?.required)) {
+        return {
+          apiBaseUrl: baseUrl,
+          valid: true,
+        };
+      }
+
+      return {
+        apiBaseUrl: baseUrl,
+        valid: false,
+      };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("That token package could not be verified with CareerOS.");
+};
+
 const signOut = async () => {
-  await chrome.storage.local.set({
+  await storageSet({
     [STORAGE_KEYS.authRaw]: "",
     [STORAGE_KEYS.authState]: null,
   });
 
   detectionByTab.clear();
-  const tabs = await chrome.tabs.query({});
+  pendingPasswordAuthById.clear();
+  const tabs = await tabsQuery({});
   await Promise.all(
     tabs
       .map((tab) => tab.id)
@@ -342,8 +490,8 @@ const getAuthStatus = async () => {
 };
 
 const saveJob = async (payload) => {
-  const settings = await readSettings();
   const idToken = await getValidAuthToken();
+  const settings = await readSettings();
   if (!idToken) {
     return {
       code: "AUTH_REQUIRED",
@@ -353,19 +501,24 @@ const saveJob = async (payload) => {
     };
   }
 
+  const headers = {
+    Authorization: `Bearer ${idToken}`,
+    "Content-Type": "application/json",
+  };
+  if (settings.authState?.twoFactorSessionToken) {
+    headers[TWO_FACTOR_SESSION_HEADER] = settings.authState.twoFactorSessionToken;
+  }
+
   const response = await fetch(`${settings.apiBaseUrl}/api/jobs/import`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${idToken}`,
-      "Content-Type": "application/json",
-    },
+    headers,
     body: JSON.stringify(payload),
   });
 
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
     return {
-      code: response.status === 401 ? "AUTH_REQUIRED" : "IMPORT_FAILED",
+      code: body?.code || (response.status === 401 ? "AUTH_REQUIRED" : "IMPORT_FAILED"),
       error: body?.error || "Failed to save job.",
       ok: false,
     };
@@ -406,18 +559,303 @@ const buildAuthorizeUrl = (provider, clientId, redirectUri) => {
   return `https://github.com/login/oauth/authorize?${params.toString()}`;
 };
 
-const fetchOauthProviders = async (apiBaseUrl) => {
-  const response = await fetch(`${apiBaseUrl}/api/extension/oauth-config`);
-  if (!response.ok) {
-    throw new Error("Could not reach CareerOS to check sign-in options.");
+const getExtensionRedirectUri = () => {
+  const redirectUri = chrome.identity.getRedirectURL();
+  try {
+    const parsed = new URL(redirectUri);
+    if (
+      parsed.protocol === "https:" &&
+      parsed.hostname &&
+      !parsed.hostname.endsWith(".chromiumapp.org")
+    ) {
+      const [subdomain] = parsed.hostname.split(".");
+      if (subdomain) {
+        return `http://127.0.0.1/mozoauth2/${subdomain}`;
+      }
+    }
+  } catch {
+    // Fall back to the browser-provided redirect URI.
   }
+
+  return redirectUri;
+};
+
+const fetchExtensionConfig = async (apiBaseUrl) => {
+  let lastError = null;
+  const normalizedPrimaryUrl = normalizeApiBaseUrl(apiBaseUrl);
+  for (const baseUrl of readFallbackApiBaseUrls(apiBaseUrl)) {
+    try {
+      const response = await fetch(`${baseUrl}/api/extension/oauth-config`);
+      if (!response.ok) {
+        throw new Error("Could not reach CareerOS to check sign-in options.");
+      }
+
+      const payload = await response.json().catch(() => ({}));
+      if (!payload?.ok) {
+        throw new Error("Could not read CareerOS sign-in configuration.");
+      }
+
+      if (baseUrl !== normalizedPrimaryUrl) {
+        await rememberApiBaseUrl(baseUrl);
+      }
+
+      return {
+        ...payload,
+        apiBaseUrl: baseUrl,
+      };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Could not reach CareerOS to check sign-in options.");
+};
+
+const mapPasswordSignInError = (errorMessage) => {
+  const message = String(errorMessage || "");
+  if (
+    message.includes("EMAIL_NOT_FOUND") ||
+    message.includes("INVALID_PASSWORD") ||
+    message.includes("INVALID_LOGIN_CREDENTIALS")
+  ) {
+    return "Incorrect email or password.";
+  }
+
+  if (message.includes("USER_DISABLED")) {
+    return "This account is disabled.";
+  }
+
+  if (message.includes("TOO_MANY_ATTEMPTS_TRY_LATER")) {
+    return "Too many sign-in attempts. Please wait and try again.";
+  }
+
+  if (message.includes("OPERATION_NOT_ALLOWED")) {
+    return "Email/password sign-in is not enabled in Firebase Authentication.";
+  }
+
+  if (message.includes("INVALID_EMAIL")) {
+    return "Enter a valid email address.";
+  }
+
+  return "Could not sign in with that email and password.";
+};
+
+const createPendingChallengeId = () => {
+  if (globalThis.crypto?.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+};
+
+const buildFirebaseAuthState = (payload, apiKey, providerId) =>
+  normalizeAuthState({
+    apiKey,
+    email: payload.email || "",
+    expiresAtMs:
+      typeof payload.expiresIn === "string" &&
+        Number.isFinite(Number(payload.expiresIn))
+        ? Date.now() + Number(payload.expiresIn) * 1000
+        : undefined,
+    idToken: payload.idToken,
+    providerId,
+    refreshToken: payload.refreshToken || "",
+    userId: payload.localId || "",
+  });
+
+const signInWithPassword = async (apiKey, email, password) => {
+  const response = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(apiKey)}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email,
+        password,
+        returnSecureToken: true,
+      }),
+    },
+  );
 
   const payload = await response.json().catch(() => ({}));
-  if (!payload?.ok) {
-    throw new Error("Could not read CareerOS sign-in configuration.");
+  if (!response.ok || !payload?.idToken) {
+    throw new Error(mapPasswordSignInError(payload?.error?.message));
   }
 
-  return payload.providers;
+  return payload;
+};
+
+const readTwoFactorSession = async (apiBaseUrl, authState) => {
+  const headers = {
+    Authorization: `Bearer ${authState.idToken}`,
+  };
+  if (authState.twoFactorSessionToken) {
+    headers[TWO_FACTOR_SESSION_HEADER] = authState.twoFactorSessionToken;
+  }
+
+  const response = await fetch(`${apiBaseUrl}/api/2fa/session`, {
+    headers,
+    method: "GET",
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (response.ok) {
+    return {
+      expiresAtMs: payload.expiresAtMs || null,
+      required: Boolean(payload.required),
+      valid: Boolean(payload.valid),
+    };
+  }
+
+  if (response.status === 401 && payload?.required) {
+    return {
+      reason: payload.reason || "missing",
+      required: true,
+      valid: false,
+    };
+  }
+
+  throw new Error(payload?.error || "Could not validate two-factor session.");
+};
+
+const storeAuthenticatedState = async (authState) => {
+  await storageSet({
+    [STORAGE_KEYS.authState]: authState,
+    [STORAGE_KEYS.authRaw]: "",
+  });
+
+  return {
+    auth: toAuthSummary(authState, hasUsableAuthState(authState)),
+    ok: true,
+  };
+};
+
+const startPasswordSignIn = async ({ email, password }) => {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  const rawPassword = String(password || "");
+  if (!normalizedEmail || !rawPassword) {
+    return {
+      code: "INVALID_PASSWORD_INPUT",
+      error: "Enter your email and password.",
+      ok: false,
+    };
+  }
+
+  const settings = await readSettings();
+  const config = await fetchExtensionConfig(settings.apiBaseUrl);
+  const apiBaseUrl = normalizeApiBaseUrl(config.apiBaseUrl || settings.apiBaseUrl);
+  await rememberApiBaseUrl(apiBaseUrl);
+  const firebaseApiKey = String(config?.auth?.firebaseApiKey || "").trim();
+  if (!firebaseApiKey) {
+    return {
+      code: "FIREBASE_AUTH_NOT_CONFIGURED",
+      error:
+        "Email/password sign-in is not configured on this CareerOS deployment.",
+      ok: false,
+    };
+  }
+
+  const payload = await signInWithPassword(
+    firebaseApiKey,
+    normalizedEmail,
+    rawPassword,
+  );
+  const authState = buildFirebaseAuthState(payload, firebaseApiKey, "password");
+  if (!authState) {
+    throw new Error("CareerOS did not return a usable password session.");
+  }
+
+  const twoFactorStatus = await readTwoFactorSession(
+    apiBaseUrl,
+    authState,
+  );
+  if (twoFactorStatus.required && !twoFactorStatus.valid) {
+    const challengeId = createPendingChallengeId();
+    pendingPasswordAuthById.set(challengeId, {
+      apiBaseUrl,
+      authState,
+      createdAtMs: Date.now(),
+    });
+
+    return {
+      auth: toAuthSummary(authState, false),
+      challengeId,
+      code: "TWO_FACTOR_REQUIRED",
+      error: "Enter the 6-digit authenticator code for this account.",
+      ok: false,
+    };
+  }
+
+  return storeAuthenticatedState(authState);
+};
+
+const verifyPasswordTwoFactor = async ({ challengeId, token }) => {
+  const normalizedToken = String(token || "").trim();
+  if (!/^\d{6}$/.test(normalizedToken)) {
+    return {
+      code: "INVALID_2FA_INPUT",
+      error: "Enter a valid 6-digit authenticator code.",
+      ok: false,
+    };
+  }
+
+  const pendingAuth = pendingPasswordAuthById.get(String(challengeId || ""));
+  if (!pendingAuth) {
+    return {
+      code: "TWO_FACTOR_CHALLENGE_EXPIRED",
+      error: "This sign-in attempt expired. Please enter your password again.",
+      ok: false,
+    };
+  }
+
+  const response = await fetch(`${pendingAuth.apiBaseUrl}/api/2fa/verify`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${pendingAuth.authState.idToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ token: normalizedToken }),
+  });
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    return {
+      code: payload?.code || "TWO_FACTOR_FAILED",
+      error: payload?.error || "Failed to verify authenticator code.",
+      ok: false,
+    };
+  }
+
+  if (!payload?.verified || !payload?.twoFactorSessionToken) {
+    return {
+      code: "TWO_FACTOR_FAILED",
+      error: "Invalid authenticator code. Please try again.",
+      ok: false,
+    };
+  }
+
+  const authState = normalizeAuthState({
+    ...pendingAuth.authState,
+    twoFactorSessionExpiresAt: payload.twoFactorSessionExpiresAt || "",
+    twoFactorSessionToken: payload.twoFactorSessionToken,
+  });
+  if (!authState) {
+    throw new Error("Authenticator verification succeeded, but session setup failed.");
+  }
+
+  pendingPasswordAuthById.delete(String(challengeId || ""));
+  return storeAuthenticatedState(authState);
+};
+
+const cancelPasswordTwoFactor = (challengeId) => {
+  pendingPasswordAuthById.delete(String(challengeId || ""));
+  return {
+    ok: true,
+  };
 };
 
 const extractCodeFromRedirect = (redirectUrl) => {
@@ -435,10 +873,15 @@ const extractCodeFromRedirect = (redirectUrl) => {
   return code;
 };
 
-const launchProviderAuthFlow = (authorizeUrl) =>
+const launchProviderAuthFlow = (authorizeUrl, redirectUri) =>
   new Promise((resolve, reject) => {
+    const details = { interactive: true, url: authorizeUrl };
+    if (redirectUri.startsWith("http://127.0.0.1/mozoauth2/")) {
+      details.redirect_uri = redirectUri;
+    }
+
     chrome.identity.launchWebAuthFlow(
-      { interactive: true, url: authorizeUrl },
+      details,
       (responseUrl) => {
         if (chrome.runtime.lastError || !responseUrl) {
           reject(
@@ -461,7 +904,10 @@ const startOauthSignIn = async (provider) => {
   }
 
   const settings = await readSettings();
-  const providers = await fetchOauthProviders(settings.apiBaseUrl);
+  const config = await fetchExtensionConfig(settings.apiBaseUrl);
+  const providers = config.providers;
+  const apiBaseUrl = normalizeApiBaseUrl(config.apiBaseUrl || settings.apiBaseUrl);
+  await rememberApiBaseUrl(apiBaseUrl);
   const providerConfig = providers?.[provider];
   if (!providerConfig?.enabled || !providerConfig.clientId) {
     const label = provider === "google" ? "Google" : "GitHub";
@@ -470,17 +916,17 @@ const startOauthSignIn = async (provider) => {
     );
   }
 
-  const redirectUri = chrome.identity.getRedirectURL();
+  const redirectUri = getExtensionRedirectUri();
   const authorizeUrl = buildAuthorizeUrl(
     provider,
     providerConfig.clientId,
     redirectUri,
   );
-  const redirectResult = await launchProviderAuthFlow(authorizeUrl);
+  const redirectResult = await launchProviderAuthFlow(authorizeUrl, redirectUri);
   const code = extractCodeFromRedirect(redirectResult);
 
   const exchangeResponse = await fetch(
-    `${settings.apiBaseUrl}/api/extension/oauth/${provider}`,
+    `${apiBaseUrl}/api/extension/oauth/${provider}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -498,7 +944,7 @@ const startOauthSignIn = async (provider) => {
     throw new Error("CareerOS did not return a usable session.");
   }
 
-  await chrome.storage.local.set({
+  await storageSet({
     [STORAGE_KEYS.authState]: authState,
     [STORAGE_KEYS.authRaw]: "",
   });
@@ -616,27 +1062,73 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       [STORAGE_KEYS.apiBaseUrl]: nextApiBaseUrl,
     };
 
-    if (Object.prototype.hasOwnProperty.call(message, "authToken")) {
-      const parsed = parseAuthInput(message.authToken);
-      nextSettings[STORAGE_KEYS.authRaw] = "";
-      nextSettings[STORAGE_KEYS.authState] = parsed.authState;
+  if (Object.prototype.hasOwnProperty.call(message, "authToken")) {
+    const parsed = parseAuthInput(message.authToken);
+    if (!parsed.authState) {
+      sendResponse({
+        error: "Paste a valid CareerOS extension token package.",
+        ok: false,
+      });
+      return true;
     }
 
-    writeSettings(nextSettings)
-      .then((settings) =>
+    validateAuthState(nextApiBaseUrl, parsed.authState)
+      .then((validation) => {
+        if (!validation.valid) {
+          sendResponse({
+            error: "That token package could not be verified with CareerOS.",
+            ok: false,
+          });
+          return;
+        }
+
+        nextSettings[STORAGE_KEYS.apiBaseUrl] = normalizeApiBaseUrl(
+          validation.apiBaseUrl || nextApiBaseUrl,
+        );
+        nextSettings[STORAGE_KEYS.authRaw] = "";
+        nextSettings[STORAGE_KEYS.authState] = parsed.authState;
+        writeSettings(nextSettings)
+          .then((settings) =>
+            sendResponse({
+              ok: true,
+              settings: {
+                apiBaseUrl: settings.apiBaseUrl,
+              },
+              auth: toAuthSummary(
+                settings.authState,
+                hasUsableAuthState(settings.authState),
+              ),
+            }),
+          )
+          .catch((error) => sendResponse({ ok: false, error: error.message }));
+      })
+      .catch((error) =>
         sendResponse({
-          ok: true,
-          settings: {
-            apiBaseUrl: settings.apiBaseUrl,
-          },
-          auth: toAuthSummary(
-            settings.authState,
-            hasUsableAuthState(settings.authState),
-          ),
+          error:
+            error instanceof Error
+              ? error.message
+              : "That token package could not be verified with CareerOS.",
+          ok: false,
         }),
-      )
-      .catch((error) => sendResponse({ ok: false, error: error.message }));
+      );
     return true;
+  }
+
+  writeSettings(nextSettings)
+    .then((settings) =>
+      sendResponse({
+        ok: true,
+        settings: {
+          apiBaseUrl: settings.apiBaseUrl,
+        },
+        auth: toAuthSummary(
+          settings.authState,
+          hasUsableAuthState(settings.authState),
+        ),
+      }),
+    )
+    .catch((error) => sendResponse({ ok: false, error: error.message }));
+  return true;
   }
 
   if (message.type === "CAREEROS_OAUTH_START") {
@@ -651,16 +1143,61 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === "CAREEROS_PASSWORD_SIGN_IN") {
+    startPasswordSignIn({
+      email: message.email,
+      password: message.password,
+    })
+      .then((result) => sendResponse(result))
+      .catch((error) =>
+        sendResponse({
+          code: "PASSWORD_SIGN_IN_FAILED",
+          error: error.message,
+          ok: false,
+        }),
+      );
+    return true;
+  }
+
+  if (message.type === "CAREEROS_PASSWORD_2FA_VERIFY") {
+    verifyPasswordTwoFactor({
+      challengeId: message.challengeId,
+      token: message.token,
+    })
+      .then((result) => sendResponse(result))
+      .catch((error) =>
+        sendResponse({
+          code: "TWO_FACTOR_FAILED",
+          error: error.message,
+          ok: false,
+        }),
+      );
+    return true;
+  }
+
+  if (message.type === "CAREEROS_PASSWORD_2FA_CANCEL") {
+    sendResponse(cancelPasswordTwoFactor(message.challengeId));
+    return true;
+  }
+
   if (message.type === "CAREEROS_GET_OAUTH_CONFIG") {
     readSettings()
-      .then((settings) => fetchOauthProviders(settings.apiBaseUrl))
-      .then((providers) =>
+      .then((settings) => fetchExtensionConfig(settings.apiBaseUrl))
+      .then(async (config) => {
+        if (config.apiBaseUrl) {
+          await rememberApiBaseUrl(config.apiBaseUrl);
+        }
+
         sendResponse({
+          auth: config.auth || {
+            emailPasswordEnabled: false,
+            firebaseApiKey: "",
+          },
           ok: true,
-          providers,
-          redirectUri: chrome.identity.getRedirectURL(),
-        }),
-      )
+          providers: config.providers,
+          redirectUri: getExtensionRedirectUri(),
+        });
+      })
       .catch((error) => sendResponse({ error: error.message, ok: false }));
     return true;
   }

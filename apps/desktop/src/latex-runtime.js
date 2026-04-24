@@ -10,24 +10,25 @@ const TECTONIC_VERSION = "0.16.9";
 const COMPILE_TIMEOUT_MS = 300_000;
 const MAX_SOURCE_LENGTH = 2_000_000;
 const MAX_LOG_CHARS = 22_000;
+const DISABLE_PORTABLE_LATEX_ENV = "CAREEROS_DISABLE_PORTABLE_LATEX";
 
 const TECTONIC_TARGETS = {
   "darwin-arm64": {
     archiveName: `tectonic-${TECTONIC_VERSION}-aarch64-apple-darwin.tar.gz`,
-    executableName: "tectonic"
+    executableName: "tectonic",
   },
   "darwin-x64": {
     archiveName: `tectonic-${TECTONIC_VERSION}-x86_64-apple-darwin.tar.gz`,
-    executableName: "tectonic"
+    executableName: "tectonic",
   },
   "linux-x64": {
     archiveName: `tectonic-${TECTONIC_VERSION}-x86_64-unknown-linux-gnu.tar.gz`,
-    executableName: "tectonic"
+    executableName: "tectonic",
   },
   "win32-x64": {
     archiveName: `tectonic-${TECTONIC_VERSION}-x86_64-pc-windows-msvc.zip`,
-    executableName: "tectonic.exe"
-  }
+    executableName: "tectonic.exe",
+  },
 };
 
 class LatexCompileError extends Error {
@@ -51,7 +52,7 @@ function getTectonicTarget(platform = process.platform, arch = process.arch) {
   return {
     ...target,
     key,
-    url: `https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%40${TECTONIC_VERSION}/${target.archiveName}`
+    url: `https://github.com/tectonic-typesetting/tectonic/releases/download/tectonic%40${TECTONIC_VERSION}/${target.archiveName}`,
   };
 }
 
@@ -65,7 +66,9 @@ function pathExists(filePath) {
 }
 
 function trimLog(logText) {
-  const text = String(logText || "").replace(/\r\n/g, "\n").trim();
+  const text = String(logText || "")
+    .replace(/\r\n/g, "\n")
+    .trim();
   if (text.length <= MAX_LOG_CHARS) {
     return text;
   }
@@ -75,13 +78,27 @@ function trimLog(logText) {
 
 function summarizeLatexLog(logText) {
   const log = trimLog(logText);
-  const lines = log.split("\n").map((line) => line.trim()).filter(Boolean);
+  const lines = log
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
   const exitLine = lines.find((line) => /exited with code/i.test(line));
   const errorLine = lines.find((line) => line.startsWith("!"));
-  const missingFileLine = lines.find((line) => /not found|cannot find|LaTeX Error: File .+ not found/i.test(line));
-  const fatalLine = lines.find((line) => /fatal error|emergency stop|no output pdf/i.test(line));
+  const missingFileLine = lines.find((line) =>
+    /not found|cannot find|LaTeX Error: File .+ not found/i.test(line),
+  );
+  const fatalLine = lines.find((line) =>
+    /fatal error|emergency stop|no output pdf/i.test(line),
+  );
 
-  return errorLine || missingFileLine || fatalLine || exitLine || lines.slice(-1)[0] || "LaTeX compilation failed.";
+  return (
+    errorLine ||
+    missingFileLine ||
+    fatalLine ||
+    exitLine ||
+    lines.slice(-1)[0] ||
+    "LaTeX compilation failed."
+  );
 }
 
 function removeLatexComments(source) {
@@ -102,7 +119,9 @@ function injectBeforeBeginDocument(source, insertion) {
 
 function createFontAwesomeFallbacks(sourceWithoutComments) {
   const commandNames = new Set();
-  for (const match of sourceWithoutComments.matchAll(/\\(fa[A-Z][A-Za-z]*)\b/g)) {
+  for (const match of sourceWithoutComments.matchAll(
+    /\\(fa[A-Z][A-Za-z]*)\b/g,
+  )) {
     commandNames.add(match[1]);
   }
 
@@ -110,7 +129,7 @@ function createFontAwesomeFallbacks(sourceWithoutComments) {
 
   const definitions = [
     "% CareerOS portable compiler fallback: omit FontAwesome icons when the bundled Windows engine cannot load the icon font.",
-    "\\providecommand{\\faIcon}[2][]{}"
+    "\\providecommand{\\faIcon}[2][]{}",
   ];
 
   for (const commandName of [...commandNames].sort()) {
@@ -122,16 +141,30 @@ function createFontAwesomeFallbacks(sourceWithoutComments) {
 
 function findUnsupportedLocalCompileFeature(source) {
   const sourceWithoutComments = removeLatexComments(source);
-  const shellEscapePackages = new Set(["asymptote", "gnuplottex", "minted", "pythontex", "sage", "svg"]);
-  const packageMatches = sourceWithoutComments.matchAll(/\\usepackage(?:\[[^\]]*])?\{([^}]+)\}/g);
+  const shellEscapePackages = new Set([
+    "asymptote",
+    "gnuplottex",
+    "minted",
+    "pythontex",
+    "sage",
+    "svg",
+  ]);
+  const packageMatches = sourceWithoutComments.matchAll(
+    /\\usepackage(?:\[[^\]]*])?\{([^}]+)\}/g,
+  );
 
   for (const match of packageMatches) {
-    const packages = match[1].split(",").map((entry) => entry.trim()).filter(Boolean);
-    const unsupportedPackage = packages.find((packageName) => shellEscapePackages.has(packageName));
+    const packages = match[1]
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    const unsupportedPackage = packages.find((packageName) =>
+      shellEscapePackages.has(packageName),
+    );
     if (unsupportedPackage) {
       return {
         feature: unsupportedPackage,
-        reason: `${unsupportedPackage} requires shell-escape or an external executable, which CareerOS disables for local desktop compiles.`
+        reason: `${unsupportedPackage} requires shell-escape or an external executable, which CareerOS disables for local desktop compiles.`,
       };
     }
   }
@@ -139,14 +172,16 @@ function findUnsupportedLocalCompileFeature(source) {
   if (/\\(?:immediate\s*)?write18\b/.test(sourceWithoutComments)) {
     return {
       feature: "\\write18",
-      reason: "\\write18 shell commands are disabled for local desktop compiles."
+      reason:
+        "\\write18 shell commands are disabled for local desktop compiles.",
     };
   }
 
   if (/\\inputminted\b|\\begin\{minted\}/.test(sourceWithoutComments)) {
     return {
       feature: "minted",
-      reason: "minted requires shell-escape and Python Pygments, which CareerOS disables for local desktop compiles."
+      reason:
+        "minted requires shell-escape and Python Pygments, which CareerOS disables for local desktop compiles.",
     };
   }
 
@@ -155,14 +190,21 @@ function findUnsupportedLocalCompileFeature(source) {
 
 function prepareSourceForTectonic(source) {
   const sourceWithoutComments = removeLatexComments(source);
-  const hasFontAwesomePackage = /\\usepackage(?:\[[^\]]*])?\{fontawesome5\}/.test(sourceWithoutComments);
+  const hasFontAwesomePackage =
+    /\\usepackage(?:\[[^\]]*])?\{fontawesome5\}/.test(sourceWithoutComments);
 
   if (!hasFontAwesomePackage || process.platform !== "win32") {
     return source;
   }
 
-  const withoutFontAwesome = source.replace(/^[ \t]*\\usepackage(?:\[[^\]]*])?\{fontawesome5\}[ \t]*(?:\r?\n)?/gm, "");
-  return injectBeforeBeginDocument(withoutFontAwesome, createFontAwesomeFallbacks(sourceWithoutComments));
+  const withoutFontAwesome = source.replace(
+    /^[ \t]*\\usepackage(?:\[[^\]]*])?\{fontawesome5\}[ \t]*(?:\r?\n)?/gm,
+    "",
+  );
+  return injectBeforeBeginDocument(
+    withoutFontAwesome,
+    createFontAwesomeFallbacks(sourceWithoutComments),
+  );
 }
 
 function escapeXml(value) {
@@ -181,7 +223,9 @@ async function createTectonicEnvironment(workDirectory) {
   const fontConfigDirectory = path.join(workDirectory, "fontconfig");
   const fontCacheDirectory = path.join(workDirectory, "font-cache");
   const windowsDirectory = process.env.WINDIR || "C:\\Windows";
-  const windowsFontDirectory = path.join(windowsDirectory, "Fonts").replace(/\\/g, "/");
+  const windowsFontDirectory = path
+    .join(windowsDirectory, "Fonts")
+    .replace(/\\/g, "/");
   const fontConfigPath = path.join(fontConfigDirectory, "fonts.conf");
 
   await fsp.mkdir(fontConfigDirectory, { recursive: true });
@@ -194,13 +238,13 @@ async function createTectonicEnvironment(workDirectory) {
   <cachedir>${escapeXml(fontCacheDirectory.replace(/\\/g, "/"))}</cachedir>
 </fontconfig>
 `,
-    "utf8"
+    "utf8",
   );
 
   return {
     ...process.env,
     FONTCONFIG_FILE: fontConfigPath,
-    FONTCONFIG_PATH: fontConfigDirectory
+    FONTCONFIG_PATH: fontConfigDirectory,
   };
 }
 
@@ -209,14 +253,19 @@ function runProcess(command, args, options = {}) {
     const child = spawn(command, args, {
       cwd: options.cwd,
       env: options.env,
-      windowsHide: true
+      windowsHide: true,
     });
 
     let stdout = "";
     let stderr = "";
     const timeoutId = setTimeout(() => {
       child.kill();
-      reject(new LatexCompileError("Compile timed out.", { engine: options.engine, log: stdout || stderr }));
+      reject(
+        new LatexCompileError("Compile timed out.", {
+          engine: options.engine,
+          log: stdout || stderr,
+        }),
+      );
     }, options.timeoutMs ?? COMPILE_TIMEOUT_MS);
 
     child.stdout?.on("data", (chunk) => {
@@ -237,7 +286,7 @@ function runProcess(command, args, options = {}) {
       resolve({
         code,
         stderr,
-        stdout
+        stdout,
       });
     });
   });
@@ -247,7 +296,7 @@ function getVersion(command, args) {
   const result = spawnSync(command, args, {
     encoding: "utf8",
     timeout: 5_000,
-    windowsHide: true
+    windowsHide: true,
   });
 
   if (result.error || result.status !== 0) {
@@ -270,20 +319,35 @@ async function downloadFile(url, destination, redirectCount = 0) {
       url,
       {
         headers: {
-          "user-agent": "CareerOS Desktop"
-        }
+          "user-agent": "CareerOS Desktop",
+        },
       },
       (response) => {
         const location = response.headers.location;
-        if (response.statusCode && response.statusCode >= 300 && response.statusCode < 400 && location) {
+        if (
+          response.statusCode &&
+          response.statusCode >= 300 &&
+          response.statusCode < 400 &&
+          location
+        ) {
           response.resume();
-          downloadFile(new URL(location, url).toString(), destination, redirectCount + 1).then(resolve).catch(reject);
+          downloadFile(
+            new URL(location, url).toString(),
+            destination,
+            redirectCount + 1,
+          )
+            .then(resolve)
+            .catch(reject);
           return;
         }
 
         if (response.statusCode !== 200) {
           response.resume();
-          reject(new Error(`Compiler download failed with HTTP ${response.statusCode}.`));
+          reject(
+            new Error(
+              `Compiler download failed with HTTP ${response.statusCode}.`,
+            ),
+          );
           return;
         }
 
@@ -293,7 +357,7 @@ async function downloadFile(url, destination, redirectCount = 0) {
           file.close(resolve);
         });
         file.on("error", reject);
-      }
+      },
     );
 
     request.on("error", reject);
@@ -332,7 +396,7 @@ async function extractArchive(archivePath, destination) {
   const tar = require("tar");
   await tar.x({
     cwd: destination,
-    file: archivePath
+    file: archivePath,
   });
 }
 
@@ -341,7 +405,9 @@ async function installTectonicRuntime(baseDirectory, options = {}) {
   const targetArch = options.arch || process.arch;
   const target = getTectonicTarget(targetPlatform, targetArch);
   if (!target) {
-    throw new Error(`No bundled compiler is configured for ${targetPlatform}-${targetArch}.`);
+    throw new Error(
+      `No bundled compiler is configured for ${targetPlatform}-${targetArch}.`,
+    );
   }
 
   const targetDirectory = path.join(baseDirectory, target.key);
@@ -350,18 +416,27 @@ async function installTectonicRuntime(baseDirectory, options = {}) {
     return executablePath;
   }
 
-  const stagingDirectory = await fsp.mkdtemp(path.join(os.tmpdir(), "careeros-tectonic-"));
+  const stagingDirectory = await fsp.mkdtemp(
+    path.join(os.tmpdir(), "careeros-tectonic-"),
+  );
   const archivePath = path.join(stagingDirectory, target.archiveName);
   const extractedDirectory = path.join(stagingDirectory, "extract");
 
   try {
-    options.log?.info?.(`Downloading Tectonic ${TECTONIC_VERSION} from ${target.url}`);
+    options.log?.info?.(
+      `Downloading Tectonic ${TECTONIC_VERSION} from ${target.url}`,
+    );
     await downloadFile(target.url, archivePath);
     await extractArchive(archivePath, extractedDirectory);
 
-    const extractedExecutable = await findFileByName(extractedDirectory, target.executableName);
+    const extractedExecutable = await findFileByName(
+      extractedDirectory,
+      target.executableName,
+    );
     if (!extractedExecutable) {
-      throw new Error(`Downloaded archive did not contain ${target.executableName}.`);
+      throw new Error(
+        `Downloaded archive did not contain ${target.executableName}.`,
+      );
     }
 
     await fsp.mkdir(targetDirectory, { recursive: true });
@@ -373,7 +448,9 @@ async function installTectonicRuntime(baseDirectory, options = {}) {
 
     return executablePath;
   } finally {
-    await fsp.rm(stagingDirectory, { force: true, recursive: true }).catch(() => {});
+    await fsp
+      .rm(stagingDirectory, { force: true, recursive: true })
+      .catch(() => {});
   }
 }
 
@@ -381,13 +458,14 @@ function createLatexRuntime({ app, log }) {
   let installPromise = null;
   let installState = {
     message: "Portable compiler has not been installed yet.",
-    state: "idle"
+    state: "idle",
   };
 
   const target = getTectonicTarget();
+  const portableLatexDisabled = process.env[DISABLE_PORTABLE_LATEX_ENV] === "1";
 
   function getTectonicCandidates() {
-    if (!target) {
+    if (!target || portableLatexDisabled) {
       return [];
     }
 
@@ -395,26 +473,45 @@ function createLatexRuntime({ app, log }) {
     if (app.isPackaged) {
       candidates.push({
         message: "Bundled with CareerOS Desktop.",
-        path: path.join(process.resourcesPath, "latex", target.key, target.executableName)
+        path: path.join(
+          process.resourcesPath,
+          "latex",
+          target.key,
+          target.executableName,
+        ),
       });
     }
 
     candidates.push(
       {
         message: "Bundled with CareerOS Desktop.",
-        path: path.resolve(__dirname, "..", "vendor", "latex", target.key, target.executableName)
+        path: path.resolve(
+          __dirname,
+          "..",
+          "vendor",
+          "latex",
+          target.key,
+          target.executableName,
+        ),
       },
       {
         message: "Installed inside CareerOS app data.",
-        path: path.join(app.getPath("userData"), "latex", target.key, target.executableName)
-      }
+        path: path.join(
+          app.getPath("userData"),
+          "latex",
+          target.key,
+          target.executableName,
+        ),
+      },
     );
 
     return candidates;
   }
 
   function getTectonicRuntime() {
-    const found = getTectonicCandidates().find((candidate) => pathExists(candidate.path));
+    const found = getTectonicCandidates().find((candidate) =>
+      pathExists(candidate.path),
+    );
     if (!found) {
       return null;
     }
@@ -426,7 +523,7 @@ function createLatexRuntime({ app, log }) {
       installState: "installed",
       kind: "tectonic",
       name: "Tectonic LaTeX",
-      version: getVersion(found.path, ["--version"])
+      version: getVersion(found.path, ["--version"]),
     };
   }
 
@@ -439,7 +536,7 @@ function createLatexRuntime({ app, log }) {
             "C:\\Program Files\\MiKTeX\\miktex\\bin\\pdflatex.exe",
             "C:\\texlive\\2026\\bin\\windows\\pdflatex.exe",
             "C:\\texlive\\2025\\bin\\windows\\pdflatex.exe",
-            "C:\\texlive\\2024\\bin\\windows\\pdflatex.exe"
+            "C:\\texlive\\2024\\bin\\windows\\pdflatex.exe",
           ]
         : ["pdflatex", "/usr/bin/pdflatex", "/usr/local/bin/pdflatex"];
 
@@ -453,7 +550,7 @@ function createLatexRuntime({ app, log }) {
           installState: "installed",
           kind: "pdflatex",
           name: "pdfLaTeX",
-          version
+          version,
         };
       }
     }
@@ -477,16 +574,20 @@ function createLatexRuntime({ app, log }) {
       installMessage: installState.message,
       installState: installState.state,
       kind: "missing",
-      name: "Portable LaTeX compiler"
+      name: "Portable LaTeX compiler",
     };
   }
 
   async function installCompiler() {
+    if (portableLatexDisabled) {
+      throw new Error("Portable LaTeX compiler is disabled for this runtime.");
+    }
+
     const existing = getTectonicRuntime();
     if (existing) {
       installState = {
         message: "Portable compiler is already installed.",
-        state: "installed"
+        state: "installed",
       };
       return existing;
     }
@@ -497,21 +598,27 @@ function createLatexRuntime({ app, log }) {
 
     installState = {
       message: "Installing portable LaTeX compiler...",
-      state: "installing"
+      state: "installing",
     };
 
-    installPromise = installTectonicRuntime(path.join(app.getPath("userData"), "latex"), { log })
+    installPromise = installTectonicRuntime(
+      path.join(app.getPath("userData"), "latex"),
+      { log },
+    )
       .then(() => {
         installState = {
           message: "Portable compiler installed.",
-          state: "installed"
+          state: "installed",
         };
         return getStatus();
       })
       .catch((error) => {
         installState = {
-          message: error instanceof Error ? error.message : "Portable compiler install failed.",
-          state: "failed"
+          message:
+            error instanceof Error
+              ? error.message
+              : "Portable compiler install failed.",
+          state: "failed",
         };
         throw error;
       })
@@ -523,7 +630,9 @@ function createLatexRuntime({ app, log }) {
   }
 
   async function compileWithTectonic(runtime, source) {
-    const workDirectory = await fsp.mkdtemp(path.join(os.tmpdir(), "careeros-latex-"));
+    const workDirectory = await fsp.mkdtemp(
+      path.join(os.tmpdir(), "careeros-latex-"),
+    );
     const outputDirectory = path.join(workDirectory, "out");
     const inputPath = path.join(workDirectory, "resume.tex");
     const pdfPath = path.join(outputDirectory, "resume.pdf");
@@ -534,37 +643,53 @@ function createLatexRuntime({ app, log }) {
 
       const result = await runProcess(
         runtime.executablePath,
-        ["--keep-logs", "--keep-intermediates", "--outdir", outputDirectory, inputPath],
+        [
+          "--keep-logs",
+          "--keep-intermediates",
+          "--outdir",
+          outputDirectory,
+          inputPath,
+        ],
         {
           cwd: workDirectory,
           engine: runtime.name,
           env: await createTectonicEnvironment(workDirectory),
-          timeoutMs: COMPILE_TIMEOUT_MS
-        }
+          timeoutMs: COMPILE_TIMEOUT_MS,
+        },
       );
 
       if (result.code !== 0) {
-        const logText = await fsp.readFile(path.join(outputDirectory, "resume.log"), "utf8").catch(() => "");
+        const logText = await fsp
+          .readFile(path.join(outputDirectory, "resume.log"), "utf8")
+          .catch(() => "");
         const exitSummary = `${runtime.name} exited with code ${result.code}.`;
-        const fullLog = trimLog([logText, result.stderr, result.stdout, exitSummary].filter(Boolean).join("\n"));
+        const fullLog = trimLog(
+          [logText, result.stderr, result.stdout, exitSummary]
+            .filter(Boolean)
+            .join("\n"),
+        );
         throw new LatexCompileError(summarizeLatexLog(fullLog), {
           engine: runtime.name,
-          log: fullLog
+          log: fullLog,
         });
       }
 
       return {
         engine: runtime.name,
         log: trimLog(result.stdout || result.stderr),
-        pdfBuffer: await fsp.readFile(pdfPath)
+        pdfBuffer: await fsp.readFile(pdfPath),
       };
     } finally {
-      await fsp.rm(workDirectory, { force: true, recursive: true }).catch(() => {});
+      await fsp
+        .rm(workDirectory, { force: true, recursive: true })
+        .catch(() => {});
     }
   }
 
   async function compileWithPdflatex(runtime, source) {
-    const workDirectory = await fsp.mkdtemp(path.join(os.tmpdir(), "careeros-latex-"));
+    const workDirectory = await fsp.mkdtemp(
+      path.join(os.tmpdir(), "careeros-latex-"),
+    );
     const outputDirectory = path.join(workDirectory, "out");
     const inputPath = path.join(workDirectory, "resume.tex");
     const pdfPath = path.join(outputDirectory, "resume.pdf");
@@ -581,30 +706,30 @@ function createLatexRuntime({ app, log }) {
           "-file-line-error",
           "-output-directory",
           outputDirectory,
-          inputPath
+          inputPath,
         ];
 
-        if (/miktex/i.test(`${runtime.executablePath} ${runtime.version || ""}`)) {
+        if (
+          /miktex/i.test(`${runtime.executablePath} ${runtime.version || ""}`)
+        ) {
           args.unshift("--enable-installer");
         }
 
-        lastResult = await runProcess(
-          runtime.executablePath,
-          args,
-          {
-            cwd: workDirectory,
-            engine: runtime.name,
-            env: process.env,
-            timeoutMs: COMPILE_TIMEOUT_MS
-          }
-        );
+        lastResult = await runProcess(runtime.executablePath, args, {
+          cwd: workDirectory,
+          engine: runtime.name,
+          env: process.env,
+          timeoutMs: COMPILE_TIMEOUT_MS,
+        });
 
         if (lastResult.code !== 0) {
-          const logText = await fsp.readFile(path.join(outputDirectory, "resume.log"), "utf8").catch(() => "");
+          const logText = await fsp
+            .readFile(path.join(outputDirectory, "resume.log"), "utf8")
+            .catch(() => "");
           const fullLog = logText || lastResult.stderr || lastResult.stdout;
           throw new LatexCompileError(summarizeLatexLog(fullLog), {
             engine: runtime.name,
-            log: fullLog
+            log: fullLog,
           });
         }
       }
@@ -612,17 +737,21 @@ function createLatexRuntime({ app, log }) {
       return {
         engine: runtime.name,
         log: trimLog(lastResult?.stdout || lastResult?.stderr),
-        pdfBuffer: await fsp.readFile(pdfPath)
+        pdfBuffer: await fsp.readFile(pdfPath),
       };
     } finally {
-      await fsp.rm(workDirectory, { force: true, recursive: true }).catch(() => {});
+      await fsp
+        .rm(workDirectory, { force: true, recursive: true })
+        .catch(() => {});
     }
   }
 
   async function compile(sourceCode) {
     const source = typeof sourceCode === "string" ? sourceCode.trim() : "";
     if (!source) {
-      throw new LatexCompileError("LaTeX source is empty.", { engine: "CareerOS" });
+      throw new LatexCompileError("LaTeX source is empty.", {
+        engine: "CareerOS",
+      });
     }
 
     const unsupportedFeature = findUnsupportedLocalCompileFeature(source);
@@ -632,26 +761,32 @@ function createLatexRuntime({ app, log }) {
         log: [
           `Unsupported local compile feature: ${unsupportedFeature.feature}`,
           unsupportedFeature.reason,
-          "Use listings/verbatim for code blocks, or remove the shell-escape dependency before compiling locally."
-        ].join("\n")
+          "Use listings/verbatim for code blocks, or remove the shell-escape dependency before compiling locally.",
+        ].join("\n"),
       });
     }
 
     let runtime = getTectonicRuntime();
 
-    if (!runtime && target) {
+    if (!runtime && target && !portableLatexDisabled) {
       try {
         runtime = await installCompiler();
       } catch (error) {
-        log?.warn?.("Portable LaTeX install failed; falling back to system pdfLaTeX if available.", error);
+        log?.warn?.(
+          "Portable LaTeX install failed; falling back to system pdfLaTeX if available.",
+          error,
+        );
       }
     }
 
     runtime = runtime || getPdflatexRuntime() || getStatus();
     if (!runtime.available) {
-      throw new LatexCompileError(runtime.installMessage || "No local LaTeX compiler is available.", {
-        engine: runtime.name
-      });
+      throw new LatexCompileError(
+        runtime.installMessage || "No local LaTeX compiler is available.",
+        {
+          engine: runtime.name,
+        },
+      );
     }
 
     if (runtime.kind === "tectonic") {
@@ -663,19 +798,25 @@ function createLatexRuntime({ app, log }) {
           throw error;
         }
 
-        log?.warn?.("Tectonic compile failed; trying pdfLaTeX fallback.", error);
+        log?.warn?.(
+          "Tectonic compile failed; trying pdfLaTeX fallback.",
+          error,
+        );
         try {
           return await compileWithPdflatex(pdflatexRuntime, source);
         } catch (fallbackError) {
-          if (fallbackError instanceof LatexCompileError && error instanceof LatexCompileError) {
+          if (
+            fallbackError instanceof LatexCompileError &&
+            error instanceof LatexCompileError
+          ) {
             fallbackError.log = trimLog(
               [
                 `${error.engine} failed first:`,
                 error.log,
                 "",
                 `${fallbackError.engine} fallback failed:`,
-                fallbackError.log
-              ].join("\n")
+                fallbackError.log,
+              ].join("\n"),
             );
           }
           throw fallbackError;
@@ -690,7 +831,7 @@ function createLatexRuntime({ app, log }) {
     compile,
     getStatus,
     installCompiler,
-    maxSourceLength: MAX_SOURCE_LENGTH
+    maxSourceLength: MAX_SOURCE_LENGTH,
   };
 }
 
@@ -699,5 +840,5 @@ module.exports = {
   TECTONIC_VERSION,
   createLatexRuntime,
   getTectonicTarget,
-  installTectonicRuntime
+  installTectonicRuntime,
 };

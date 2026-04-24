@@ -1,16 +1,16 @@
 "use client";
 
 import { BarChart3, CalendarDays, Gauge, Target, TrendingUp, Trophy } from "lucide-react";
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { MetricCard } from "@/components/MetricCard";
 import {
   useUserPracticeAttempts,
   type PracticeAttemptRecord
 } from "@/lib/firebase/interview-war-room";
+import { fetchAiInterviewRoles, fetchMcqReview, type McqReviewEntry } from "@/lib/interview/client";
 import {
   formatInterviewTestType,
-  listAiInterviewRoles,
-  getMcqQuestionById,
+  type AiInterviewRole,
   type InterviewTestType,
   type PracticeQuestion
 } from "@/lib/interview/question-bank";
@@ -96,11 +96,12 @@ function percentageFromMarks(earned: number, total: number): number {
 
 function computeQuestionOutcome(
   attempt: PracticeAttemptRecord,
-  question: PracticeQuestion
+  question: PracticeQuestion,
+  mcqReviews: Record<string, McqReviewEntry>
 ): QuestionOutcome {
   if (question.kind === "mcq") {
     const selected = (attempt.mcqAnswers[question.id] ?? "").trim().toLowerCase();
-    const canonical = getMcqQuestionById(question.id);
+    const canonical = mcqReviews[question.id];
     const earned = canonical && selected && selected === canonical.correctOptionId ? 1 : 0;
     return {
       earned,
@@ -114,7 +115,10 @@ function computeQuestionOutcome(
   };
 }
 
-function computeAttemptScore(attempt: PracticeAttemptRecord): {
+function computeAttemptScore(
+  attempt: PracticeAttemptRecord,
+  mcqReviews: Record<string, McqReviewEntry>
+): {
   earned: number;
   percentage: number;
   total: number;
@@ -129,7 +133,7 @@ function computeAttemptScore(attempt: PracticeAttemptRecord): {
 
   const computed = attempt.questions.reduce(
     (aggregate, question) => {
-      const outcome = computeQuestionOutcome(attempt, question);
+      const outcome = computeQuestionOutcome(attempt, question, mcqReviews);
       aggregate.earned += outcome.earned;
       aggregate.total += outcome.total;
       return aggregate;
@@ -151,7 +155,10 @@ function computeAttemptScore(attempt: PracticeAttemptRecord): {
   };
 }
 
-function computeTopicPerformance(attempts: PracticeAttemptRecord[]): TopicPerformanceRow[] {
+function computeTopicPerformance(
+  attempts: PracticeAttemptRecord[],
+  mcqReviews: Record<string, McqReviewEntry>
+): TopicPerformanceRow[] {
   const tracker = new Map<string, TopicPerformanceRow>();
 
   attempts.forEach((attempt) => {
@@ -160,7 +167,7 @@ function computeTopicPerformance(attempts: PracticeAttemptRecord[]): TopicPerfor
     attempt.questions.forEach((question) => {
       const subtopic = question.category || "General";
       const key = `${topic}::${subtopic}`;
-      const outcome = computeQuestionOutcome(attempt, question);
+      const outcome = computeQuestionOutcome(attempt, question, mcqReviews);
       const current = tracker.get(key) ?? {
         key,
         topic,
@@ -201,18 +208,64 @@ export default function AnalyticsPage() {
   const [trackFilter, setTrackFilter] = useState<TrackFilter>("all");
   const [aiRoleFilter, setAiRoleFilter] = useState("all");
   const [summaryPage, setSummaryPage] = useState(1);
-  const aiRoles = useMemo(() => listAiInterviewRoles(), []);
+  const [aiRoles, setAiRoles] = useState<AiInterviewRole[]>([]);
+  const [mcqReviews, setMcqReviews] = useState<Record<string, McqReviewEntry>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAiInterviewRoles()
+      .then((roles) => {
+        if (!cancelled) setAiRoles(roles);
+      })
+      .catch(() => {
+        if (!cancelled) setAiRoles([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const completedAttempts = useMemo(
     () => attempts.filter((attempt) => attempt.status === "submitted" || attempt.status === "timed_out"),
     [attempts]
   );
 
+  // getMcqQuestionById() used to run in-browser to recompute per-question outcomes for the topic breakdown below -
+  // that function is now async (question content is fetched from R2 server-side), so the canonical answer key for
+  // every MCQ question referenced by a completed attempt is fetched up front via /api/interview/mcq-review and
+  // looked up synchronously from this map instead (see computeQuestionOutcome()).
+  useEffect(() => {
+    const mcqQuestionIds = Array.from(
+      new Set(
+        completedAttempts.flatMap((attempt) =>
+          attempt.questions.filter((question) => question.kind === "mcq").map((question) => question.id)
+        )
+      )
+    );
+
+    if (mcqQuestionIds.length === 0) {
+      setMcqReviews({});
+      return;
+    }
+
+    let cancelled = false;
+    fetchMcqReview(mcqQuestionIds)
+      .then((result) => {
+        if (!cancelled) setMcqReviews(result.reviews);
+      })
+      .catch(() => {
+        if (!cancelled) setMcqReviews({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [completedAttempts]);
+
   const analyticsPoints = useMemo<AttemptAnalyticsPoint[]>(() => {
     return completedAttempts
       .map((attempt) => {
         const timestamp = resolveAttemptTimestamp(attempt);
-        const score = computeAttemptScore(attempt);
+        const score = computeAttemptScore(attempt, mcqReviews);
 
         return {
           attempt,
@@ -231,7 +284,7 @@ export default function AnalyticsPage() {
         };
       })
       .sort((first, second) => first.submittedAtMs - second.submittedAtMs);
-  }, [completedAttempts]);
+  }, [completedAttempts, mcqReviews]);
 
   const suggestedDateRange = useMemo(() => {
     if (analyticsPoints.length === 0) {
@@ -326,8 +379,8 @@ export default function AnalyticsPage() {
   const showTestLabels = filteredPoints.length <= MAX_LABELLED_POINTS;
 
   const topicRows = useMemo(
-    () => computeTopicPerformance(filteredPoints.map((point) => point.attempt)),
-    [filteredPoints]
+    () => computeTopicPerformance(filteredPoints.map((point) => point.attempt), mcqReviews),
+    [filteredPoints, mcqReviews]
   );
 
   const strongestRows = useMemo(() => {

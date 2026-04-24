@@ -1,81 +1,93 @@
 {
-    "name": "@careeros/desktop",
-    "version": "1.0.0",
-    "private": true,
-    "main": "src/main.js",
-    "scripts": {
-        "dev": "cross-env NODE_ENV=development electron .",
-        "start": "electron .",
-        "build:web": "node scripts/build-web.js",
-        "prepare:ai": "node scripts/prepare-ai-runtime.js",
-        "prepare:ai:linux": "bash scripts/install-ai-runtime-linux.sh",
-        "prepare:latex": "node scripts/prepare-latex-runtime.js",
-        "smoke:helper": "node scripts/smoke-helper-api.js",
-        "smoke:latex": "node scripts/smoke-latex-runtime.js",
-        "smoke:coding": "node scripts/smoke-coding-arena.js",
-        "dist": "npm run build:web && npm run prepare:latex && electron-builder --publish never",
-        "dist:win": "npm run build:web && npm run prepare:latex && electron-builder --win nsis --publish never",
-        "dist:linux": "npm run build:web && npm run prepare:latex && electron-builder --linux AppImage --publish never",
-        "build": "npm run build:web"
+  "name": "@careeros/desktop",
+  "version": "1.0.0",
+  "private": true,
+  "desktopName": "com.careeros.CareerOS.desktop",
+  "main": "src/main.js",
+  "scripts": {
+    "dev": "cross-env NODE_ENV=development electron .",
+    "start": "electron .",
+    "build:web": "node scripts/build-web.js",
+    "prepare:ai": "node scripts/prepare-ai-runtime.js",
+    "prepare:ai:linux": "bash scripts/install-ai-runtime-linux.sh",
+    "prepare:latex": "node scripts/prepare-latex-runtime.js",
+    "prepare:latex:win": "node scripts/prepare-latex-runtime.js --target win32-x64",
+    "verify:latex:bundle:win": "node scripts/verify-latex-bundle.js win32-x64",
+    "smoke:helper": "node scripts/smoke-helper-api.js",
+    "smoke:latex": "node scripts/smoke-latex-runtime.js",
+    "smoke:coding": "node scripts/smoke-coding-arena.js",
+    "dist": "npm run build:web && npm run prepare:latex && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --publish never",
+    "dist:win": "npm run build:web && npm run prepare:latex:win && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis zip --publish never && npm run verify:latex:bundle:win",
+    "dist:win:local": "npm run build:web && npm run prepare:latex:win && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis zip --publish never --config.win.signAndEditExecutable=false && npm run verify:latex:bundle:win",
+    "dist:linux": "npm run build:web && npm run prepare:latex && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --linux AppImage deb rpm pacman --publish never",
+    "dist:flatpak:dir": "npm run build:web && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --config electron-builder.flatpak.yml --linux dir --publish never",
+    "build": "npm run build:web"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "electron-log": "^5.2.4",
+    "express": "^4.21.2",
+    "extract-zip": "^2.0.1",
+    "tar": "^7.4.3"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "^31.0.2",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.careeros.desktop",
+    "productName": "CareerOS",
+    "artifactName": "CareerOS-${version}-${arch}.${ext}",
+    "icon": "build/icon.png",
+    "files": [
+      "src/**/*",
+      "package.json",
+      "!src/**/*.test.js"
+    ],
+    "extraResources": [
+      {
+        "from": "vendor/latex",
+        "to": "latex",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../web/.next/standalone",
+        "to": "web",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "directories": {
+      "output": "dist"
     },
-    "dependencies": {
-        "cors": "^2.8.5",
-        "electron-log": "^5.2.4",
-        "express": "^4.21.2",
-        "extract-zip": "^2.0.1",
-        "tar": "^7.4.3"
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "build/icon.png"
     },
-    "devDependencies": {
-        "cross-env": "^7.0.3",
-        "electron": "^31.0.2",
-        "electron-builder": "^24.13.3"
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ],
+      "icon": "build/icon.png"
     },
-    "build": {
-        "appId": "com.careeros.desktop",
-        "productName": "CareerOS",
-        "artifactName": "CareerOS-${version}-${arch}.${ext}",
-        "icon": "build/icon.png",
-        "files": [
-            "src/**/*",
-            "package.json",
-            "!src/**/*.test.js"
-        ],
-        "extraResources": [
-            {
-                "from": "vendor/latex",
-                "to": "latex",
-                "filter": [
-                    "**/*"
-                ]
-            },
-            {
-                "from": "../web/.next/standalone",
-                "to": "web",
-                "filter": [
-                    "**/*"
-                ]
-            }
-        ],
-        "directories": {
-            "output": "dist"
-        },
-        "mac": {
-            "target": [
-                "dmg"
-            ],
-            "icon": "build/icon.png"
-        },
-        "win": {
-            "target": [
-                "nsis"
-            ],
-            "icon": "build/icon.png"
-        },
-        "linux": {
-            "target": [
-                "AppImage"
-            ],
-            "icon": "build/icon.png"
-        }
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm",
+        "pacman"
+      ],
+      "icon": "build/icon.png",
+      "category": "Office",
+      "synopsis": "Career workspace for resumes, jobs, interviews, and applications.",
+      "description": "CareerOS is a desktop career workspace for managing resumes, jobs, interview preparation, coding practice, and AI-assisted application workflows."
     }
+  }
 }

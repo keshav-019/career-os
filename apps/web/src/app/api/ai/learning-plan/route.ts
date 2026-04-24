@@ -3,6 +3,7 @@ import {
   type LearningPlanTrackInput,
   type LearningPlanWeakRowInput
 } from "@/lib/ai/career-ai";
+import { requireAuthAndRateLimit } from "@/lib/server/require-auth-rate-limit";
 
 export const runtime = "nodejs";
 
@@ -12,6 +13,9 @@ type LearningPlanRequestBody = {
 };
 
 export async function POST(request: Request) {
+  const gate = await requireAuthAndRateLimit(request, "ai-learning-plan");
+  if (!gate.ok) return gate.response;
+
   try {
     const body = (await request.json()) as LearningPlanRequestBody;
 

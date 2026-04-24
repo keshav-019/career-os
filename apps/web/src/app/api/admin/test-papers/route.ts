@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as CustomTestPaperInput;
     const existing = body?.id ? await getCustomTestPaperRecord(body.id, verifiedAuth.idToken) : null;
 
-    const record = buildCustomTestPaperRecord(body, {
+    const record = await buildCustomTestPaperRecord(body, {
       createdBy: existing?.createdBy ?? verifiedAuth.userId,
       existingCreatedAt: existing?.createdAt
     });

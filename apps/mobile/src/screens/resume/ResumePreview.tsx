@@ -6,6 +6,38 @@ function accentFor(templateId: ResumeTemplateId): string {
   return RESUME_VISUAL_TEMPLATES.find((t) => t.id === templateId)?.accent ?? "#c1652f";
 }
 
+/** A skill group with no category renders as a plain bullet list with no bold heading ("just a bunch of
+ *  skills"); a group with a category renders as a labeled line. Groups wrap into `columns` (1-3) side-by-side
+ *  columns via percentage-width flex items - React Native has no CSS grid, so this is the standard flex-wrap
+ *  equivalent. `columns` is forced to 1 in the sidebar template's narrow rail regardless of the saved setting,
+ *  since multiple columns wouldn't fit there. */
+function SkillsBlock({ data, accent, variant, columns }: { data: ResumeData; accent: string; variant: ResumeTemplateId; columns: number }) {
+  if (data.skills.length === 0) return null;
+  return (
+    <View style={{ gap: 6 }}>
+      <SectionTitle text="Skills" accent={accent} variant={variant} />
+      <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+        {data.skills.map((skill) => (
+          <View key={skill.id} style={{ width: `${100 / columns}%`, paddingRight: 8, paddingBottom: 6 }}>
+            {skill.category ? (
+              <Text style={{ color: "#333", fontSize: 11, lineHeight: 16 }}>
+                <Text style={{ fontWeight: "700" }}>{skill.category}: </Text>
+                {skill.items.join(", ")}
+              </Text>
+            ) : (
+              skill.items.map((item, itemIndex) => (
+                <Text key={itemIndex} style={{ color: "#333", fontSize: 11, lineHeight: 16 }}>
+                  - {item}
+                </Text>
+              ))
+            )}
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 function ContactLine({ data }: { data: ResumeData }) {
   const parts = [data.personal.email, data.personal.phone, data.personal.location, data.personal.linkedin, data.personal.github, data.personal.portfolio].filter(
     Boolean
@@ -118,19 +150,6 @@ export function ResumePreview({ data, templateId }: { data: ResumeData; template
     </View>
   );
 
-  const skillsBlock =
-    data.skills.length > 0 ? (
-      <View style={{ gap: 6 }}>
-        <SectionTitle text="Skills" accent={accent} variant={templateId} />
-        {data.skills.map((skill) => (
-          <Text key={skill.id} style={{ color: "#333", fontSize: 11, lineHeight: 16 }}>
-            <Text style={{ fontWeight: "700" }}>{skill.category}: </Text>
-            {skill.items.join(", ")}
-          </Text>
-        ))}
-      </View>
-    ) : null;
-
   if (templateId === "sidebar") {
     return (
       <View style={{ backgroundColor: "#fff", borderRadius: 8, padding: 16, flexDirection: "row", gap: 14 }}>
@@ -140,7 +159,7 @@ export function ResumePreview({ data, templateId }: { data: ResumeData; template
           </Text>
           <Text style={{ color: "#555", fontSize: 11 }}>{data.personal.title}</Text>
           <ContactLine data={data} />
-          {skillsBlock}
+          <SkillsBlock data={data} accent={accent} variant={templateId} columns={1} />
         </View>
         <View style={{ flex: 1 }}>{body}</View>
       </View>
@@ -157,7 +176,7 @@ export function ResumePreview({ data, templateId }: { data: ResumeData; template
         <ContactLine data={data} />
       </View>
       {body}
-      {skillsBlock}
+      <SkillsBlock data={data} accent={accent} variant={templateId} columns={data.skillsColumns ?? 2} />
     </View>
   );
 }

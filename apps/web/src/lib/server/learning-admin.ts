@@ -43,8 +43,16 @@ function signPayload(payload: string, secret: string): string {
   return crypto.createHmac("sha256", secret).update(payload).digest("base64url");
 }
 
+// Falls back to deriving a secret from the password (rather than using the password itself as the HMAC key)
+// when CAREEROS_LEARNING_ADMIN_SESSION_SECRET isn't set - a leaked signing key this way still can't be used to
+// log in directly, unlike reusing the raw password.
 function getSessionSecret(config: LearningAdminConfig): string {
-  return (process.env.CAREEROS_LEARNING_ADMIN_SESSION_SECRET ?? "").trim() || config.password;
+  const configured = (process.env.CAREEROS_LEARNING_ADMIN_SESSION_SECRET ?? "").trim();
+  if (configured) {
+    return configured;
+  }
+
+  return crypto.createHash("sha256").update(`careeros-learning-admin-session:${config.password}`).digest("base64url");
 }
 
 export function getLearningAdminConfig(): LearningAdminConfig {
