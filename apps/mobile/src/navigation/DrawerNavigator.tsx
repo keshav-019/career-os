@@ -82,7 +82,7 @@ export default function DrawerNavigator() {
         drawerInactiveTintColor: colors.muted,
         drawerActiveBackgroundColor: `${colors.brand}22`,
         drawerStyle: { backgroundColor: colors.bgSoft, width: 280 },
-        sceneContainerStyle: { backgroundColor: colors.bg }
+        sceneStyle: { backgroundColor: colors.bg }
       }}
       drawerContent={(props) => <CustomDrawerContent {...props} />}
     >

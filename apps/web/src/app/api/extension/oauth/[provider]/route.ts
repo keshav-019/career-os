@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { extensionCorsPreflight, jsonWithExtensionCors } from "@/lib/server/extension-cors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +25,18 @@ export const dynamic = "force-dynamic";
  * downstream.
  */
 
-const FIREBASE_WEB_API_KEY = process.env.FIREBASE_API_KEY ?? process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "";
+function readFirstEnv(...names: string[]): string {
+  for (const name of names) {
+    const value = (process.env[name] ?? "").trim();
+    if (value) {
+      return value;
+    }
+  }
+
+  return "";
+}
+
+const FIREBASE_WEB_API_KEY = readFirstEnv("FIREBASE_API_KEY", "NEXT_PUBLIC_FIREBASE_API_KEY");
 
 type ProviderId = "google" | "github";
 
@@ -35,8 +47,8 @@ function isProviderId(value: string): value is ProviderId {
 type TokenExchangeResult = { accessToken: string } | { error: string };
 
 async function exchangeGoogleCode(code: string, redirectUri: string): Promise<TokenExchangeResult> {
-  const clientId = (process.env.GOOGLE_OAUTH_CLIENT_ID ?? "").trim();
-  const clientSecret = (process.env.GOOGLE_OAUTH_CLIENT_SECRET ?? "").trim();
+  const clientId = readFirstEnv("GOOGLE_OAUTH_CLIENT_ID", "NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID");
+  const clientSecret = readFirstEnv("GOOGLE_OAUTH_CLIENT_SECRET");
   if (!clientId || !clientSecret) {
     return { error: "Google sign-in isn't configured on this server yet." };
   }
@@ -62,8 +74,8 @@ async function exchangeGoogleCode(code: string, redirectUri: string): Promise<To
 }
 
 async function exchangeGithubCode(code: string, redirectUri: string): Promise<TokenExchangeResult> {
-  const clientId = (process.env.GITHUB_OAUTH_CLIENT_ID ?? "").trim();
-  const clientSecret = (process.env.GITHUB_OAUTH_CLIENT_SECRET ?? "").trim();
+  const clientId = readFirstEnv("GITHUB_OAUTH_CLIENT_ID", "NEXT_PUBLIC_GITHUB_OAUTH_CLIENT_ID");
+  const clientSecret = readFirstEnv("GITHUB_OAUTH_CLIENT_SECRET");
   if (!clientId || !clientSecret) {
     return { error: "GitHub sign-in isn't configured on this server yet." };
   }
@@ -127,29 +139,33 @@ async function signInWithIdp(providerId: "google.com" | "github.com", accessToke
   return payload;
 }
 
+export async function OPTIONS(request: Request) {
+  return extensionCorsPreflight(request, ["OPTIONS", "POST"]);
+}
+
 export async function POST(request: NextRequest, context: { params: Promise<{ provider: string }> }) {
   try {
     const { provider } = await context.params;
     if (!isProviderId(provider)) {
-      return NextResponse.json({ ok: false, error: `Unsupported provider "${provider}".` }, { status: 400 });
+      return jsonWithExtensionCors(request, { ok: false, error: `Unsupported provider "${provider}".` }, 400);
     }
 
     const body = await request.json().catch(() => null);
     const code = typeof body?.code === "string" ? body.code.trim() : "";
     const redirectUri = typeof body?.redirectUri === "string" ? body.redirectUri.trim() : "";
     if (!code || !redirectUri) {
-      return NextResponse.json({ ok: false, error: "Expected { code, redirectUri }." }, { status: 400 });
+      return jsonWithExtensionCors(request, { ok: false, error: "Expected { code, redirectUri }." }, 400);
     }
 
     const exchanged = provider === "google" ? await exchangeGoogleCode(code, redirectUri) : await exchangeGithubCode(code, redirectUri);
     if ("error" in exchanged) {
-      return NextResponse.json({ ok: false, error: exchanged.error }, { status: 400 });
+      return jsonWithExtensionCors(request, { ok: false, error: exchanged.error }, 400);
     }
 
     const providerId = provider === "google" ? "google.com" : "github.com";
     const idpResult = await signInWithIdp(providerId, exchanged.accessToken, redirectUri);
 
-    return NextResponse.json({
+    return jsonWithExtensionCors(request, {
       ok: true,
       auth: {
         apiKey: FIREBASE_WEB_API_KEY,
@@ -163,9 +179,10 @@ export async function POST(request: NextRequest, context: { params: Promise<{ pr
     });
   } catch (error) {
     console.error("Extension OAuth exchange failed.", error);
-    return NextResponse.json(
+    return jsonWithExtensionCors(
+      request,
       { ok: false, error: error instanceof Error ? error.message : "Unable to complete sign-in." },
-      { status: 500 }
+      500
     );
   }
 }

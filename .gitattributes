@@ -1,0 +1,10 @@
+apps/desktop/vendor/latex/** export-ignore
+apps/desktop/dist/** export-ignore
+dist/** export-ignore
+node_modules/** export-ignore
+.env export-ignore
+.env.local export-ignore
+.secrets/** export-ignore
+apps/extension.crx export-ignore
+apps/extension.pem export-ignore
+apps/extension.zip export-ignore

@@ -7,7 +7,6 @@
   "permissions": [
     "activeTab",
     "tabs",
-    "scripting",
     "storage",
     "identity"
   ],
@@ -15,8 +14,15 @@
     "http://localhost:3000/*",
     "http://127.0.0.1:3000/*",
     "https://*.vercel.app/*",
-    "https://*.careeros.app/*"
+    "https://*.careeros.app/*",
+    "https://securetoken.googleapis.com/*",
+    "https://identitytoolkit.googleapis.com/*",
+    "https://oauth2.googleapis.com/*",
+    "https://github.com/*"
   ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' http://localhost:3000 http://127.0.0.1:3000 https://*.vercel.app https://*.careeros.app https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://oauth2.googleapis.com https://github.com"
+  },
   "action": {
     "default_icon": {
       "16": "icons/icon16.png",
@@ -39,8 +45,11 @@
   "content_scripts": [
     {
       "matches": [
+        "*://linkedin.com/*",
         "*://*.linkedin.com/*",
+        "*://indeed.com/*",
         "*://*.indeed.com/*",
+        "*://naukri.com/*",
         "*://*.naukri.com/*"
       ],
       "js": [

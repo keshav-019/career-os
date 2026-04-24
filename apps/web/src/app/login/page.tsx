@@ -1,9 +1,16 @@
 "use client";
 
-import { GitBranch, Mail } from "lucide-react";
+import { Eye, EyeOff, GitBranch, Mail } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from "react";
 import {
   GithubAuthProvider,
   GoogleAuthProvider,
@@ -15,13 +22,13 @@ import {
   signInWithRedirect,
   signOut,
   updateProfile,
-  type User
+  type User,
 } from "firebase/auth";
 import { auth, isFirebaseClientConfigured } from "@/lib/firebase/client";
 import { THEME_CHANGE_EVENT, readThemePreference } from "@/lib/preferences";
 import {
   clearStoredTwoFactorSessionToken,
-  setStoredTwoFactorSessionToken
+  setStoredTwoFactorSessionToken,
 } from "@/lib/two-factor-session";
 import { writeLocalAdminSession } from "@/lib/local-admin-session";
 
@@ -107,7 +114,10 @@ function getAuthErrorMessage(error: unknown) {
   return "Authentication failed. Please try again.";
 }
 
-async function parseApiError(response: Response, fallback: string): Promise<string> {
+async function parseApiError(
+  response: Response,
+  fallback: string,
+): Promise<string> {
   try {
     const payload = (await response.json()) as { error?: unknown };
     if (typeof payload.error === "string" && payload.error.trim().length > 0) {
@@ -124,12 +134,12 @@ async function getAuthHeaders(user: User): Promise<HeadersInit> {
   const idToken = await user.getIdToken(true);
   return {
     Authorization: `Bearer ${idToken}`,
-    "Content-Type": "application/json"
+    "Content-Type": "application/json",
   };
 }
 
 function getPreferredOAuthProvider(
-  signInMethods: string[]
+  signInMethods: string[],
 ): "google" | "github" | null {
   if (signInMethods.includes(GoogleAuthProvider.PROVIDER_ID)) {
     return "google";
@@ -148,6 +158,7 @@ export default function LoginPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [busyMethod, setBusyMethod] = useState<AuthMethod>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -156,7 +167,7 @@ export default function LoginPage() {
   const [lightMode, setLightMode] = useState(false);
   const submitLabel = useMemo(
     () => (mode === "signin" ? "Sign in with email" : "Create account"),
-    [mode]
+    [mode],
   );
   const logoSrc = lightMode ? LIGHT_MODE_LOGO_SRC : DARK_MODE_LOGO_SRC;
 
@@ -175,8 +186,15 @@ export default function LoginPage() {
       applyThemePreference((event as CustomEvent<string>).detail ?? null);
     };
 
-    window.addEventListener(THEME_CHANGE_EVENT, onThemePreferenceChange as EventListener);
-    return () => window.removeEventListener(THEME_CHANGE_EVENT, onThemePreferenceChange as EventListener);
+    window.addEventListener(
+      THEME_CHANGE_EVENT,
+      onThemePreferenceChange as EventListener,
+    );
+    return () =>
+      window.removeEventListener(
+        THEME_CHANGE_EVENT,
+        onThemePreferenceChange as EventListener,
+      );
   }, []);
 
   const handlePostSignInRouting = useCallback(async () => {
@@ -214,7 +232,9 @@ export default function LoginPage() {
         clearStoredTwoFactorSessionToken();
         clearPendingTwoFactorUserId();
         setRequiresTwoFactor(false);
-        setErrorMessage("Could not validate your session. Please sign in again.");
+        setErrorMessage(
+          "Could not validate your session. Please sign in again.",
+        );
       });
     });
 
@@ -234,21 +254,23 @@ export default function LoginPage() {
     const response = await fetch("/api/learning/admin/session", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         username,
-        password
-      })
+        password,
+      }),
     });
 
     if (response.ok) {
-      const payload = (await response.json().catch(() => null)) as { username?: string } | null;
+      const payload = (await response.json().catch(() => null)) as {
+        username?: string;
+      } | null;
       const resolvedUsername = payload?.username || username;
       writeLocalAdminSession({
         username: resolvedUsername,
         displayName: "Learning Admin",
-        email: `${resolvedUsername}@local.admin`
+        email: `${resolvedUsername}@local.admin`,
       });
       await handlePostSignInRouting();
       return true;
@@ -291,13 +313,19 @@ export default function LoginPage() {
           // Ignore sign-out errors for non-authenticated states.
         }
 
-        const signInMethods = await fetchSignInMethodsForEmail(auth, normalizedEmail);
+        const signInMethods = await fetchSignInMethodsForEmail(
+          auth,
+          normalizedEmail,
+        );
         const hasPasswordMethod = signInMethods.includes("password");
         const preferredOAuthProvider = getPreferredOAuthProvider(signInMethods);
 
         if (!hasPasswordMethod && preferredOAuthProvider) {
-          const providerLabel = preferredOAuthProvider === "google" ? "Google" : "GitHub";
-          setErrorMessage(`This account uses ${providerLabel} sign-in. Continue with ${providerLabel}.`);
+          const providerLabel =
+            preferredOAuthProvider === "google" ? "Google" : "GitHub";
+          setErrorMessage(
+            `This account uses ${providerLabel} sign-in. Continue with ${providerLabel}.`,
+          );
           return;
         }
 
@@ -308,7 +336,11 @@ export default function LoginPage() {
           setErrorMessage("Please enter your full name.");
           return;
         }
-        const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
+        const credential = await createUserWithEmailAndPassword(
+          auth,
+          email.trim(),
+          password,
+        );
         await updateProfile(credential.user, { displayName: fullName.trim() });
         clearStoredTwoFactorSessionToken();
         clearPendingTwoFactorUserId();
@@ -357,9 +389,14 @@ export default function LoginPage() {
       }
     } catch (error) {
       const errorCode = extractErrorCode(error);
-      if (errorCode === "auth/internal-error" || errorCode === "auth/popup-blocked") {
+      if (
+        errorCode === "auth/internal-error" ||
+        errorCode === "auth/popup-blocked"
+      ) {
         try {
-          setErrorMessage("Popup sign-in failed. Redirecting to complete authentication...");
+          setErrorMessage(
+            "Popup sign-in failed. Redirecting to complete authentication...",
+          );
 
           if (providerName === "google") {
             await signInWithRedirect(auth, new GoogleAuthProvider());
@@ -403,7 +440,9 @@ export default function LoginPage() {
 
     const otp = twoFactorCode.trim();
     if (!/^\d{6}$/.test(otp)) {
-      setErrorMessage("Enter a valid 6-digit code from your authenticator app.");
+      setErrorMessage(
+        "Enter a valid 6-digit code from your authenticator app.",
+      );
       return;
     }
 
@@ -414,11 +453,14 @@ export default function LoginPage() {
       const response = await fetch("/api/2fa/verify", {
         method: "POST",
         headers: await getAuthHeaders(auth.currentUser),
-        body: JSON.stringify({ token: otp })
+        body: JSON.stringify({ token: otp }),
       });
 
       if (!response.ok) {
-        const message = await parseApiError(response, "Failed to verify authenticator code.");
+        const message = await parseApiError(
+          response,
+          "Failed to verify authenticator code.",
+        );
         throw new Error(message);
       }
 
@@ -428,8 +470,13 @@ export default function LoginPage() {
         return;
       }
 
-      if (typeof payload.twoFactorSessionToken !== "string" || payload.twoFactorSessionToken.length === 0) {
-        throw new Error("Authenticator verification succeeded, but secure session setup failed.");
+      if (
+        typeof payload.twoFactorSessionToken !== "string" ||
+        payload.twoFactorSessionToken.length === 0
+      ) {
+        throw new Error(
+          "Authenticator verification succeeded, but secure session setup failed.",
+        );
       }
 
       setStoredTwoFactorSessionToken(payload.twoFactorSessionToken);
@@ -462,7 +509,13 @@ export default function LoginPage() {
         <section className="auth-card" aria-labelledby="login-heading">
           <div className="auth-brand">
             <span className="career-brand-mark">
-              <Image alt="CareerOS" className="career-brand-logo" height={40} src={logoSrc} width={40} />
+              <Image
+                alt="CareerOS"
+                className="career-brand-logo"
+                height={40}
+                src={logoSrc}
+                width={40}
+              />
             </span>
             <div>
               <p className="eyebrow">CareerOS</p>
@@ -470,8 +523,8 @@ export default function LoginPage() {
             </div>
           </div>
           <p className="auth-muted">
-            Add Firebase keys in `apps/web/.env.local` or export them as `NEXT_PUBLIC_FIREBASE_*` variables in
-            Vercel.
+            Add Firebase keys in `apps/web/.env.local` or export them as
+            `NEXT_PUBLIC_FIREBASE_*` variables in Vercel.
           </p>
         </section>
       </main>
@@ -483,11 +536,19 @@ export default function LoginPage() {
       <section className="auth-card" aria-labelledby="login-heading">
         <div className="auth-brand">
           <span className="career-brand-mark">
-            <Image alt="CareerOS" className="career-brand-logo" height={40} src={logoSrc} width={40} />
+            <Image
+              alt="CareerOS"
+              className="career-brand-logo"
+              height={40}
+              src={logoSrc}
+              width={40}
+            />
           </span>
           <div>
             <p className="eyebrow">CareerOS</p>
-            <h1 id="login-heading">{mode === "signin" ? "Welcome back" : "Create your account"}</h1>
+            <h1 id="login-heading">
+              {mode === "signin" ? "Welcome back" : "Create your account"}
+            </h1>
           </div>
         </div>
 
@@ -508,40 +569,73 @@ export default function LoginPage() {
             </>
           ) : null}
 
-          <label htmlFor="auth-email">{mode === "signin" ? "Email or username" : "Email"}</label>
+          <label htmlFor="auth-email">
+            {mode === "signin" ? "Email or username" : "Email"}
+          </label>
           <input
             autoComplete={mode === "signin" ? "username" : "email"}
             id="auth-email"
             inputMode={mode === "signin" ? "text" : "email"}
             onChange={(event) => setEmail(event.target.value)}
-            placeholder={mode === "signin" ? "you@example.com or admin" : "you@example.com"}
+            placeholder={
+              mode === "signin" ? "you@example.com or admin" : "you@example.com"
+            }
             required
             type={mode === "signin" ? "text" : "email"}
             value={email}
           />
 
           <label htmlFor="auth-password">Password</label>
-          <input
-            autoComplete={mode === "signin" ? "current-password" : "new-password"}
-            id="auth-password"
-            minLength={mode === "signin" ? 1 : 6}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder={mode === "signin" ? "Password" : "At least 6 characters"}
-            required
-            type="password"
-            value={password}
-          />
+          <div className="auth-password-field">
+            <input
+              autoComplete={
+                mode === "signin" ? "current-password" : "new-password"
+              }
+              id="auth-password"
+              minLength={mode === "signin" ? 1 : 6}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder={
+                mode === "signin" ? "Password" : "At least 6 characters"
+              }
+              required
+              type={passwordVisible ? "text" : "password"}
+              value={password}
+            />
+            <button
+              aria-label={passwordVisible ? "Hide password" : "Show password"}
+              aria-pressed={passwordVisible}
+              className="auth-password-toggle"
+              onClick={() => setPasswordVisible((current) => !current)}
+              title={passwordVisible ? "Hide password" : "Show password"}
+              type="button"
+            >
+              {passwordVisible ? (
+                <EyeOff aria-hidden="true" size={17} />
+              ) : (
+                <Eye aria-hidden="true" size={17} />
+              )}
+            </button>
+          </div>
 
           {errorMessage ? <p className="auth-error">{errorMessage}</p> : null}
 
-          <button className="primary-button auth-submit" disabled={busyMethod !== null} type="submit">
+          <button
+            className="primary-button auth-submit"
+            disabled={busyMethod !== null}
+            type="submit"
+          >
             {busyMethod === "email" ? "Please wait..." : submitLabel}
           </button>
         </form>
 
         {mode === "signin" && requiresTwoFactor ? (
-          <form className="auth-form auth-mfa-form" onSubmit={handleTwoFactorSubmit}>
-            <p className="auth-muted">Enter the 6-digit code from your authenticator app.</p>
+          <form
+            className="auth-form auth-mfa-form"
+            onSubmit={handleTwoFactorSubmit}
+          >
+            <p className="auth-muted">
+              Enter the 6-digit code from your authenticator app.
+            </p>
 
             <label htmlFor="auth-mfa-code">Authenticator code</label>
             <input
@@ -550,18 +644,30 @@ export default function LoginPage() {
               inputMode="numeric"
               maxLength={6}
               minLength={6}
-              onChange={(event) => setTwoFactorCode(event.target.value.replace(/\s+/g, ""))}
+              onChange={(event) =>
+                setTwoFactorCode(event.target.value.replace(/\s+/g, ""))
+              }
               placeholder="123456"
               required
               type="text"
               value={twoFactorCode}
             />
 
-            <button className="primary-button auth-submit" disabled={busyMethod !== null} type="submit">
-              {busyMethod === "mfa" ? "Verifying..." : "Verify authenticator code"}
+            <button
+              className="primary-button auth-submit"
+              disabled={busyMethod !== null}
+              type="submit"
+            >
+              {busyMethod === "mfa"
+                ? "Verifying..."
+                : "Verify authenticator code"}
             </button>
 
-            <button className="ghost-button auth-provider-button" onClick={() => void handleUseDifferentAccount()} type="button">
+            <button
+              className="ghost-button auth-provider-button"
+              onClick={() => void handleUseDifferentAccount()}
+              type="button"
+            >
               Use a different account
             </button>
           </form>
@@ -605,7 +711,9 @@ export default function LoginPage() {
           }}
           type="button"
         >
-          {mode === "signin" ? "Need an account? Create one" : "Already have an account? Sign in"}
+          {mode === "signin"
+            ? "Need an account? Create one"
+            : "Already have an account? Sign in"}
         </button>
       </section>
     </main>

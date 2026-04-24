@@ -1,4 +1,4 @@
-const DEFAULT_APP_BASE_URL = "http://localhost:3000";
+const DEFAULT_APP_BASE_URL = "http://127.0.0.1:3000";
 
 const statusEl = document.getElementById("status");
 const authBadgeEl = document.getElementById("authBadge");
@@ -7,6 +7,15 @@ const accountMetaEl = document.getElementById("accountMeta");
 const tokenInputEl = document.getElementById("tokenInput");
 const saveTokenButton = document.getElementById("saveTokenButton");
 const signOutButton = document.getElementById("signOutButton");
+const emailSignInFormEl = document.getElementById("emailSignInForm");
+const emailInputEl = document.getElementById("emailInput");
+const passwordInputEl = document.getElementById("passwordInput");
+const togglePasswordButton = document.getElementById("togglePasswordButton");
+const emailSignInButton = document.getElementById("emailSignInButton");
+const twoFactorFormEl = document.getElementById("twoFactorForm");
+const twoFactorInputEl = document.getElementById("twoFactorInput");
+const verifyTwoFactorButton = document.getElementById("verifyTwoFactorButton");
+const cancelTwoFactorButton = document.getElementById("cancelTwoFactorButton");
 const jobTitleEl = document.getElementById("jobTitle");
 const jobMetaEl = document.getElementById("jobMeta");
 const googleSignInButton = document.getElementById("googleSignInButton");
@@ -19,6 +28,45 @@ const copyRedirectUriButton = document.getElementById("copyRedirectUriButton");
 let activeTabId = null;
 let appBaseUrl = DEFAULT_APP_BASE_URL;
 let isAuthenticated = false;
+let emailPasswordEnabled = false;
+let pendingTwoFactorChallengeId = null;
+const browserApi =
+  typeof globalThis.browser === "object" ? globalThis.browser : null;
+const callbackLastError = () => chrome.runtime?.lastError || null;
+const tabsQuery = (queryInfo) =>
+  browserApi?.tabs?.query
+    ? browserApi.tabs.query(queryInfo)
+    : new Promise((resolve, reject) => {
+        let settled = false;
+        const finish = (tabs) => {
+          if (settled) {
+            return;
+          }
+
+          settled = true;
+          resolve(tabs || []);
+        };
+        const fail = (error) => {
+          if (settled) {
+            return;
+          }
+
+          settled = true;
+          reject(error instanceof Error ? error : new Error(String(error)));
+        };
+        const maybePromise = chrome.tabs.query(queryInfo, (tabs) => {
+          const error = callbackLastError();
+          if (error) {
+            fail(new Error(error.message));
+            return;
+          }
+
+          finish(tabs);
+        });
+        if (maybePromise && typeof maybePromise.then === "function") {
+          maybePromise.then(finish).catch(fail);
+        }
+      });
 
 const stripChipStyles = (element) => {
   element.classList.remove("chip-muted", "chip-active", "chip-warning");
@@ -68,6 +116,17 @@ const setJobPreview = (payload) => {
   setDetectionBadge("Job detected", "chip-active");
 };
 
+const setTwoFactorMode = (enabled) => {
+  pendingTwoFactorChallengeId = enabled ? pendingTwoFactorChallengeId : null;
+  twoFactorFormEl.hidden = !enabled;
+  emailSignInFormEl.hidden = enabled || isAuthenticated;
+  if (enabled) {
+    twoFactorInputEl.focus();
+  } else {
+    twoFactorInputEl.value = "";
+  }
+};
+
 const sendRuntimeMessage = (message) =>
   new Promise((resolve, reject) => {
     chrome.runtime.sendMessage(message, (response) => {
@@ -81,7 +140,7 @@ const sendRuntimeMessage = (message) =>
   });
 
 const withActiveTab = async () => {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const [tab] = await tabsQuery({ active: true, currentWindow: true });
   if (!tab?.id) {
     return null;
   }
@@ -124,14 +183,22 @@ const parseApiBaseUrlFromToken = (rawToken) => {
 const setActionButtonsDisabled = (disabled) => {
   saveTokenButton.disabled = disabled;
   signOutButton.disabled = disabled;
-  googleSignInButton.disabled = disabled || googleSignInButton.dataset.unavailable === "true";
-  githubSignInButton.disabled = disabled || githubSignInButton.dataset.unavailable === "true";
+  googleSignInButton.disabled =
+    disabled || googleSignInButton.dataset.unavailable === "true";
+  githubSignInButton.disabled =
+    disabled || githubSignInButton.dataset.unavailable === "true";
+  emailSignInButton.disabled = disabled || !emailPasswordEnabled;
+  verifyTwoFactorButton.disabled = disabled;
+  cancelTwoFactorButton.disabled = disabled;
 };
 
 const setAuthUi = (authSummary) => {
   const authenticated = Boolean(authSummary?.authenticated);
   isAuthenticated = authenticated;
   signOutButton.hidden = !authenticated;
+  emailSignInFormEl.hidden =
+    authenticated || Boolean(pendingTwoFactorChallengeId);
+  twoFactorFormEl.hidden = authenticated || !pendingTwoFactorChallengeId;
 
   if (authenticated) {
     const provider = authSummary?.providerLabel || "CareerOS";
@@ -142,7 +209,7 @@ const setAuthUi = (authSummary) => {
     setAuthBadge("Connected", "chip-active");
   } else {
     accountMetaEl.textContent =
-      "Not connected. Continue with Google/GitHub, or paste a token package below.";
+      "Not connected. Continue with Google/GitHub, sign in with email, or paste a token package below.";
     setAuthBadge("Sign in required", "chip-muted");
   }
 };
@@ -158,26 +225,57 @@ const setOauthError = (message) => {
   oauthErrorEl.textContent = message;
 };
 
+const setPasswordVisible = (visible) => {
+  passwordInputEl.type = visible ? "text" : "password";
+  togglePasswordButton.setAttribute(
+    "aria-label",
+    visible ? "Hide password" : "Show password",
+  );
+  togglePasswordButton.setAttribute("aria-pressed", visible ? "true" : "false");
+  togglePasswordButton.title = visible ? "Hide password" : "Show password";
+  togglePasswordButton.querySelector(".password-toggle-icon-show").hidden =
+    visible;
+  togglePasswordButton.querySelector(".password-toggle-icon-hide").hidden =
+    !visible;
+};
+
 const configureProviderButton = (button, providerConfig, label) => {
   const enabled = Boolean(providerConfig?.enabled && providerConfig?.clientId);
   button.dataset.unavailable = enabled ? "false" : "true";
   button.disabled = !enabled;
   button.title = enabled
     ? `Continue with ${label}`
-    : `${label} sign-in isn't configured yet on this CareerOS deployment. See Setup help below.`;
+    : `${label} sign-in needs client ID and client secret env vars on this CareerOS deployment. See Setup help below.`;
 };
 
 const refreshOauthProviders = async () => {
   try {
-    const response = await sendRuntimeMessage({ type: "CAREEROS_GET_OAUTH_CONFIG" });
+    const response = await sendRuntimeMessage({
+      type: "CAREEROS_GET_OAUTH_CONFIG",
+    });
     if (!response?.ok) {
       throw new Error(response?.error || "Could not check sign-in options.");
     }
 
-    configureProviderButton(googleSignInButton, response.providers?.google, "Google");
-    configureProviderButton(githubSignInButton, response.providers?.github, "GitHub");
+    configureProviderButton(
+      googleSignInButton,
+      response.providers?.google,
+      "Google",
+    );
+    configureProviderButton(
+      githubSignInButton,
+      response.providers?.github,
+      "GitHub",
+    );
+    emailPasswordEnabled = Boolean(response.auth?.emailPasswordEnabled);
+    emailSignInButton.disabled = !emailPasswordEnabled;
+    emailSignInButton.title = emailPasswordEnabled
+      ? "Sign in with your CareerOS email and password"
+      : "Email/password sign-in needs NEXT_PUBLIC_FIREBASE_API_KEY on the CareerOS deployment.";
 
-    const bothConfigured = response.providers?.google?.enabled && response.providers?.github?.enabled;
+    const bothConfigured =
+      response.providers?.google?.enabled &&
+      response.providers?.github?.enabled;
     if (!bothConfigured && response.redirectUri) {
       redirectUriValueEl.textContent = response.redirectUri;
       setupHelpDetailsEl.hidden = false;
@@ -188,8 +286,12 @@ const refreshOauthProviders = async () => {
     // Provider buttons just stay disabled with a generic tooltip - the paste-token fallback still works.
     configureProviderButton(googleSignInButton, null, "Google");
     configureProviderButton(githubSignInButton, null, "GitHub");
+    emailPasswordEnabled = false;
+    emailSignInButton.disabled = true;
     setOauthError(
-      error instanceof Error ? error.message : "Could not check Google/GitHub sign-in availability.",
+      error instanceof Error
+        ? error.message
+        : "Could not check Google/GitHub sign-in availability.",
     );
   }
 };
@@ -197,10 +299,15 @@ const refreshOauthProviders = async () => {
 const handleProviderSignIn = async (provider) => {
   setOauthError(null);
   setActionButtonsDisabled(true);
-  setStatus(`Opening ${provider === "google" ? "Google" : "GitHub"} sign-in...`);
+  setStatus(
+    `Opening ${provider === "google" ? "Google" : "GitHub"} sign-in...`,
+  );
 
   try {
-    const response = await sendRuntimeMessage({ type: "CAREEROS_OAUTH_START", provider });
+    const response = await sendRuntimeMessage({
+      type: "CAREEROS_OAUTH_START",
+      provider,
+    });
     if (!response?.ok) {
       throw new Error(response?.error || "Sign-in did not complete.");
     }
@@ -210,7 +317,9 @@ const handleProviderSignIn = async (provider) => {
     await refreshDetection();
     showPromptOnActiveTab();
   } catch (error) {
-    setOauthError(error instanceof Error ? error.message : "Sign-in did not complete.");
+    setOauthError(
+      error instanceof Error ? error.message : "Sign-in did not complete.",
+    );
     setStatus("Sign-in did not complete.", "error");
   } finally {
     setActionButtonsDisabled(false);
@@ -256,8 +365,8 @@ const refreshDetection = async () => {
 
   if (!isAuthenticated) {
     setJobPreview(null);
-    setDetectionBadge("Token required", "chip-warning");
-    setStatus("Paste token package to enable capture.");
+    setDetectionBadge("Sign in required", "chip-warning");
+    setStatus("Sign in to enable job detection.");
     return;
   }
 
@@ -368,6 +477,121 @@ const saveTokenPackage = async () => {
   }
 };
 
+const signInWithEmailPassword = async (event) => {
+  event.preventDefault();
+  const email = emailInputEl.value.trim();
+  const password = passwordInputEl.value;
+  if (!email || !password) {
+    setStatus("Enter your email and password.", "error");
+    return;
+  }
+
+  setOauthError(null);
+  setActionButtonsDisabled(true);
+  setStatus("Signing in...");
+
+  try {
+    const response = await sendRuntimeMessage({
+      email,
+      password,
+      type: "CAREEROS_PASSWORD_SIGN_IN",
+    });
+
+    if (response?.code === "TWO_FACTOR_REQUIRED") {
+      pendingTwoFactorChallengeId = response.challengeId || null;
+      setAuthBadge("2FA required", "chip-warning");
+      accountMetaEl.textContent =
+        "Enter the 6-digit code from your authenticator app to finish signing in.";
+      setPasswordVisible(false);
+      setTwoFactorMode(true);
+      setStatus("Authenticator code required.", "muted");
+      return;
+    }
+
+    if (!response?.ok) {
+      throw new Error(response?.error || "Could not sign in.");
+    }
+
+    passwordInputEl.value = "";
+    setPasswordVisible(false);
+    setTwoFactorMode(false);
+    setAuthUi(response.auth);
+    setStatus("Signed in. Job capture is ready.", "success");
+    await refreshDetection();
+    showPromptOnActiveTab();
+  } catch (error) {
+    setStatus(
+      error instanceof Error ? error.message : "Could not sign in.",
+      "error",
+    );
+  } finally {
+    setActionButtonsDisabled(false);
+  }
+};
+
+const verifyTwoFactorCode = async (event) => {
+  event.preventDefault();
+  const token = twoFactorInputEl.value.trim();
+  if (!pendingTwoFactorChallengeId) {
+    setStatus("Sign-in attempt expired. Enter your password again.", "error");
+    setTwoFactorMode(false);
+    return;
+  }
+
+  if (!/^\d{6}$/.test(token)) {
+    setStatus("Enter a valid 6-digit authenticator code.", "error");
+    return;
+  }
+
+  setActionButtonsDisabled(true);
+  setStatus("Verifying authenticator code...");
+
+  try {
+    const response = await sendRuntimeMessage({
+      challengeId: pendingTwoFactorChallengeId,
+      token,
+      type: "CAREEROS_PASSWORD_2FA_VERIFY",
+    });
+
+    if (!response?.ok) {
+      throw new Error(
+        response?.error || "Could not verify authenticator code.",
+      );
+    }
+
+    passwordInputEl.value = "";
+    setPasswordVisible(false);
+    twoFactorInputEl.value = "";
+    setTwoFactorMode(false);
+    setAuthUi(response.auth);
+    setStatus("Signed in. Job capture is ready.", "success");
+    await refreshDetection();
+    showPromptOnActiveTab();
+  } catch (error) {
+    setStatus(
+      error instanceof Error
+        ? error.message
+        : "Could not verify authenticator code.",
+      "error",
+    );
+  } finally {
+    setActionButtonsDisabled(false);
+  }
+};
+
+const cancelTwoFactor = async () => {
+  if (pendingTwoFactorChallengeId) {
+    await sendRuntimeMessage({
+      challengeId: pendingTwoFactorChallengeId,
+      type: "CAREEROS_PASSWORD_2FA_CANCEL",
+    }).catch(() => null);
+  }
+
+  setTwoFactorMode(false);
+  setAuthUi({ authenticated: false });
+  setStatus("Two-factor sign-in cancelled.");
+};
+
 const clearTokenPackage = async () => {
   setActionButtonsDisabled(true);
   setStatus("Signing out...");
@@ -381,6 +605,10 @@ const clearTokenPackage = async () => {
     }
 
     tokenInputEl.value = "";
+    passwordInputEl.value = "";
+    setPasswordVisible(false);
+    twoFactorInputEl.value = "";
+    setTwoFactorMode(false);
     setAuthUi({ authenticated: false });
     setOauthError("");
     setJobPreview(null);
@@ -419,6 +647,22 @@ const bootstrap = async () => {
 
 saveTokenButton.addEventListener("click", () => {
   void saveTokenPackage();
+});
+
+emailSignInFormEl.addEventListener("submit", (event) => {
+  void signInWithEmailPassword(event);
+});
+
+togglePasswordButton.addEventListener("click", () => {
+  setPasswordVisible(passwordInputEl.type === "password");
+});
+
+twoFactorFormEl.addEventListener("submit", (event) => {
+  void verifyTwoFactorCode(event);
+});
+
+cancelTwoFactorButton.addEventListener("click", () => {
+  void cancelTwoFactor();
 });
 
 signOutButton.addEventListener("click", () => {

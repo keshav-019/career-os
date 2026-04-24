@@ -12,16 +12,16 @@ import {
 } from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase/client";
+import { fetchInterviewTestTemplateWithQuestions, fetchMcqReview } from "@/lib/interview/client";
 import {
-  buildPracticeAttemptSeed,
   formatInterviewTestType,
-  getPracticeQuestionById,
   getInterviewTrack,
-  scorePracticeMcqResponses,
+  type InterviewTestTemplate,
   type InterviewTestType,
   type McqOptionId,
   type PracticeAttemptMode,
   type PracticeAttemptStatus,
+  type PracticeMcqQuestion,
   type PracticeQuestion,
   type PracticeScore
 } from "@/lib/interview/question-bank";
@@ -284,13 +284,14 @@ function parsePracticeAttempt(snapshot: QueryDocumentSnapshot<DocumentData>): Pr
   const testTemplateId = asString(data.testTemplateId) || undefined;
 
   const questionIds = asStringArray(data.questionIds, 300);
-  const parsedEmbeddedQuestions = asPracticeQuestions(data.questions);
-  const parsedQuestions =
-    parsedEmbeddedQuestions.length > 0
-      ? parsedEmbeddedQuestions
-      : questionIds
-          .map((questionId) => getPracticeQuestionById(questionId))
-          .filter((question): question is PracticeQuestion => Boolean(question));
+  // Attempts created via createPracticeAttempt() below always embed their full `questions` array in the Firestore
+  // doc (mirrors apps/mobile/src/lib/practiceAttempts.ts's createPracticeAttempt()), so this is normally always
+  // populated. There used to be a fallback here that reconstructed questions one-by-one from bare questionIds via
+  // getPracticeQuestionById() - that function is now async (question content is fetched from R2 server-side) and
+  // can't run inside this synchronous Firestore snapshot parser, so the fallback was dropped. Only affects attempt
+  // records created before this migration that stored questionIds without embedded questions - those will show as
+  // having 0 questions. Known gap; flagged for manual backfill if any such records exist.
+  const parsedQuestions = asPracticeQuestions(data.questions);
   const fallbackQuestionCount = parsedQuestions.length;
 
   return {
@@ -532,23 +533,42 @@ export async function createPracticeAttempt(
     throw new Error("Firestore is not configured.");
   }
 
-  const seed = buildPracticeAttemptSeed(testType, testTemplateId);
-  const questionIds = seed.questions.map((question) => question.id);
+  const track = getInterviewTrack(testType);
+
+  // Question content (compiled banks, AI role questions, computer-science tests) now lives in R2 and is fetched
+  // server-side only (see lib/interview/question-bank.ts's ensureQuestionBankLoaded()), so buildPracticeAttemptSeed()
+  // can no longer run in-browser - this fetches the same fully-built, answer-stripped question set from
+  // /api/interview/templates/[templateId] instead. Mirrors apps/mobile/src/lib/practiceAttempts.ts's
+  // createPracticeAttempt(), which was the reference implementation for this change - including always embedding
+  // the full `questions` array in the Firestore doc (not just questionIds), since parsePracticeAttempt() above can
+  // no longer reconstruct question content from bare ids on the fly either.
+  let template: InterviewTestTemplate | undefined;
+  let questions: PracticeQuestion[] = [];
+
+  if (testTemplateId) {
+    const result = await fetchInterviewTestTemplateWithQuestions(testType, testTemplateId);
+    template = result.template;
+    questions = result.questions;
+  }
+
+  const questionIds = questions.map((question) => question.id);
+  const categories = Array.from(new Set(questions.map((question) => question.category))).slice(0, 12);
   const nowIso = new Date().toISOString();
 
   const attemptRef = await addDoc(collection(db, "users", userId, "practiceAttempts"), {
     userId,
     testType,
-    mode: seed.track.mode,
-    title: seed.template?.title ?? seed.track.title,
-    subtitle: seed.template?.subtitle ?? seed.track.subtitle,
-    description: seed.template?.summary ?? seed.track.description,
-    ...(seed.template ? { testTemplateId: seed.template.id } : {}),
-    durationMinutes: seed.track.durationMinutes,
-    questionCount: seed.track.questionCount,
+    mode: template?.mode ?? track.mode,
+    title: template?.title ?? track.title,
+    subtitle: template?.subtitle ?? track.subtitle,
+    description: template?.summary ?? track.description,
+    ...(template ? { testTemplateId: template.id } : {}),
+    durationMinutes: template?.durationMinutes ?? track.durationMinutes,
+    questionCount: template?.questionCount ?? track.questionCount,
     questionIds,
-    categories: seed.categories,
-    answerKeyVersion: seed.answerKeyVersion,
+    questions,
+    categories,
+    answerKeyVersion: "v1",
     status: "ready",
     createdAt: nowIso,
     updatedAt: nowIso,
@@ -640,7 +660,17 @@ export async function submitPracticeAttempt(
     throw new Error("Firestore is not configured.");
   }
 
-  const score = scorePracticeMcqResponses(attempt.questions, payload.mcqAnswers);
+  // scorePracticeMcqResponses() used to run in-browser against the bundled answer key - that's no longer possible
+  // (question content, including correctOptionId, is fetched from R2 server-side only), so scoring now goes
+  // through /api/interview/mcq-review, exactly like apps/mobile/src/lib/practiceAttempts.ts's
+  // submitPracticeAttempt().
+  const mcqQuestionIds = attempt.questions
+    .filter((question): question is PracticeMcqQuestion => question.kind === "mcq")
+    .map((question) => question.id);
+  const { score } =
+    mcqQuestionIds.length > 0
+      ? await fetchMcqReview(mcqQuestionIds, payload.mcqAnswers)
+      : { score: { total: 0, correct: 0, answered: 0, percentage: 0 } };
   const nowIso = new Date().toISOString();
 
   await updateDoc(doc(db, "users", userId, "practiceAttempts", attempt.id), {

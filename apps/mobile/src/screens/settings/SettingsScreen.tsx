@@ -109,7 +109,13 @@ export default function SettingsScreen() {
 
       <Card>
         <SectionHeader eyebrow="Calendar" title="Calendar sync preferences" right={<CalendarDays color={colors.text} size={18} />} />
-        <SwitchRow title="Sync CareerOS events to Google Calendar" description="Only enable if you want events copied to your Google calendar." value={settings.calendarSyncEnabled} onValueChange={(v) => update("calendarSyncEnabled", v)} />
+        <SwitchRow
+          title="Sync CareerOS events to Google Calendar"
+          description="Real Google Calendar sync isn't built yet - this toggle doesn't do anything yet."
+          value={settings.calendarSyncEnabled}
+          onValueChange={(v) => update("calendarSyncEnabled", v)}
+          comingSoon
+        />
       </Card>
 
       <Card>

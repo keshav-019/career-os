@@ -168,6 +168,8 @@ function parseResume(snapshot: QueryDocumentSnapshot<DocumentData>): CareerResum
     createdAt,
     updatedAt,
     fileUrl: asString(data.fileUrl) || undefined,
+    fileName: asString(data.fileName) || undefined,
+    fileR2Key: asString(data.fileR2Key) || undefined,
     bulletHighlights: bulletHighlights.length > 0 ? bulletHighlights : inferBulletHighlights(sections),
     keywordCoverage,
     templateId: normalizeTemplateId(data.templateId),
@@ -326,6 +328,49 @@ export async function createResumeRecord(userId: string, payload: ResumeCreatePa
 
   await updateDoc(resumeRef, { id: resumeRef.id });
 
+  return resumeRef.id;
+}
+
+export type UploadedResumeCreatePayload = {
+  contentType: string;
+  fileName: string;
+  fileR2Key: string;
+  fileSize: number;
+  fileUrl?: string;
+  label?: string;
+};
+
+export async function createUploadedResumeRecord(
+  userId: string,
+  payload: UploadedResumeCreatePayload
+): Promise<string> {
+  if (!db) {
+    throw new Error("Firestore is not configured.");
+  }
+
+  const nowIso = new Date().toISOString();
+  const label = asString(payload.label) || asString(payload.fileName) || "Uploaded resume";
+  const resumeRef = await addDoc(collection(db, "users", userId, "resumes"), {
+    bulletHighlights: [`Uploaded file: ${asString(payload.fileName) || "resume"}`],
+    contentType: asString(payload.contentType),
+    createdAt: nowIso,
+    editorMode: "builder",
+    fileName: asString(payload.fileName),
+    fileR2Key: asString(payload.fileR2Key),
+    fileSize: Math.max(0, Math.round(asNumber(payload.fileSize))),
+    fileUrl: asString(payload.fileUrl),
+    keywordCoverage: 0,
+    label,
+    pageCount: 1,
+    sections: [],
+    status: "active",
+    targetRoles: [],
+    templateId: defaultResumeTemplateId,
+    updatedAt: nowIso,
+    userId
+  });
+
+  await updateDoc(resumeRef, { id: resumeRef.id });
   return resumeRef.id;
 }
 

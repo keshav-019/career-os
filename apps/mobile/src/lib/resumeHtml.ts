@@ -65,9 +65,19 @@ export function buildResumeHtml(data: ResumeData, templateId: ResumeTemplateId):
     .map((cert) => `<div style="font-size:11px;color:#333;">${cert.name} - ${cert.issuer} (${cert.date})</div>`)
     .join("");
 
-  const skillsHtml = data.skills
-    .map((skill) => `<div style="font-size:11px;color:#333;margin-bottom:4px;"><b>${skill.category}:</b> ${skill.items.join(", ")}</div>`)
-    .join("");
+  // A skill group with no category renders as a plain bullet list with no bold heading ("just a bunch of
+  // skills"). Groups flow into skillsColumns (1-3) via real CSS multi-column layout - sidebar's narrow rail
+  // forces a single column regardless of the saved setting, same as the on-screen RN preview.
+  const skillsColumnCount = isSidebar ? 1 : data.skillsColumns ?? 2;
+  const skillsHtml = `<div style="column-count:${skillsColumnCount};column-gap:16px;">${data.skills
+    .map((skill) =>
+      skill.category
+        ? `<div style="font-size:11px;color:#333;margin-bottom:4px;break-inside:avoid;"><b>${skill.category}:</b> ${skill.items.join(", ")}</div>`
+        : skill.items
+            .map((item) => `<div style="font-size:11px;color:#333;margin-bottom:2px;break-inside:avoid;">- ${item}</div>`)
+            .join("")
+    )
+    .join("")}</div>`;
 
   const bodySections = `
     ${data.personal.summary ? `<div style="margin-bottom:14px;">${sectionTitle("Summary")}<div style="font-size:12px;color:#222;line-height:1.5;">${data.personal.summary}</div></div>` : ""}

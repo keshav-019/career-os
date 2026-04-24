@@ -82,6 +82,8 @@ export interface ResumeVersion {
   createdAt: string;
   updatedAt: string;
   fileUrl?: string;
+  fileName?: string;
+  fileR2Key?: string;
   bulletHighlights: string[];
   keywordCoverage: number;
   templateId?: ResumeTemplateId;

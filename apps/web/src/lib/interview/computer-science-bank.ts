@@ -1,4 +1,4 @@
-import rawBank from "@/lib/interview/computer-science-tests.min.json";
+import { getR2Json } from "@/lib/r2/client";
 
 type OptionId = "a" | "b" | "c" | "d";
 type Difficulty = "easy" | "medium" | "hard";
@@ -28,6 +28,12 @@ export type ExternalComputerScienceTest = {
   summary: string;
   title: string;
   topicWeights: Record<string, number>;
+};
+
+type ComputerScienceBank = {
+  externalComputerScienceQuestions: ExternalComputerScienceQuestion[];
+  externalComputerScienceTests: ExternalComputerScienceTest[];
+  hasExternalComputerScienceBank: boolean;
 };
 
 function asString(value: unknown): string {
@@ -204,9 +210,25 @@ function parseBank(value: unknown): {
   };
 }
 
-const parsed = parseBank(rawBank);
+// Was a static `import rawBank from "./computer-science-tests.min.json"` (984KB) - now fetched from R2 on first
+// use and cached in-process, same reasoning as ai-role-bank.ts's ensureAiRoleBankLoaded().
+let cache: ComputerScienceBank | null = null;
+let loadPromise: Promise<ComputerScienceBank> | null = null;
 
-export const externalComputerScienceQuestions = parsed.questions;
-export const externalComputerScienceTests = parsed.tests;
-export const hasExternalComputerScienceBank =
-  externalComputerScienceQuestions.length > 0 && externalComputerScienceTests.length > 0;
+export async function ensureComputerScienceBankLoaded(): Promise<ComputerScienceBank> {
+  if (cache) {
+    return cache;
+  }
+  if (!loadPromise) {
+    loadPromise = getR2Json<unknown>("interview-content/computer-science-tests.json").then((rawBank) => {
+      const parsed = parseBank(rawBank);
+      return {
+        externalComputerScienceQuestions: parsed.questions,
+        externalComputerScienceTests: parsed.tests,
+        hasExternalComputerScienceBank: parsed.questions.length > 0 && parsed.tests.length > 0
+      };
+    });
+  }
+  cache = await loadPromise;
+  return cache;
+}
