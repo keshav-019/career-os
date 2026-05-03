@@ -19,14 +19,14 @@ export default function DesktopSetupPage() {
         </div>
         <div className="row-between" style={{ marginTop: 12 }}>
           <span className="pill success">Desktop helper endpoint: {DESKTOP_HELPER_ENDPOINT}</span>
-          <a
+          <button
             className="primary-button"
-            href="#"
-            onClick={(event) => event.preventDefault()}
+            disabled
+            type="button"
             title="Desktop installer packaging is ready in apps/desktop. Publish your installer URL here."
           >
             <Download size={14} /> Download Desktop App
-          </a>
+          </button>
         </div>
       </section>
 
