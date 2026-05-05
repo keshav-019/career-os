@@ -10,9 +10,10 @@
     <projectUrl>https://github.com/keshav-019/career-os</projectUrl>
     <iconUrl>https://raw.githubusercontent.com/keshav-019/career-os/first-phase/apps/desktop/build/icon.png</iconUrl>
     <copyright>Keshav Jha</copyright>
-    <licenseUrl>https://github.com/keshav-019/career-os/blob/first-phase/LICENSE</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <projectSourceUrl>https://github.com/keshav-019/career-os</projectSourceUrl>
+    <!-- Proprietary software: no public license file/URL to reference. -->
+    <docsUrl>https://github.com/keshav-019/career-os#readme</docsUrl>
     <bugTrackerUrl>https://github.com/keshav-019/career-os/issues</bugTrackerUrl>
     <tags>careeros career job-search resume interview-prep electron desktop</tags>
     <summary>Career workspace for resumes, jobs, interviews, and applications</summary>
