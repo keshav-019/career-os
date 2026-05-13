@@ -2,7 +2,6 @@
 
 import { AlertTriangle, Download, LayoutTemplate, Loader2, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import html2pdf from 'html2pdf.js';
 import ResumeForm from './ResumeForm';
 import ResumeTemplateGallery from './ResumeTemplateGallery';
 import { DEFAULT_RESUME_TEMPLATE_ID, getResumeVisualTemplate, type ResumeVisualTemplateId } from './templates';
@@ -194,6 +193,10 @@ export default function VisualMode({ data, onChange, initialTemplateId, onGenera
         margin: 0
       };
 
+      // Dynamically imported (not a top-level import) because html2pdf.js references browser globals
+      // (`self`) at module-evaluation time - a static import crashes Next.js's server-side prerendering
+      // of this page even though the component itself only ever calls it client-side.
+      const { default: html2pdf } = await import('html2pdf.js');
       await html2pdf().set(opt).from(canvasRef.current).save();
     } catch (err) {
       console.error('PDF download failed', err);
