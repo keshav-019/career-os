@@ -384,12 +384,33 @@ async function findFileByName(directory, fileName) {
   return null;
 }
 
+function extractTarGzWithSystemTar(archivePath, destination) {
+  // --force-local prevents GNU tar from misreading a Windows drive letter
+  // (e.g. "C:\Users\...") as a "host:path" remote-archive spec.
+  const result = spawnSync(
+    "tar",
+    ["--force-local", "-xzf", archivePath, "-C", destination],
+    { stdio: "ignore" },
+  );
+  return !result.error && result.status === 0;
+}
+
 async function extractArchive(archivePath, destination) {
   await fsp.mkdir(destination, { recursive: true });
 
   if (archivePath.endsWith(".zip")) {
     const extractZip = require("extract-zip");
     await extractZip(archivePath, { dir: destination });
+    return;
+  }
+
+  // Some upstream release archives (e.g. Tectonic's Linux build) use GNU tar's
+  // sparse-file format, which the "tar" npm package cannot parse - it silently
+  // extracts zero entries instead of throwing. The system "tar" binary (GNU tar
+  // on Linux, bsdtar on macOS) handles this correctly and is present on every
+  // supported platform, so prefer it and only fall back to the npm package if
+  // it's unavailable.
+  if (extractTarGzWithSystemTar(archivePath, destination)) {
     return;
   }
 

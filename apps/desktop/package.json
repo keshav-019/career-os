@@ -4,6 +4,10 @@
   "private": true,
   "desktopName": "com.careeros.CareerOS.desktop",
   "main": "src/main.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/keshav-019/career-os.git"
+  },
   "scripts": {
     "dev": "cross-env NODE_ENV=development electron .",
     "start": "electron .",
@@ -38,6 +42,7 @@
   "build": {
     "appId": "com.careeros.desktop",
     "productName": "CareerOS",
+    "publish": null,
     "artifactName": "CareerOS-${version}-${arch}.${ext}",
     "icon": "build/icon.png",
     "files": [
