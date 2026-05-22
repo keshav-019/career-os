@@ -4,6 +4,11 @@
   "private": true,
   "desktopName": "com.careeros.CareerOS.desktop",
   "main": "src/main.js",
+  "author": {
+    "name": "Keshav Jha",
+    "email": "keshavkjha1999@gmail.com"
+  },
+  "description": "CareerOS is a desktop career workspace for managing resumes, jobs, interview preparation, coding practice, and AI-assisted application workflows.",
   "repository": {
     "type": "git",
     "url": "https://github.com/keshav-019/career-os.git"
