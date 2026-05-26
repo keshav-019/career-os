@@ -23,6 +23,7 @@ jobs:
             artifactName: careeros-windows
             assetPath: |
               apps/desktop/dist/*.exe
+              apps/desktop/dist/*.zip
               apps/desktop/dist/*.blockmap
           - platform: linux
             os: ubuntu-latest
