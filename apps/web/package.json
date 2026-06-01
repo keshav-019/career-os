@@ -10,6 +10,9 @@
     "start": "next start",
     "typecheck": "tsc --noEmit"
   },
+  "engines": {
+    "node": ">=20.9.0 <21"
+  },
   "dependencies": {
     "@careeros/shared": "file:../../packages/shared",
     "firebase": "latest",
