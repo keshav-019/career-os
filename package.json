@@ -14,8 +14,9 @@
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "engines": {
-    "node": ">=20.11.0"
+    "node": "24.x"
   },
+  "packageManager": "npm@11.8.0",
   "devDependencies": {
     "@types/node": "latest",
     "@types/react": "latest",
