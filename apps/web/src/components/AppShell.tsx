@@ -11,6 +11,7 @@ import {
   FlaskConical,
   GraduationCap,
   LayoutDashboard,
+  LogOut,
   Menu,
   Moon,
   PanelLeftClose,
@@ -22,8 +23,10 @@ import {
   X
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { auth, isFirebaseClientConfigured } from "@/lib/firebase/client";
 
 type NavItem = {
   href: string;
@@ -134,13 +137,31 @@ function getRouteCopy(pathname: string) {
   return routeCopy[pathname] ?? routeCopy["/"];
 }
 
+function getUserInitials(user: User | null) {
+  const source = user?.displayName ?? user?.email ?? "CareerOS";
+  const pieces = source
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(Boolean)
+    .slice(0, 2);
+
+  return pieces.map((part) => part[0]?.toUpperCase() ?? "").join("") || "CO";
+}
+
 function SidebarNav({
   pathname,
-  onNavigate
+  onNavigate,
+  user,
+  onSignOut
 }: {
   pathname: string;
   onNavigate?: () => void;
+  user: User | null;
+  onSignOut: () => Promise<void>;
 }) {
+  const userName = user?.displayName ?? "CareerOS User";
+  const userEmail = user?.email ?? "Signed in";
+  const userInitials = getUserInitials(user);
+
   return (
     <>
       <Link className="career-brand" href="/" onClick={onNavigate}>
@@ -183,12 +204,14 @@ function SidebarNav({
       </nav>
 
       <div className="career-profile">
-        <div className="career-avatar">KR</div>
+        <div className="career-avatar">{userInitials}</div>
         <div>
-          <strong>Keshav Reddy</strong>
-          <span>Software Engineer</span>
+          <strong>{userName}</strong>
+          <span>{userEmail}</span>
         </div>
-        <i />
+        <button aria-label="Sign out" className="profile-signout" onClick={() => void onSignOut()} type="button">
+          <LogOut size={14} />
+        </button>
       </div>
     </>
   );
@@ -196,17 +219,82 @@ function SidebarNav({
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const router = useRouter();
+  const [mobileMenuState, setMobileMenuState] = useState({ open: false, route: "" });
   const [lightMode, setLightMode] = useState(false);
+  const [isAuthResolved, setIsAuthResolved] = useState(!isFirebaseClientConfigured || !auth);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const copy = useMemo(() => getRouteCopy(pathname), [pathname]);
+  const isAuthRoute = pathname.startsWith("/login");
+  const sidebarOpen = mobileMenuState.open && mobileMenuState.route === pathname;
 
   useEffect(() => {
     document.documentElement.classList.toggle("light-theme", lightMode);
   }, [lightMode]);
 
   useEffect(() => {
-    setSidebarOpen(false);
-  }, [pathname]);
+    if (!auth) {
+      return;
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      setIsAuthResolved(true);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    if (!isFirebaseClientConfigured || !isAuthResolved) {
+      return;
+    }
+
+    if (!currentUser && !isAuthRoute) {
+      router.replace("/login");
+      return;
+    }
+
+    if (currentUser && isAuthRoute) {
+      router.replace("/");
+    }
+  }, [currentUser, isAuthResolved, isAuthRoute, router]);
+
+  const handleSignOut = async () => {
+    if (!auth) {
+      return;
+    }
+
+    await signOut(auth);
+    router.replace("/login");
+  };
+
+  const toggleSidebar = () => {
+    setMobileMenuState((state) =>
+      state.open && state.route === pathname
+        ? { open: false, route: pathname }
+        : { open: true, route: pathname }
+    );
+  };
+
+  const closeSidebar = () => {
+    setMobileMenuState({ open: false, route: pathname });
+  };
+
+  if (isAuthRoute) {
+    return <>{children}</>;
+  }
+
+  if (isFirebaseClientConfigured && (!isAuthResolved || !currentUser)) {
+    return (
+      <div className="auth-loading">
+        <div className="auth-loading-card">
+          <Sparkles size={18} />
+          <p>Checking your session...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="career-shell">
@@ -214,23 +302,28 @@ export function AppShell({ children }: { children: ReactNode }) {
         aria-label={sidebarOpen ? "Close navigation" : "Open navigation"}
         aria-expanded={sidebarOpen}
         className="mobile-menu-button"
-        onClick={() => setSidebarOpen((value) => !value)}
+        onClick={toggleSidebar}
         type="button"
       >
         {sidebarOpen ? <X size={19} /> : <Menu size={19} />}
       </button>
 
       <aside className="career-sidebar">
-        <SidebarNav pathname={pathname} />
+        <SidebarNav pathname={pathname} user={currentUser} onSignOut={handleSignOut} />
       </aside>
 
       <div
         className={sidebarOpen ? "sidebar-scrim open" : "sidebar-scrim"}
-        onClick={() => setSidebarOpen(false)}
+        onClick={closeSidebar}
       />
 
       <aside className={sidebarOpen ? "mobile-sidebar open" : "mobile-sidebar"}>
-        <SidebarNav pathname={pathname} onNavigate={() => setSidebarOpen(false)} />
+        <SidebarNav
+          pathname={pathname}
+          onNavigate={closeSidebar}
+          user={currentUser}
+          onSignOut={handleSignOut}
+        />
       </aside>
 
       <main className="career-main">
