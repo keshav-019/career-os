@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" role="img" aria-labelledby="title desc">
+  <title id="title">Computer Science Interview Category</title>
+  <desc id="desc">Illustration of systems, databases, and networking nodes for computer science tests.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0a1f18"/>
+      <stop offset="100%" stop-color="#14372a"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="620" fill="url(#bg)" rx="28"/>
+  <rect x="90" y="118" width="440" height="392" rx="26" fill="#123329" stroke="#2d6a4f"/>
+  <rect x="130" y="156" width="360" height="98" rx="16" fill="#1c4d3c"/>
+  <text x="154" y="215" fill="#b8f2dd" font-size="46" font-family="Arial, sans-serif" font-weight="700">DBMS / OS</text>
+  <rect x="130" y="276" width="360" height="200" rx="16" fill="#0d291f"/>
+  <g stroke="#67e8b5" stroke-width="6" fill="none">
+    <circle cx="190" cy="330" r="22"/>
+    <circle cx="312" cy="330" r="22"/>
+    <circle cx="434" cy="330" r="22"/>
+    <line x1="212" y1="330" x2="290" y2="330"/>
+    <line x1="334" y1="330" x2="412" y2="330"/>
+    <circle cx="251" cy="400" r="22"/>
+    <circle cx="373" cy="400" r="22"/>
+    <line x1="205" y1="346" x2="236" y2="382"/>
+    <line x1="298" y1="400" x2="351" y2="400"/>
+    <line x1="419" y1="346" x2="388" y2="382"/>
+  </g>
+  <rect x="592" y="132" width="520" height="356" rx="28" fill="#102d23" stroke="#2f6f55"/>
+  <rect x="624" y="170" width="214" height="122" rx="16" fill="#1d523f"/>
+  <text x="654" y="244" fill="#c7f9e5" font-size="42" font-family="Arial, sans-serif" font-weight="700">TCP</text>
+  <rect x="858" y="170" width="222" height="122" rx="16" fill="#1d523f"/>
+  <text x="885" y="244" fill="#c7f9e5" font-size="42" font-family="Arial, sans-serif" font-weight="700">SQL</text>
+  <rect x="624" y="312" width="456" height="146" rx="16" fill="#0d231b"/>
+  <text x="652" y="372" fill="#7ce0b9" font-size="38" font-family="Arial, sans-serif" font-weight="700">Computer Science Core</text>
+  <text x="652" y="420" fill="#b6e9d5" font-size="28" font-family="Arial, sans-serif">OS • DBMS • Networks • Algorithms</text>
+</svg>

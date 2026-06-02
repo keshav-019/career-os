@@ -7,6 +7,7 @@ const config = [
   {
     ignores: [
       ".next/**",
+      "public/texlive/**",
       "next-env.d.ts"
     ]
   }

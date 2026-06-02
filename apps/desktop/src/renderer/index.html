@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+    <title>CareerOS Desktop</title>
+    <style>
+      :root {
+        --bg: #0b1220;
+        --card: #111b2f;
+        --text: #ecf2ff;
+        --muted: #9db0d1;
+        --accent: #4c9aff;
+        --ok: #3bc287;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background:
+          radial-gradient(circle at 85% 5%, rgba(76, 154, 255, 0.32), transparent 45%),
+          linear-gradient(150deg, #0b1220, #0c182c 55%, #111f38);
+        color: var(--text);
+        font-family: "Segoe UI", "Inter", sans-serif;
+      }
+      main {
+        margin: 32px auto;
+        width: min(900px, calc(100% - 48px));
+        display: grid;
+        gap: 18px;
+      }
+      .hero,
+      .panel {
+        background: rgba(17, 27, 47, 0.9);
+        border: 1px solid rgba(157, 176, 209, 0.22);
+        border-radius: 18px;
+        padding: 22px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 28px;
+      }
+      p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+      .status {
+        margin-top: 14px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: #d5e2ff;
+      }
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--ok);
+      }
+      h2 {
+        margin: 0 0 10px;
+        font-size: 18px;
+      }
+      code {
+        padding: 2px 6px;
+        border-radius: 6px;
+        background: rgba(76, 154, 255, 0.12);
+        color: #d9e8ff;
+      }
+      ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted);
+        line-height: 1.8;
+      }
+      .endpoint {
+        color: var(--accent);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <h1>CareerOS Desktop</h1>
+        <p>
+          Desktop helper is active. Keep this app open while using Resume Studio in the browser for local LaTeX compilation and
+          faster PDF generation.
+        </p>
+        <div class="status"><span class="dot"></span> Local helper listening on <code>127.0.0.1:43823</code></div>
+      </section>
+
+      <section class="panel">
+        <h2>How Web App Connects</h2>
+        <ul>
+          <li><span class="endpoint">GET /health</span> checks helper + local TeX availability.</li>
+          <li><span class="endpoint">POST /compile-latex</span> compiles source and returns PDF as base64.</li>
+          <li>Compile requires local TeX runtime installed (TeX Live, MacTeX, or MiKTeX).</li>
+        </ul>
+      </section>
+    </main>
+  </body>
+</html>

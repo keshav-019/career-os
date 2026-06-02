@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" role="img" aria-labelledby="title desc">
+  <title id="title">Coding Interview Category</title>
+  <desc id="desc">Illustration of code windows and graph lines for coding interview tests.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#071426"/>
+      <stop offset="100%" stop-color="#122b4a"/>
+    </linearGradient>
+    <linearGradient id="chip" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#4ecdc4"/>
+      <stop offset="100%" stop-color="#18a999"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="620" fill="url(#bg)" rx="28"/>
+  <rect x="70" y="84" width="470" height="430" rx="24" fill="#0f2138" stroke="#26496e"/>
+  <rect x="90" y="118" width="430" height="44" rx="12" fill="#153154"/>
+  <circle cx="126" cy="140" r="8" fill="#f87171"/>
+  <circle cx="154" cy="140" r="8" fill="#facc15"/>
+  <circle cx="182" cy="140" r="8" fill="#4ade80"/>
+  <g fill="#7ab6ff" opacity="0.94">
+    <rect x="104" y="196" width="170" height="16" rx="8"/>
+    <rect x="104" y="228" width="270" height="16" rx="8"/>
+    <rect x="134" y="260" width="220" height="16" rx="8" fill="#56d7c8"/>
+    <rect x="104" y="292" width="300" height="16" rx="8"/>
+    <rect x="134" y="324" width="180" height="16" rx="8" fill="#56d7c8"/>
+    <rect x="104" y="356" width="250" height="16" rx="8"/>
+    <rect x="104" y="388" width="320" height="16" rx="8"/>
+  </g>
+  <rect x="600" y="130" width="530" height="350" rx="26" fill="#0c1c31" stroke="#244666"/>
+  <polyline points="650,400 750,320 830,350 930,250 1020,280" fill="none" stroke="#47d7c4" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="750" cy="320" r="11" fill="#47d7c4"/>
+  <circle cx="830" cy="350" r="11" fill="#47d7c4"/>
+  <circle cx="930" cy="250" r="11" fill="#47d7c4"/>
+  <circle cx="1020" cy="280" r="11" fill="#47d7c4"/>
+  <rect x="632" y="164" width="310" height="54" rx="16" fill="url(#chip)" opacity="0.86"/>
+  <text x="653" y="199" fill="#041322" font-size="31" font-family="Arial, sans-serif" font-weight="700">Coding Simulations</text>
+  <text x="638" y="452" fill="#8cbaf0" font-size="28" font-family="Arial, sans-serif">Algorithms • Complexity • Debugging</text>
+</svg>

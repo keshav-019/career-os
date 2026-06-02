@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="420" viewBox="0 0 920 420" role="img" aria-labelledby="title desc">
+  <title id="title">Probability Bag Visual</title>
+  <desc id="desc">Bag containing red and blue balls to represent probability.</desc>
+  <rect width="920" height="420" fill="#f7fafc"/>
+  <rect x="56" y="44" width="808" height="332" rx="16" fill="#ffffff" stroke="#d0dae7"/>
+  <path d="M350 104 C350 78, 570 78, 570 104 L540 150 L380 150 Z" fill="#9ca3af"/>
+  <path d="M320 148 C320 120, 600 120, 600 148 L560 302 C554 338, 366 338, 360 302 Z" fill="#cbd5e1" stroke="#64748b" stroke-width="4"/>
+  <circle cx="400" cy="206" r="18" fill="#ef4444"/>
+  <circle cx="455" cy="206" r="18" fill="#3b82f6"/>
+  <circle cx="510" cy="206" r="18" fill="#ef4444"/>
+  <circle cx="428" cy="250" r="18" fill="#3b82f6"/>
+  <circle cx="482" cy="250" r="18" fill="#3b82f6"/>
+  <circle cx="538" cy="250" r="18" fill="#ef4444"/>
+  <text x="690" y="188" font-size="22" fill="#334155">Red = Favorable</text>
+  <text x="690" y="224" font-size="22" fill="#334155">Blue = Other</text>
+</svg>

@@ -8,8 +8,26 @@ const fallback = (value: string | undefined, label: string) => {
 const createDraftId = () =>
   `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
+const sanitizeSourceUrl = (value: string | undefined): string | undefined => {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return undefined;
+    }
+
+    return parsed.toString();
+  } catch {
+    return undefined;
+  }
+};
+
 export function normalizeJobImport(payload: JobSourcePayload): JobImportDraft {
-  const sourceUrl = payload.sourceUrl?.trim();
+  const sourceUrl = sanitizeSourceUrl(payload.sourceUrl);
 
   return {
     id: createDraftId(),

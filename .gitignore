@@ -1,11 +1,13 @@
 .DS_Store
 .env
 .env.*
+env.ts
 !.env.example
 !.env.local.example
 .firebase/
 .codex/
 .next/
+apps/web/public/texlive/
 coverage/
 dist/
 logs/

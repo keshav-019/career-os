@@ -3,7 +3,8 @@ export const firestoreCollections = {
   interviews: "interviews",
   resumes: "resumes",
   emails: "emails",
-  reminders: "reminders"
+  reminders: "reminders",
+  practiceAttempts: "practiceAttempts"
 } as const;
 
 export type FirestoreCollection = keyof typeof firestoreCollections;

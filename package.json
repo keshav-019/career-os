@@ -11,10 +11,12 @@
     "build": "npm run build --workspace @careeros/web",
     "lint": "npm run lint --workspace @careeros/web",
     "start": "npm run start --workspace @careeros/web",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "desktop:dev": "npm run dev --workspace @careeros/desktop",
+    "desktop:dist": "npm run dist --workspace @careeros/desktop"
   },
   "engines": {
-    "node": ">=20.9.0 <21"
+    "node": ">=20.9.0"
   },
   "devDependencies": {
     "@types/node": "latest",

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="420" viewBox="0 0 920 420" role="img" aria-labelledby="title desc">
+  <title id="title">Arithmetic Visual</title>
+  <desc id="desc">Generic arithmetic workspace with formula blocks.</desc>
+  <rect width="920" height="420" fill="#f7fafc"/>
+  <rect x="56" y="44" width="808" height="332" rx="16" fill="#ffffff" stroke="#d0dae7"/>
+  <rect x="120" y="110" width="680" height="68" rx="10" fill="#eef2ff"/>
+  <rect x="120" y="198" width="680" height="68" rx="10" fill="#f8fafc" stroke="#d4dbe6"/>
+  <rect x="120" y="286" width="680" height="48" rx="10" fill="#f8fafc" stroke="#d4dbe6"/>
+  <text x="150" y="153" font-size="24" fill="#334155">Formula -> Substitute values -> Compute</text>
+  <text x="150" y="241" font-size="21" fill="#475569">Check units and simplify fractions if needed</text>
+  <text x="150" y="318" font-size="20" fill="#475569">Use elimination or direct ratio methods</text>
+</svg>

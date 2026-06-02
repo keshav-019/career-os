@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="420" viewBox="0 0 920 420" role="img" aria-labelledby="title desc">
+  <title id="title">Ratio Bar Visual</title>
+  <desc id="desc">Segmented bars showing ratio parts.</desc>
+  <rect width="920" height="420" fill="#f7fafc"/>
+  <rect x="56" y="44" width="808" height="332" rx="16" fill="#ffffff" stroke="#d0dae7"/>
+  <text x="140" y="124" font-size="24" fill="#1e293b">Ratio A : B</text>
+  <rect x="140" y="154" width="480" height="52" rx="8" fill="#dbeafe"/>
+  <rect x="140" y="154" width="192" height="52" rx="8" fill="#2f6fe7"/>
+  <rect x="140" y="248" width="480" height="52" rx="8" fill="#dcfce7"/>
+  <rect x="140" y="248" width="288" height="52" rx="8" fill="#16a34a"/>
+  <text x="140" y="224" font-size="18" fill="#334155">A parts</text>
+  <text x="140" y="320" font-size="18" fill="#334155">B parts</text>
+</svg>
