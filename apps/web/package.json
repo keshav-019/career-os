@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "engines": {
-    "node": ">=20.9.0"
+    "node": "20.x"
   },
   "dependencies": {
     "@careeros/shared": "file:../../packages/shared",
