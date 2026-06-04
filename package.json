@@ -25,6 +25,8 @@
     "mobile:android": "npm run android --workspace @careeros/mobile",
     "mobile:android:emulator": "npm run android:emulator --workspace @careeros/mobile",
     "mobile:typecheck": "npm run typecheck --workspace @careeros/mobile",
+    "mobile-backend:dev": "npm run dev --workspace @careeros/mobile-backend",
+    "mobile-backend:start": "npm run start --workspace @careeros/mobile-backend",
     "format": "prettier --write ."
   },
   "engines": {

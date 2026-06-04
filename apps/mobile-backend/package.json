@@ -1,0 +1,28 @@
+{
+  "name": "@careeros/mobile-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Standalone Node/Express backend for the CareerOS Android app - reuses apps/web/src/lib directly (no duplicated business logic). Exists because Vercel's serverless bundling of firebase-admin breaks these routes in production; this runs as a normal long-lived Node process instead (Railway, or any plain Node host).",
+  "main": "src/server.ts",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "dev": "tsx watch src/server.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@careeros/shared": "file:../../packages/shared",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "firebase-admin": "^13.10.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "latest",
+    "tsx": "^4.19.2",
+    "typescript": "latest"
+  },
+  "engines": {
+    "node": "20.x"
+  }
+}

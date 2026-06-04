@@ -1,0 +1,12 @@
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "npm ci --workspace @careeros/mobile-backend --workspace @careeros/shared --no-audit --no-fund"
+  },
+  "deploy": {
+    "startCommand": "npm run start --workspace @careeros/mobile-backend",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
+  }
+}
