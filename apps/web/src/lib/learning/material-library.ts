@@ -1,4 +1,3 @@
-import { existsSync } from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import aiTextbookCurriculum from "../../../../../learning-material/ai_textbook_curriculum_clean.min.json";
@@ -882,13 +881,9 @@ const RAW_MATERIAL_DATASETS: Array<{ entryName: string; raw: unknown }> = [
 let parsedMaterialCache: ParsedMaterialFile[] | null = null;
 
 function resolveLearningMaterialFilePath(entryName: string): string | null {
-  const candidates = [
-    path.join(process.cwd(), "learning-material", entryName),
-    path.join(process.cwd(), "..", "learning-material", entryName),
-    path.join(process.cwd(), "..", "..", "learning-material", entryName)
-  ];
-
-  return candidates.find((candidate) => existsSync(candidate)) ?? null;
+  const configuredDirectory = (process.env.LEARNING_MATERIAL_DIR ?? "").trim();
+  const materialDirectory = configuredDirectory || path.join(process.cwd(), "..", "..", "learning-material");
+  return path.join(/* turbopackIgnore: true */ materialDirectory, entryName);
 }
 
 async function loadMaterialFiles(): Promise<ParsedMaterialFile[]> {
@@ -1220,19 +1215,8 @@ function sanitizeFigureId(value: string, fallback: string): string {
 }
 
 function resolvePublicDirectoryPath(): string {
-  const candidates = [
-    path.join(process.cwd(), "public"),
-    path.join(process.cwd(), "apps", "web", "public"),
-    path.join(process.cwd(), "..", "public"),
-    path.join(process.cwd(), "..", "apps", "web", "public")
-  ];
-
-  const existing = candidates.find((candidate) => existsSync(candidate));
-  if (!existing) {
-    throw new Error("Unable to locate web public directory for image upload.");
-  }
-
-  return existing;
+  const configuredDirectory = (process.env.LEARNING_PUBLIC_DIR ?? "").trim();
+  return configuredDirectory || path.join(/* turbopackIgnore: true */ process.cwd(), "public");
 }
 
 function parseImageDataUrl(dataUrl: string): { buffer: Buffer; extension: string; mimeType: string } | null {
@@ -1277,11 +1261,17 @@ async function saveEditedFigureImage(
   const safeDataset = sanitizeFigureId(datasetKey, "learning");
   const safeTopic = sanitizeFigureId(topicId, "topic");
   const safeFigure = sanitizeFigureId(figureId, "figure");
-  const uploadDirectory = path.join(publicDirectory, "learning", "admin-uploads", safeDataset, safeTopic);
+  const uploadDirectory = path.join(
+    /* turbopackIgnore: true */ publicDirectory,
+    "learning",
+    "admin-uploads",
+    safeDataset,
+    safeTopic
+  );
   await fs.mkdir(uploadDirectory, { recursive: true });
 
   const fileName = `${safeFigure}.${parsed.extension}`;
-  const filePath = path.join(uploadDirectory, fileName);
+  const filePath = path.join(/* turbopackIgnore: true */ uploadDirectory, fileName);
   await fs.writeFile(filePath, parsed.buffer);
 
   return `/learning/admin-uploads/${safeDataset}/${safeTopic}/${fileName}`;

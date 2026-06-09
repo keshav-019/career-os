@@ -8,7 +8,8 @@ export async function GET() {
   try {
     const summary = await getLearningLibrarySummary();
     return NextResponse.json(summary);
-  } catch {
+  } catch (error) {
+    console.error("Unable to load learning library.", error);
     return NextResponse.json(
       {
         error: "Unable to load learning library."
