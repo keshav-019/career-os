@@ -21,7 +21,7 @@ Imported by route pages to avoid duplicated layout and UI primitives.
 - No direct child folders.
 
 ## Maintenance Notes
-Prefer pure, prop-driven components; keep route-specific side effects out of shared components.
+Prefer pure, prop-driven components; keep route-specific side effects out of shared components. `AppShell` also honors the local admin session stored by the login page so env-only learning edits can be checked without creating a Firebase user.
 
 ## Contributor Checklist
 1. Keep changes scoped to this folder responsibility before reaching into adjacent modules.

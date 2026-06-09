@@ -1,13 +1,19 @@
-import aiPhase1 from "../../../../../learning-material/ai_ml_reading_materials_phase_1.min.json";
-import aiPhase2 from "../../../../../learning-material/ai_ml_reading_materials_phase_2.min.json";
-import aiPhase3 from "../../../../../learning-material/ai_ml_reading_materials_phase_3.min.json";
-import aiPhase4 from "../../../../../learning-material/ai_ml_reading_materials_phase_4.min.json";
-import aiPhase5 from "../../../../../learning-material/ai_ml_reading_materials_phase_5.min.json";
-import aptitudeMaterials from "../../../../../learning-material/aptitude_reading_materials_by_subtopic_54.min.json";
+import { existsSync } from "node:fs";
+import fs from "node:fs/promises";
+import path from "node:path";
+import aiTextbookCurriculum from "../../../../../learning-material/ai_textbook_curriculum_clean.min.json";
+import algorithmsTextbook from "../../../../../learning-material/algorithms_textbook_clean.min.json";
+import cProgrammingTextbook from "../../../../../learning-material/c_programming_textbook_clean.min.json";
+import computerNetworksTextbook from "../../../../../learning-material/computer_networks_textbook_clean.min.json";
+import dataStructuresTextbook from "../../../../../learning-material/data_structures_textbook_clean.min.json";
 import computerScienceMaterials from "../../../../../learning-material/cse_detailed_reading_material_minified.json";
-import systemDesignMaterials from "../../../../../learning-material/system_design_deep_reading_materials_210.min.json";
+import databaseSystemsTextbook from "../../../../../learning-material/database_systems_textbook_clean.min.json";
+import operatingSystemsTextbook from "../../../../../learning-material/operating_systems_textbook_clean.min.json";
+import pythonProgrammingTextbook from "../../../../../learning-material/python_programming_textbook_clean.min.json";
+import systemDesignInterviewTextbook from "../../../../../learning-material/system_design_interview_textbook_clean.min.json";
+import osFigureDimensions from "./os-figure-dimensions.json";
 
-export type LearningTrackId = "computer-science" | "system-design" | "aptitude" | "ai";
+export type LearningTrackId = "computer-science" | "ai";
 
 type MaterialReference = {
   bestFor?: string;
@@ -18,14 +24,30 @@ type MaterialReference = {
   url: string;
 };
 
+type MaterialFigure = {
+  caption?: string;
+  description?: string;
+  height?: number;
+  id: string;
+  page?: number | string;
+  reference?: string;
+  src: string;
+  width?: number;
+};
+
 type MaterialTopic = {
   candidateTraps?: string[];
   coreNotes?: string[];
   difficulty?: string;
+  figures?: MaterialFigure[];
   focusKeywords?: string[];
   id?: number;
   learningObjectives?: string[];
+  pageEnd?: number | string;
+  pageStart?: number | string;
+  paragraphPages?: Array<number | string>;
   practiceDrills?: string[];
+  readingParagraphs?: string[];
   recommendedStudyOrderWithinSubject?: number;
   referenceIds?: string[];
   rulesAndFormulas?: string[];
@@ -59,6 +81,10 @@ type MaterialFile = {
   referenceCatalog?: MaterialReference[];
   subjects?: MaterialSubject[];
 };
+
+function getPublicImageDimensions(src: string): { height: number; width: number } | null {
+  return (osFigureDimensions as Record<string, { height: number; width: number }>)[src] ?? null;
+}
 
 type JsonRecord = Record<string, unknown>;
 
@@ -123,23 +149,33 @@ type TopicReferenceGroup = {
 };
 
 type TopicDetail = {
-  candidateTraps: string[];
-  coreNotes: string[];
   difficulty: string;
+  figures: MaterialFigure[];
   focusKeywords: string[];
-  learningObjectives: string[];
-  practiceDrills: string[];
+  pageEnd?: number;
+  pageStart?: number;
+  paragraphPages: number[];
+  readingParagraphs: string[];
   referenceGroups: TopicReferenceGroup[];
-  rulesAndFormulas: string[];
-  studyPlan: string[];
   subjectId: string;
   subjectTitle: string;
   title: string;
   topicId: string;
-  unicodeSketch: string;
 };
 
-const TRACK_ORDER: LearningTrackId[] = ["computer-science", "system-design", "aptitude", "ai"];
+export type LearningTopicFigureEdit = {
+  caption?: string;
+  dataUrl?: string;
+  description?: string;
+  height?: number;
+  id?: string;
+  page?: number | string;
+  reference?: string;
+  src?: string;
+  width?: number;
+};
+
+const TRACK_ORDER: LearningTrackId[] = ["computer-science", "ai"];
 
 const TRACK_DEFS: Record<
   LearningTrackId,
@@ -148,23 +184,10 @@ const TRACK_DEFS: Record<
   "computer-science": {
     title: "Computer Science",
     subtitle: "Fundamentals and interview-ready concepts",
-    description: "OS, DBMS, networks, algorithms, architecture, and core programming fundamentals.",
+    description:
+      "OS, Database Systems, Computer Networks, System Design, algorithms, and practical Python/C/Data Structures foundations.",
     imageSrc: "/war-room/cs-card.svg",
     imageAlt: "Computer science track visual"
-  },
-  "system-design": {
-    title: "System Design",
-    subtitle: "Scalable architecture and tradeoffs",
-    description: "Distributed systems, reliability, data modeling, and production architecture decisions.",
-    imageSrc: "/war-room/coding-card.svg",
-    imageAlt: "System design track visual"
-  },
-  aptitude: {
-    title: "Aptitude",
-    subtitle: "Speed, logic, and quantitative reasoning",
-    description: "Arithmetic, logical reasoning, and exam-oriented timed problem-solving patterns.",
-    imageSrc: "/war-room/aptitude-card.svg",
-    imageAlt: "Aptitude track visual"
   },
   ai: {
     title: "AI",
@@ -525,11 +548,7 @@ function detectTrackId(fileName: string, title: string, metadataTrack: string): 
   }
 
   if (explicit === "system-design" || explicit === "system design" || explicit === "design") {
-    return "system-design";
-  }
-
-  if (explicit === "aptitude") {
-    return "aptitude";
+    return "computer-science";
   }
 
   if (explicit === "ai" || explicit === "artificial intelligence" || explicit === "machine learning") {
@@ -539,11 +558,7 @@ function detectTrackId(fileName: string, title: string, metadataTrack: string): 
   const source = `${fileName} ${title}`.toLowerCase();
 
   if (/(system[-\s]?design|hld|lld|distributed)/.test(source)) {
-    return "system-design";
-  }
-
-  if (/\baptitude\b/.test(source)) {
-    return "aptitude";
+    return "computer-science";
   }
 
   if (/\bai\b|artificial intelligence|machine learning|genai/.test(source)) {
@@ -551,6 +566,49 @@ function detectTrackId(fileName: string, title: string, metadataTrack: string): 
   }
 
   return "computer-science";
+}
+
+function removeLegacyComputerScienceSubjects(subjects: MaterialSubject[]): MaterialSubject[] {
+  return subjects.filter((subject) => {
+    const titleKey = normalizeSlug(typeof subject.title === "string" ? subject.title : "");
+    const idKey = normalizeSlug(typeof subject.subjectId === "string" ? subject.subjectId : "");
+    const isProgrammingFundamentals = titleKey === "programming-fundamentals" || idKey === "programming-fundamentals";
+    const isLegacyCProgramming = titleKey === "c-programming" || idKey === "c-programming";
+    const isLegacyDataStructures = titleKey === "data-structures" || idKey === "data-structures";
+    const isLegacyAlgorithms = titleKey === "algorithms" || idKey === "algorithms";
+    const isLegacyOperatingSystems = titleKey === "operating-systems" || idKey === "operating-systems";
+    return (
+      !isProgrammingFundamentals &&
+      !isLegacyCProgramming &&
+      !isLegacyDataStructures &&
+      !isLegacyAlgorithms &&
+      !isLegacyOperatingSystems
+    );
+  });
+}
+
+function buildReadingParagraphs(topic: MaterialTopic): string[] {
+  const curatedParagraphs = toArrayOfStrings(topic.readingParagraphs);
+  if (curatedParagraphs.length > 0) {
+    return curatedParagraphs;
+  }
+
+  const derived = dedupeStrings([
+    ...toArrayOfStrings(topic.coreNotes),
+    ...toArrayOfStrings(topic.rulesAndFormulas).map((line) => `Formula / rule: ${line}`),
+    ...toArrayOfStrings(topic.learningObjectives).map((line) => `Learning checkpoint: ${line}`),
+    ...toArrayOfStrings(topic.candidateTraps).map((line) => `Watch-out: ${line}`),
+    ...toArrayOfStrings(topic.practiceDrills).map((line) => `Practice prompt: ${line}`),
+    typeof topic.unicodeSketch === "string" && topic.unicodeSketch.trim()
+      ? `Quick visual sketch:\n${topic.unicodeSketch}`
+      : ""
+  ]);
+
+  if (derived.length > 0) {
+    return derived;
+  }
+
+  return ["Detailed reading notes for this topic will be added soon."];
 }
 
 function parseClassicMaterialFile(
@@ -572,14 +630,21 @@ function parseClassicMaterialFile(
     .map((value) => toSafeReference(value))
     .filter((value): value is MaterialReference => Boolean(value));
 
+  const trackId = detectTrackId(entryName, metadataTitle, metadataTrack);
+  const isComputerScienceBaseDataset = entryName === "cse_detailed_reading_material_minified.json";
+  const normalizedSubjects =
+    trackId === "computer-science" && isComputerScienceBaseDataset
+      ? removeLegacyComputerScienceSubjects(subjects)
+      : subjects;
+
   return {
     fileName: entryName,
     datasetKey,
     metadataTitle,
-    trackId: detectTrackId(entryName, metadataTitle, metadataTrack),
+    trackId,
     globalStudyPlan: toArrayOfStrings(raw.globalStudyPlan),
     referenceCatalog,
-    subjects
+    subjects: normalizedSubjects
   };
 }
 
@@ -782,118 +847,10 @@ function parseSystemDesignMaterialFile(
     fileName: entryName,
     datasetKey,
     metadataTitle,
-    trackId: "system-design",
+    trackId: "computer-science",
     globalStudyPlan: dedupeStrings([
       ...toDetailedLines(rawRecord.global_study_sequence),
       ...toDetailedLines(rawRecord.interview_answer_template)
-    ]),
-    referenceCatalog,
-    subjects
-  };
-}
-
-function parseAptitudeMaterialFile(
-  entryName: string,
-  datasetKey: string,
-  rawRecord: JsonRecord
-): ParsedMaterialFile | null {
-  const sections = Array.isArray(rawRecord.sections)
-    ? rawRecord.sections.map((entry) => toRecord(entry)).filter((entry): entry is JsonRecord => Boolean(entry))
-    : [];
-  if (sections.length === 0) {
-    return null;
-  }
-
-  const metadataTitle = toStringValue(rawRecord.title) || entryName;
-  const referenceCatalog: MaterialReference[] = [];
-  const referenceByUrl = new Map<string, string>();
-
-  const subjects: MaterialSubject[] = sections.map((section, sectionIndex) => {
-    const sectionTitle =
-      toStringValue(section.section_title) || toStringValue(section.section) || `Section ${sectionIndex + 1}`;
-    const sectionId = toStringValue(section.section_id) || `section-${sectionIndex + 1}`;
-
-    const topicsRaw = Array.isArray(section.topics)
-      ? section.topics.map((entry) => toRecord(entry)).filter((entry): entry is JsonRecord => Boolean(entry))
-      : [];
-
-    const topics: MaterialTopic[] = topicsRaw.map((topic, topicIndex) => {
-      const topicTitle = toStringValue(topic.topic) || `Topic ${topicIndex + 1}`;
-      const topicId = toStringValue(topic.topic_id) || `topic-${topicIndex + 1}`;
-      const readingMaterial = toRecord(topic.reading_material);
-      const workedExamples = Array.isArray(topic.worked_examples)
-        ? topic.worked_examples.map((entry) => toRecord(entry)).filter((entry): entry is JsonRecord => Boolean(entry))
-        : [];
-
-      const workedExampleLines = workedExamples.flatMap((example, exampleIndex) => {
-        const title = `Worked Example ${exampleIndex + 1}`;
-        return dedupeStrings([
-          toStringValue(example.problem) ? `${title} Problem: ${toStringValue(example.problem)}` : "",
-          ...toDetailedLines(example.solution_steps).map((step) => `${title} Step: ${step}`),
-          toStringValue(example.answer) ? `${title} Answer: ${toStringValue(example.answer)}` : ""
-        ]);
-      });
-
-      const topicReferences = collectReferenceIds(
-        topic,
-        `${sectionTitle} - ${topicTitle}`,
-        datasetKey,
-        referenceCatalog,
-        referenceByUrl
-      );
-
-      return {
-        topicId,
-        title: topicTitle,
-        difficulty: normalizeDifficulty(topic.difficulty_scope),
-        focusKeywords: dedupeStrings([
-          ...toDetailedLines(topic.subtopics_covered),
-          toStringValue(topic.section)
-        ]).slice(0, 8),
-        learningObjectives: dedupeStrings([...toDetailedLines(topic.learning_objectives)]),
-        coreNotes: dedupeStrings([
-          toStringValue(readingMaterial?.overview),
-          ...toDetailedLines(readingMaterial?.core_ideas_to_master),
-          ...toDetailedLines(readingMaterial?.subtopic_wise_reading),
-          ...toDetailedLines(readingMaterial?.advanced_preparation_notes)
-        ]),
-        rulesAndFormulas: dedupeStrings([
-          ...toDetailedLines(readingMaterial?.rules_formulas_or_principles),
-          ...toDetailedLines(readingMaterial?.solving_framework)
-        ]),
-        candidateTraps: dedupeStrings([...toDetailedLines(topic.common_traps)]),
-        practiceDrills: dedupeStrings([
-          ...toDetailedLines(topic.practice_drills),
-          ...toDetailedLines(topic.mastery_check),
-          ...toDetailedLines(topic.common_question_patterns),
-          ...workedExampleLines
-        ]),
-        referenceIds: topicReferences
-      };
-    });
-
-    return {
-      subjectId: normalizeSlug(sectionId),
-      order: sectionIndex + 1,
-      title: sectionTitle,
-      overview: `${topics.length} curated aptitude subtopics in this section.`,
-      topicCount: topics.length,
-      topics,
-      capstoneTasks: [],
-      selfAssessmentChecklist: [],
-      defaultReferenceIds: []
-    };
-  });
-
-  return {
-    fileName: entryName,
-    datasetKey,
-    metadataTitle,
-    trackId: "aptitude",
-    globalStudyPlan: dedupeStrings([
-      toStringValue(rawRecord.source_note),
-      `Total sections: ${toStringValue(rawRecord.total_sections)}`,
-      `Total topics: ${toStringValue(rawRecord.total_topics)}`
     ]),
     referenceCatalog,
     subjects
@@ -905,23 +862,34 @@ function parseMaterialFile(entryName: string, rawRecord: JsonRecord): ParsedMate
   return (
     parseClassicMaterialFile(entryName, datasetKey, rawRecord) ??
     parseSystemDesignMaterialFile(entryName, datasetKey, rawRecord) ??
-    parseAptitudeMaterialFile(entryName, datasetKey, rawRecord) ??
     parseAiRoleMaterialFile(entryName, datasetKey, rawRecord)
   );
 }
 
 const RAW_MATERIAL_DATASETS: Array<{ entryName: string; raw: unknown }> = [
+  { entryName: "algorithms_textbook_clean.min.json", raw: algorithmsTextbook },
+  { entryName: "operating_systems_textbook_clean.min.json", raw: operatingSystemsTextbook },
+  { entryName: "database_systems_textbook_clean.min.json", raw: databaseSystemsTextbook },
+  { entryName: "computer_networks_textbook_clean.min.json", raw: computerNetworksTextbook },
+  { entryName: "system_design_interview_textbook_clean.min.json", raw: systemDesignInterviewTextbook },
+  { entryName: "python_programming_textbook_clean.min.json", raw: pythonProgrammingTextbook },
+  { entryName: "c_programming_textbook_clean.min.json", raw: cProgrammingTextbook },
+  { entryName: "data_structures_textbook_clean.min.json", raw: dataStructuresTextbook },
   { entryName: "cse_detailed_reading_material_minified.json", raw: computerScienceMaterials },
-  { entryName: "system_design_deep_reading_materials_210.min.json", raw: systemDesignMaterials },
-  { entryName: "aptitude_reading_materials_by_subtopic_54.min.json", raw: aptitudeMaterials },
-  { entryName: "ai_ml_reading_materials_phase_1.min.json", raw: aiPhase1 },
-  { entryName: "ai_ml_reading_materials_phase_2.min.json", raw: aiPhase2 },
-  { entryName: "ai_ml_reading_materials_phase_3.min.json", raw: aiPhase3 },
-  { entryName: "ai_ml_reading_materials_phase_4.min.json", raw: aiPhase4 },
-  { entryName: "ai_ml_reading_materials_phase_5.min.json", raw: aiPhase5 }
+  { entryName: "ai_textbook_curriculum_clean.min.json", raw: aiTextbookCurriculum }
 ];
 
 let parsedMaterialCache: ParsedMaterialFile[] | null = null;
+
+function resolveLearningMaterialFilePath(entryName: string): string | null {
+  const candidates = [
+    path.join(process.cwd(), "learning-material", entryName),
+    path.join(process.cwd(), "..", "learning-material", entryName),
+    path.join(process.cwd(), "..", "..", "learning-material", entryName)
+  ];
+
+  return candidates.find((candidate) => existsSync(candidate)) ?? null;
+}
 
 async function loadMaterialFiles(): Promise<ParsedMaterialFile[]> {
   if (parsedMaterialCache) {
@@ -1048,8 +1016,6 @@ function buildReferenceGroups(
   subject: MaterialSubject,
   referencesById: Map<string, MaterialReference>
 ): TopicReferenceGroup[] {
-  const groups: TopicReferenceGroup[] = [];
-
   const topicRefs = toArrayOfStrings(topic.referenceIds)
     .map((id) => referencesById.get(id))
     .filter((entry): entry is MaterialReference => Boolean(entry));
@@ -1062,31 +1028,101 @@ function buildReferenceGroups(
     .map((id) => referencesById.get(id))
     .filter((entry): entry is MaterialReference => Boolean(entry));
 
-  if (topicRefs.length > 0) {
-    groups.push({
-      id: "topic-references",
-      title: "Topic References",
-      references: topicRefs
-    });
+  const merged = [...visualRefs, ...topicRefs, ...defaultRefs].reduce<MaterialReference[]>(
+    (result, reference) => {
+      if (!result.some((entry) => entry.id === reference.id)) {
+        result.push(reference);
+      }
+
+      return result;
+    },
+    []
+  );
+
+  if (merged.length === 0) {
+    return [];
   }
 
-  if (visualRefs.length > 0) {
-    groups.push({
+  return [
+    {
       id: "visual-references",
       title: "Visual Study References",
-      references: visualRefs
-    });
+      references: merged
+    }
+  ];
+}
+
+function buildTopicFigures(topic: MaterialTopic): MaterialFigure[] {
+  if (!Array.isArray(topic.figures)) {
+    return [];
   }
 
-  if (defaultRefs.length > 0) {
-    groups.push({
-      id: "subject-default-references",
-      title: "Subject Default References",
-      references: defaultRefs
+  const seen = new Set<string>();
+  const figures: MaterialFigure[] = [];
+
+  topic.figures.forEach((figure, index) => {
+    const srcRaw = toStringValue(figure?.src);
+    if (!srcRaw) {
+      return;
+    }
+
+    const src = srcRaw.startsWith("/") ? srcRaw : normalizeHttpUrl(srcRaw);
+    if (!src || seen.has(src)) {
+      return;
+    }
+    seen.add(src);
+
+    const id = toStringValue(figure?.id) || `${normalizeSlug(topic.title || "topic")}-figure-${index + 1}`;
+    const caption = toStringValue(figure?.caption) || undefined;
+    const description = toStringValue(figure?.description) || undefined;
+    const reference = toStringValue(figure?.reference) || undefined;
+
+    const pageRaw = figure?.page;
+    const page =
+      typeof pageRaw === "number" && Number.isFinite(pageRaw)
+        ? pageRaw
+        : typeof pageRaw === "string" && /^\d+$/.test(pageRaw.trim())
+          ? Number(pageRaw)
+          : undefined;
+    const inlineWidth = typeof figure?.width === "number" && Number.isFinite(figure.width) ? figure.width : undefined;
+    const inlineHeight = typeof figure?.height === "number" && Number.isFinite(figure.height) ? figure.height : undefined;
+    const inlineDimensions =
+      inlineWidth && inlineHeight
+        ? {
+            width: inlineWidth,
+            height: inlineHeight
+          }
+        : null;
+    const dimensions = getPublicImageDimensions(src) ?? inlineDimensions;
+
+    figures.push({
+      id,
+      src,
+      caption,
+      description,
+      page,
+      reference,
+      ...(dimensions ?? {})
     });
+  });
+
+  return figures;
+}
+
+function buildParagraphPages(topic: MaterialTopic): number[] {
+  if (!Array.isArray(topic.paragraphPages)) {
+    return [];
   }
 
-  return groups;
+  return topic.paragraphPages
+    .map((value) =>
+      typeof value === "number" && Number.isFinite(value)
+        ? Math.floor(value)
+        : typeof value === "string" && /^\d+$/.test(value.trim())
+          ? Number(value)
+          : NaN
+    )
+    .filter((value) => Number.isFinite(value) && value > 0);
 }
 
 export async function getLearningTopicDetail(
@@ -1127,14 +1163,22 @@ export async function getLearningTopicDetail(
             typeof subject.title === "string" && subject.title.trim().length > 0
               ? subject.title
               : `Subject ${subjectIndex + 1}`,
+          figures: buildTopicFigures(topic),
           focusKeywords: toArrayOfStrings(topic.focusKeywords),
-          learningObjectives: toArrayOfStrings(topic.learningObjectives),
-          coreNotes: toArrayOfStrings(topic.coreNotes),
-          rulesAndFormulas: toArrayOfStrings(topic.rulesAndFormulas),
-          candidateTraps: toArrayOfStrings(topic.candidateTraps),
-          practiceDrills: toArrayOfStrings(topic.practiceDrills),
-          unicodeSketch: typeof topic.unicodeSketch === "string" ? topic.unicodeSketch : "",
-          studyPlan: dataset.globalStudyPlan,
+          pageStart:
+            typeof topic.pageStart === "number" && Number.isFinite(topic.pageStart)
+              ? Math.floor(topic.pageStart)
+              : typeof topic.pageStart === "string" && /^\d+$/.test(topic.pageStart.trim())
+                ? Number(topic.pageStart)
+                : undefined,
+          pageEnd:
+            typeof topic.pageEnd === "number" && Number.isFinite(topic.pageEnd)
+              ? Math.floor(topic.pageEnd)
+              : typeof topic.pageEnd === "string" && /^\d+$/.test(topic.pageEnd.trim())
+                ? Number(topic.pageEnd)
+                : undefined,
+          paragraphPages: buildParagraphPages(topic),
+          readingParagraphs: buildReadingParagraphs(topic),
           referenceGroups: buildReferenceGroups(topic, subject, referencesById)
         };
       }
@@ -1142,4 +1186,295 @@ export async function getLearningTopicDetail(
   }
 
   return null;
+}
+
+function normalizeEditedParagraphs(readingParagraphs: string[]): string[] {
+  return readingParagraphs
+    .map((paragraph) => paragraph.replace(/\r/g, "").trim())
+    .filter((paragraph) => paragraph.length > 0);
+}
+
+function toPageNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return Math.floor(value);
+  }
+
+  if (typeof value === "string" && /^\d+$/.test(value.trim())) {
+    return Number(value);
+  }
+
+  return null;
+}
+
+function toPositiveDimension(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    return undefined;
+  }
+
+  return Math.round(value);
+}
+
+function sanitizeFigureId(value: string, fallback: string): string {
+  const normalized = normalizeSlug(value).slice(0, 80);
+  return normalized || fallback;
+}
+
+function resolvePublicDirectoryPath(): string {
+  const candidates = [
+    path.join(process.cwd(), "public"),
+    path.join(process.cwd(), "apps", "web", "public"),
+    path.join(process.cwd(), "..", "public"),
+    path.join(process.cwd(), "..", "apps", "web", "public")
+  ];
+
+  const existing = candidates.find((candidate) => existsSync(candidate));
+  if (!existing) {
+    throw new Error("Unable to locate web public directory for image upload.");
+  }
+
+  return existing;
+}
+
+function parseImageDataUrl(dataUrl: string): { buffer: Buffer; extension: string; mimeType: string } | null {
+  const match = dataUrl.match(/^data:(image\/(?:png|jpe?g|webp|gif));base64,([a-zA-Z0-9+/=\s]+)$/);
+  if (!match) {
+    return null;
+  }
+
+  const mimeType = match[1].toLowerCase();
+  const extension =
+    mimeType === "image/png"
+      ? "png"
+      : mimeType === "image/webp"
+        ? "webp"
+        : mimeType === "image/gif"
+          ? "gif"
+          : "jpg";
+  const buffer = Buffer.from(match[2].replace(/\s/g, ""), "base64");
+  if (buffer.length === 0 || buffer.length > 8 * 1024 * 1024) {
+    return null;
+  }
+
+  return {
+    buffer,
+    extension,
+    mimeType
+  };
+}
+
+async function saveEditedFigureImage(
+  datasetKey: string,
+  topicId: string,
+  figureId: string,
+  dataUrl: string
+): Promise<string> {
+  const parsed = parseImageDataUrl(dataUrl);
+  if (!parsed) {
+    throw new Error("Pasted image must be a PNG, JPG, WebP, or GIF data URL under 8 MB.");
+  }
+
+  const publicDirectory = resolvePublicDirectoryPath();
+  const safeDataset = sanitizeFigureId(datasetKey, "learning");
+  const safeTopic = sanitizeFigureId(topicId, "topic");
+  const safeFigure = sanitizeFigureId(figureId, "figure");
+  const uploadDirectory = path.join(publicDirectory, "learning", "admin-uploads", safeDataset, safeTopic);
+  await fs.mkdir(uploadDirectory, { recursive: true });
+
+  const fileName = `${safeFigure}.${parsed.extension}`;
+  const filePath = path.join(uploadDirectory, fileName);
+  await fs.writeFile(filePath, parsed.buffer);
+
+  return `/learning/admin-uploads/${safeDataset}/${safeTopic}/${fileName}`;
+}
+
+function normalizeEditedFigureSrc(value: unknown): string | null {
+  const srcRaw = toStringValue(value);
+  if (!srcRaw) {
+    return null;
+  }
+
+  if (srcRaw.startsWith("/learning/")) {
+    return srcRaw.slice(0, 1024);
+  }
+
+  return normalizeHttpUrl(srcRaw);
+}
+
+async function normalizeEditedFigure(
+  figure: LearningTopicFigureEdit,
+  datasetKey: string,
+  topicId: string,
+  fallbackIndex: number
+): Promise<MaterialFigure | null> {
+  const id = sanitizeFigureId(toStringValue(figure.id), `edited-figure-${fallbackIndex + 1}`);
+  const dataUrl = toStringValue(figure.dataUrl);
+  const src = dataUrl
+    ? await saveEditedFigureImage(datasetKey, topicId, id, dataUrl)
+    : normalizeEditedFigureSrc(figure.src);
+
+  if (!src) {
+    return null;
+  }
+
+  const page = toPageNumber(figure.page) ?? undefined;
+  const width = toPositiveDimension(figure.width);
+  const height = toPositiveDimension(figure.height);
+
+  return {
+    id,
+    src,
+    caption: toStringValue(figure.caption) || undefined,
+    description: toStringValue(figure.description) || undefined,
+    page,
+    reference: toStringValue(figure.reference) || undefined,
+    ...(width ? { width } : {}),
+    ...(height ? { height } : {})
+  };
+}
+
+function upsertEditedFigures(existingFigures: unknown, editedFigures: MaterialFigure[]): MaterialFigure[] {
+  const figures = Array.isArray(existingFigures)
+    ? existingFigures.map((figure) => toRecord(figure)).filter((figure): figure is JsonRecord => Boolean(figure))
+    : [];
+
+  const merged = figures.map((figure) => ({
+    ...figure
+  })) as MaterialFigure[];
+
+  editedFigures.forEach((figure) => {
+    const existingIndex = merged.findIndex((entry) => toStringValue(entry.id) === figure.id);
+    if (existingIndex >= 0) {
+      merged[existingIndex] = {
+        ...merged[existingIndex],
+        ...figure
+      };
+      return;
+    }
+
+    merged.push(figure);
+  });
+
+  return merged;
+}
+
+export async function updateLearningTopicReadingContent(
+  trackId: LearningTrackId,
+  subjectId: string,
+  topicId: string,
+  readingParagraphs: string[],
+  editedFigures: LearningTopicFigureEdit[] = []
+): Promise<TopicDetail | null> {
+  const editingEnabled = process.env.NODE_ENV !== "production" || process.env.ALLOW_LEARNING_CONTENT_EDIT === "1";
+  if (!editingEnabled) {
+    throw new Error("Learning content editing is disabled in this environment.");
+  }
+
+  const normalizedParagraphs = normalizeEditedParagraphs(readingParagraphs);
+  if (normalizedParagraphs.length === 0) {
+    throw new Error("Edited content cannot be empty.");
+  }
+
+  const files = await loadMaterialFiles();
+  let targetFile: ParsedMaterialFile | null = null;
+  let targetSubjectIndex = -1;
+  let targetTopicIndex = -1;
+
+  for (const file of files) {
+    if (file.trackId !== trackId) {
+      continue;
+    }
+
+    for (let subjectIndex = 0; subjectIndex < file.subjects.length; subjectIndex += 1) {
+      const subject = file.subjects[subjectIndex];
+      const resolvedSubjectId = resolveSubjectId(file.datasetKey, subject, subjectIndex);
+      if (resolvedSubjectId !== subjectId) {
+        continue;
+      }
+
+      const topics = Array.isArray(subject.topics) ? subject.topics : [];
+      for (let topicIndex = 0; topicIndex < topics.length; topicIndex += 1) {
+        const topic = topics[topicIndex];
+        const resolvedTopicId = resolveTopicId(resolvedSubjectId, topic, topicIndex);
+        if (resolvedTopicId !== topicId) {
+          continue;
+        }
+
+        targetFile = file;
+        targetSubjectIndex = subjectIndex;
+        targetTopicIndex = topicIndex;
+        break;
+      }
+
+      if (targetFile) {
+        break;
+      }
+    }
+
+    if (targetFile) {
+      break;
+    }
+  }
+
+  if (!targetFile || targetSubjectIndex < 0 || targetTopicIndex < 0) {
+    return null;
+  }
+
+  const datasetEntry = RAW_MATERIAL_DATASETS.find((dataset) => dataset.entryName === targetFile.fileName);
+  if (!datasetEntry) {
+    throw new Error("Unable to locate source dataset entry.");
+  }
+
+  const filePath = resolveLearningMaterialFilePath(targetFile.fileName);
+  if (!filePath) {
+    throw new Error("Unable to locate learning material file on disk.");
+  }
+
+  const rawText = await fs.readFile(filePath, "utf8");
+  const rawRecord = JSON.parse(rawText) as MaterialFile;
+  const rawSubjects = Array.isArray(rawRecord.subjects) ? rawRecord.subjects : [];
+  const rawSubject =
+    rawSubjects.find((subject, index) => resolveSubjectId(targetFile.datasetKey, subject, index) === subjectId)
+    ?? rawSubjects[targetSubjectIndex];
+  if (!rawSubject || !Array.isArray(rawSubject.topics)) {
+    throw new Error("Unable to locate target subject in learning material file.");
+  }
+
+  const rawTopic =
+    rawSubject.topics.find((topic, index) => resolveTopicId(subjectId, topic, index) === topicId)
+    ?? (rawSubject.topics[targetTopicIndex] as (MaterialTopic & { paragraphPages?: unknown }) | undefined);
+  if (!rawTopic) {
+    throw new Error("Unable to locate target topic in learning material file.");
+  }
+
+  const existingParagraphPages = Array.isArray(rawTopic.paragraphPages)
+    ? rawTopic.paragraphPages.map((value) => toPageNumber(value)).filter((value): value is number => value !== null)
+    : [];
+  const fallbackPage = toPageNumber((rawTopic as { pageStart?: unknown }).pageStart) ?? 1;
+  const lastKnownPage =
+    existingParagraphPages.length > 0 ? existingParagraphPages[existingParagraphPages.length - 1] : fallbackPage;
+  const nextParagraphPages = normalizedParagraphs.map(
+    (_, index) => existingParagraphPages[index] ?? lastKnownPage ?? fallbackPage
+  );
+
+  rawTopic.readingParagraphs = normalizedParagraphs;
+  rawTopic.paragraphPages = nextParagraphPages;
+
+  const normalizedFigures = (
+    await Promise.all(
+      editedFigures
+        .filter((figure) => figure && typeof figure === "object")
+        .map((figure, index) => normalizeEditedFigure(figure, targetFile.datasetKey, topicId, index))
+    )
+  ).filter((figure): figure is MaterialFigure => Boolean(figure));
+
+  if (normalizedFigures.length > 0) {
+    rawTopic.figures = upsertEditedFigures(rawTopic.figures, normalizedFigures);
+  }
+
+  await fs.writeFile(filePath, JSON.stringify(rawRecord), "utf8");
+
+  datasetEntry.raw = rawRecord;
+  parsedMaterialCache = null;
+
+  return getLearningTopicDetail(trackId, subjectId, topicId);
 }

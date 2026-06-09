@@ -5,7 +5,7 @@ Provides the Learning Center track catalog and hierarchical summaries (track -> 
 
 ## What This Folder Owns
 Read-only GET handler that returns:
-- all supported tracks (Computer Science, System Design, Aptitude, AI)
+- all supported tracks (Computer Science, AI)
 - availability status per track
 - subject and subtopic metadata for tile rendering
 
