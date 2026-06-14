@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useFocusEffect } from "@react-navigation/native";
+import { GitBranch, Mail } from "lucide-react-native";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../theme/ThemeContext";
 import {
@@ -19,6 +20,7 @@ import {
   TextField,
 } from "../../components/ui/Primitives";
 import type { AuthStackParamList } from "../../navigation/types";
+import { signInWithGithub, signInWithGoogle } from "../../lib/oauth";
 
 const careerLogo = require("../../../assets/icon.png");
 
@@ -32,6 +34,7 @@ export default function LoginScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [oauthProvider, setOauthProvider] = useState<"google" | "github" | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
   useFocusEffect(() => {
@@ -52,6 +55,19 @@ export default function LoginScreen({ navigation }: Props) {
       setError(err instanceof Error ? err.message : "Could not sign in.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleOAuthSignIn = async (provider: "google" | "github") => {
+    setError(null);
+    setNotice(null);
+    setOauthProvider(provider);
+    try {
+      await (provider === "google" ? signInWithGoogle() : signInWithGithub());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not sign in.");
+    } finally {
+      setOauthProvider(null);
     }
   };
 
@@ -141,6 +157,33 @@ export default function LoginScreen({ navigation }: Props) {
             onPress={() => void handleForgotPassword()}
           />
         </Card>
+
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+          <Text style={{ color: colors.muted, fontSize: fontSize.sm }}>
+            or continue with
+          </Text>
+          <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+        </View>
+
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <GhostButton
+              label={oauthProvider === "google" ? "Connecting..." : "Google"}
+              icon={<Mail size={15} color={colors.text} />}
+              disabled={submitting || oauthProvider !== null}
+              onPress={() => void handleOAuthSignIn("google")}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <GhostButton
+              label={oauthProvider === "github" ? "Connecting..." : "GitHub"}
+              icon={<GitBranch size={15} color={colors.text} />}
+              disabled={submitting || oauthProvider !== null}
+              onPress={() => void handleOAuthSignIn("github")}
+            />
+          </View>
+        </View>
 
         <GhostButton
           label="Create an account"
