@@ -3,6 +3,7 @@
     "name": "CareerOS",
     "slug": "careeros-mobile",
     "version": "1.0.0",
+    "scheme": "careeros",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -31,7 +32,8 @@
         }
       ],
       "expo-sharing",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-web-browser"
     ]
   }
 }
