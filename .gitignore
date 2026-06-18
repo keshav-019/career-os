@@ -4,6 +4,7 @@
 env.ts
 !.env.example
 !.env.local.example
+!apps/web/.env.production
 .firebase/
 .codex/
 .secrets/
