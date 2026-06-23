@@ -21,7 +21,19 @@
         "backgroundColor": "#0b1020"
       },
       "package": "com.careeros.mobile",
-      "permissions": []
+      "permissions": [],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": false,
+          "data": [
+            {
+              "scheme": "com.googleusercontent.apps.718498812867-t90bm4fdputicamhsbr8b948nofbl4ek"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "plugins": [
       "expo-status-bar",

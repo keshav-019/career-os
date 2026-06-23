@@ -17,6 +17,7 @@ import {
   createUserWithEmailAndPassword,
   fetchSignInMethodsForEmail,
   onAuthStateChanged,
+  signInWithCredential,
   signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
@@ -25,6 +26,7 @@ import {
   type User,
 } from "firebase/auth";
 import { auth, isFirebaseClientConfigured } from "@/lib/firebase/client";
+import { isDesktopAppEnabled } from "@/lib/desktop-mode";
 import { THEME_CHANGE_EVENT, readThemePreference } from "@/lib/preferences";
 import {
   clearStoredTwoFactorSessionToken,
@@ -364,6 +366,31 @@ export default function LoginPage() {
     }
   };
 
+  const handleDesktopProviderSignIn = async (providerName: "google" | "github") => {
+    if (!auth) return;
+
+    const helperUrl = process.env.NEXT_PUBLIC_DESKTOP_HELPER_URL?.trim() || "http://127.0.0.1:43823";
+    const response = await fetch(`${helperUrl}/oauth/${providerName}/start`, { method: "POST" });
+    const payload = (await response.json().catch(() => ({}))) as {
+      ok?: boolean;
+      accessToken?: string;
+      idToken?: string | null;
+      error?: string;
+    };
+
+    if (!response.ok || !payload.ok || !payload.accessToken) {
+      throw new Error(payload.error || "Sign-in did not complete.");
+    }
+
+    const credential =
+      providerName === "google"
+        ? GoogleAuthProvider.credential(payload.idToken ?? null, payload.accessToken)
+        : GithubAuthProvider.credential(payload.accessToken);
+
+    await signInWithCredential(auth, credential);
+    await handlePostSignInRouting();
+  };
+
   const handleProviderSignIn = async (providerName: "google" | "github") => {
     if (!auth) {
       setErrorMessage("Firebase auth is not configured.");
@@ -377,6 +404,15 @@ export default function LoginPage() {
     authFlowInProgressRef.current = true;
 
     try {
+      // Firebase's popup/redirect OAuth flow doesn't work here: Google actively blocks OAuth consent screens
+      // loaded inside an embedded webview like an Electron BrowserWindow. The desktop app instead opens the
+      // system browser via its local helper server (apps/desktop/src/oauth.js) and hands back a provider access
+      // token the same way this page's own signInWithPopup would internally - see handleDesktopProviderSignIn.
+      if (isDesktopAppEnabled()) {
+        await handleDesktopProviderSignIn(providerName);
+        return;
+      }
+
       if (providerName === "google") {
         await signInWithPopup(auth, new GoogleAuthProvider());
         await handlePostSignInRouting();
