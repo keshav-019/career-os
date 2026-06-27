@@ -9,7 +9,10 @@ const TWO_FACTOR_SESSION_HEADER = "x-2fa-session";
 const detectionByTab = new Map();
 const pendingPasswordAuthById = new Map();
 const LOCAL_API_BASE_URLS = ["http://127.0.0.1:3000", "http://localhost:3000"];
-const DEFAULT_API_BASE_URL = LOCAL_API_BASE_URLS[0];
+// The deployed web app - used as the real default so a fresh install (nothing saved in Settings yet) works out
+// of the box, instead of only ever succeeding when a local dev server happens to be running on port 3000.
+const PRODUCTION_API_BASE_URL = "https://keshav-019-career-os.vercel.app";
+const DEFAULT_API_BASE_URL = PRODUCTION_API_BASE_URL;
 const TRUSTED_HTTPS_HOST_PATTERNS = [
   /(^|\.)careeros\.app$/i,
   /^career-os(?:[-.][a-z0-9-]+)*\.vercel\.app$/i,
@@ -110,7 +113,7 @@ const normalizeApiBaseUrl = (value) => {
 };
 
 const readFallbackApiBaseUrls = (primaryUrl) => {
-  const values = [normalizeApiBaseUrl(primaryUrl), ...LOCAL_API_BASE_URLS];
+  const values = [normalizeApiBaseUrl(primaryUrl), ...LOCAL_API_BASE_URLS, PRODUCTION_API_BASE_URL];
   return Array.from(new Set(values));
 };
 
@@ -898,6 +901,59 @@ const launchProviderAuthFlow = (authorizeUrl, redirectUri) =>
     );
   });
 
+/**
+ * Chrome-only native flow for Google, using chrome.identity.getAuthToken() instead of launchWebAuthFlow.
+ * Chrome validates this directly against the extension's own published Chrome Web Store ID (see manifest.json's
+ * "oauth2" key) - no redirect_uri, no authorization code, no client secret anywhere in this flow, which sidesteps
+ * the ID-mismatch problem launchWebAuthFlow has: its redirect_uri is derived from the extension's *runtime* ID
+ * (chrome.identity.getRedirectURL()), which differs between an unpacked dev install (fixed dev-key ID) and the
+ * published Store version (Store-assigned ID) - whichever OAuth client you register a redirect URI against, the
+ * other install method breaks. getAuthToken() has no such split: Chrome verifies the calling extension's real
+ * identity itself, so it works correctly from the Store-installed copy regardless of how it's tested locally.
+ *
+ * Firefox has no equivalent API (falls through to the launchWebAuthFlow path below), and GitHub has no
+ * extension-aware OAuth client type at all, so both keep using launchWebAuthFlow regardless of browser.
+ */
+const startGoogleSignInChromeNative = async (apiBaseUrl) => {
+  const result = await callbackApi(chrome.identity.getAuthToken, chrome.identity, [{ interactive: true }]);
+  const accessToken = typeof result === "string" ? result : result?.token;
+  if (!accessToken) {
+    throw new Error("Google sign-in did not return an access token.");
+  }
+
+  const exchangeResponse = await fetch(`${apiBaseUrl}/api/extension/oauth/google-token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ accessToken }),
+  });
+
+  const exchangePayload = await exchangeResponse.json().catch(() => ({}));
+  if (!exchangeResponse.ok || !exchangePayload?.ok) {
+    // Drop a stale/invalid cached token so the next attempt gets a fresh one instead of repeating the same
+    // failure indefinitely.
+    chrome.identity.removeCachedAuthToken({ token: accessToken }, () => {});
+    throw new Error(exchangePayload?.error || "Could not complete sign-in.");
+  }
+
+  const authState = normalizeAuthState(exchangePayload.auth);
+  if (!authState) {
+    throw new Error("CareerOS did not return a usable session.");
+  }
+
+  await storageSet({
+    [STORAGE_KEYS.authState]: authState,
+    [STORAGE_KEYS.authRaw]: "",
+  });
+
+  return {
+    auth: toAuthSummary(authState, hasUsableAuthState(authState)),
+    ok: true,
+  };
+};
+
+const IS_CHROME_NATIVE_IDENTITY =
+  !browserApi && typeof chrome !== "undefined" && typeof chrome.identity?.getAuthToken === "function";
+
 const startOauthSignIn = async (provider) => {
   if (provider !== "google" && provider !== "github") {
     throw new Error(`Unsupported provider "${provider}".`);
@@ -905,9 +961,14 @@ const startOauthSignIn = async (provider) => {
 
   const settings = await readSettings();
   const config = await fetchExtensionConfig(settings.apiBaseUrl);
-  const providers = config.providers;
   const apiBaseUrl = normalizeApiBaseUrl(config.apiBaseUrl || settings.apiBaseUrl);
   await rememberApiBaseUrl(apiBaseUrl);
+
+  if (provider === "google" && IS_CHROME_NATIVE_IDENTITY) {
+    return startGoogleSignInChromeNative(apiBaseUrl);
+  }
+
+  const providers = config.providers;
   const providerConfig = providers?.[provider];
   if (!providerConfig?.enabled || !providerConfig.clientId) {
     const label = provider === "google" ? "Google" : "GitHub";
