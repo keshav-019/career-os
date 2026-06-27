@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { extensionCorsPreflight, jsonWithExtensionCors } from "@/lib/server/extension-cors";
+import { buildAuthPackage, readFirstEnv, signInWithIdp } from "@/lib/server/extension-oauth-idp";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,19 +25,6 @@ export const dynamic = "force-dynamic";
  * shape as the "paste token package" flow from Settings), so both auth paths converge on one code path
  * downstream.
  */
-
-function readFirstEnv(...names: string[]): string {
-  for (const name of names) {
-    const value = (process.env[name] ?? "").trim();
-    if (value) {
-      return value;
-    }
-  }
-
-  return "";
-}
-
-const FIREBASE_WEB_API_KEY = readFirstEnv("FIREBASE_API_KEY", "NEXT_PUBLIC_FIREBASE_API_KEY");
 
 type ProviderId = "google" | "github";
 
@@ -102,43 +90,6 @@ async function exchangeGithubCode(code: string, redirectUri: string): Promise<To
   return { accessToken: payload.access_token };
 }
 
-type SignInWithIdpResponse = {
-  idToken?: string;
-  refreshToken?: string;
-  expiresIn?: string;
-  email?: string;
-  localId?: string;
-  providerId?: string;
-  error?: { message?: string };
-};
-
-async function signInWithIdp(providerId: "google.com" | "github.com", accessToken: string, requestUri: string) {
-  if (!FIREBASE_WEB_API_KEY) {
-    throw new Error("Missing NEXT_PUBLIC_FIREBASE_API_KEY - cannot mint a CareerOS session.");
-  }
-
-  const response = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${encodeURIComponent(FIREBASE_WEB_API_KEY)}`,
-    {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        postBody: `access_token=${encodeURIComponent(accessToken)}&providerId=${providerId}`,
-        requestUri,
-        returnIdpCredential: true,
-        returnSecureToken: true
-      })
-    }
-  );
-
-  const payload = (await response.json().catch(() => ({}))) as SignInWithIdpResponse;
-  if (!response.ok || !payload.idToken) {
-    throw new Error(payload.error?.message || "Could not complete sign-in with that account.");
-  }
-
-  return payload;
-}
-
 export async function OPTIONS(request: Request) {
   return extensionCorsPreflight(request, ["OPTIONS", "POST"]);
 }
@@ -165,18 +116,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ pr
     const providerId = provider === "google" ? "google.com" : "github.com";
     const idpResult = await signInWithIdp(providerId, exchanged.accessToken, redirectUri);
 
-    return jsonWithExtensionCors(request, {
-      ok: true,
-      auth: {
-        apiKey: FIREBASE_WEB_API_KEY,
-        idToken: idpResult.idToken,
-        refreshToken: idpResult.refreshToken ?? "",
-        email: idpResult.email ?? "",
-        userId: idpResult.localId ?? "",
-        providerId,
-        expiresAtMs: idpResult.expiresIn ? Date.now() + Number(idpResult.expiresIn) * 1000 : undefined
-      }
-    });
+    return jsonWithExtensionCors(request, { ok: true, auth: buildAuthPackage(idpResult, providerId) });
   } catch (error) {
     console.error("Extension OAuth exchange failed.", error);
     return jsonWithExtensionCors(
