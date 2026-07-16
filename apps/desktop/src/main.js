@@ -21,6 +21,10 @@ let isShuttingDown = false;
 function createHelperServer() {
     helperServer = createDesktopHelperServer({ app, host: HELPER_HOST, log, port: HELPER_PORT });
     void helperServer.start();
+    // Fire-and-forget: warms Tectonic's local file cache in the background so the wait (if any) happens before
+    // the user opens Resume Studio instead of blocking their first actual compile - see latex-runtime.js's
+    // warmCache() for why this is needed at all. Never blocks window creation.
+    void helperServer.latexRuntime.warmCache();
 }
 
 async function createWindow() {
