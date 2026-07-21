@@ -11,9 +11,13 @@ Main process exposes local helper endpoints consumed by web flows.
 
 ## Files In This Folder
 - `main.js`
+- `web-app.js`
+- `helper-server.js`
+- `latex-runtime.js`
 
 ## Child Folders
 - `renderer`
+- `coding`
 
 ## Maintenance Notes
 Keep UI shell thin; core desktop behavior should live in explicit service modules when expanded.

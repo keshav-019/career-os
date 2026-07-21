@@ -1,7 +1,7 @@
 const STORAGE_KEYS = {
   apiBaseUrl: "careeros_api_base_url",
   authRaw: "careeros_auth_raw",
-  authState: "careeros_auth_state"
+  authState: "careeros_auth_state",
 };
 
 const TOKEN_REFRESH_MARGIN_MS = 30 * 1000;
@@ -9,7 +9,7 @@ const detectionByTab = new Map();
 const DEFAULT_API_BASE_URL = "http://localhost:3000";
 const TRUSTED_HTTPS_HOST_PATTERNS = [
   /(^|\.)careeros\.app$/i,
-  /^career-os(?:[-.][a-z0-9-]+)*\.vercel\.app$/i
+  /^career-os(?:[-.][a-z0-9-]+)*\.vercel\.app$/i,
 ];
 
 const isTrustedHttpsHost = (hostname) =>
@@ -53,7 +53,7 @@ const decodeTokenExpiryMs = (idToken) => {
     const normalizedPayload = payloadRaw.replace(/-/g, "+").replace(/_/g, "/");
     const paddedPayload = normalizedPayload.padEnd(
       normalizedPayload.length + ((4 - (normalizedPayload.length % 4)) % 4),
-      "="
+      "=",
     );
     const decodedPayload = JSON.parse(atob(paddedPayload));
     if (typeof decodedPayload.exp !== "number") {
@@ -72,14 +72,23 @@ const normalizeAuthState = (input) => {
   }
 
   const candidate = input;
-  const idToken = typeof candidate.idToken === "string" ? candidate.idToken.trim() : "";
-  const refreshToken = typeof candidate.refreshToken === "string" ? candidate.refreshToken.trim() : "";
-  const apiKey = typeof candidate.apiKey === "string" ? candidate.apiKey.trim() : "";
-  const email = typeof candidate.email === "string" ? candidate.email.trim() : "";
-  const providerId = typeof candidate.providerId === "string" ? candidate.providerId.trim() : "";
-  const userId = typeof candidate.userId === "string" ? candidate.userId.trim() : "";
+  const idToken =
+    typeof candidate.idToken === "string" ? candidate.idToken.trim() : "";
+  const refreshToken =
+    typeof candidate.refreshToken === "string"
+      ? candidate.refreshToken.trim()
+      : "";
+  const apiKey =
+    typeof candidate.apiKey === "string" ? candidate.apiKey.trim() : "";
+  const email =
+    typeof candidate.email === "string" ? candidate.email.trim() : "";
+  const providerId =
+    typeof candidate.providerId === "string" ? candidate.providerId.trim() : "";
+  const userId =
+    typeof candidate.userId === "string" ? candidate.userId.trim() : "";
   const expiresAtMs =
-    typeof candidate.expiresAtMs === "number" && Number.isFinite(candidate.expiresAtMs)
+    typeof candidate.expiresAtMs === "number" &&
+      Number.isFinite(candidate.expiresAtMs)
       ? candidate.expiresAtMs
       : decodeTokenExpiryMs(idToken);
 
@@ -94,7 +103,7 @@ const normalizeAuthState = (input) => {
     idToken,
     providerId,
     refreshToken,
-    userId
+    userId,
   };
 };
 
@@ -103,7 +112,7 @@ const parseAuthInput = (rawValue) => {
   if (!raw) {
     return {
       authRaw: "",
-      authState: null
+      authState: null,
     };
   }
 
@@ -113,7 +122,7 @@ const parseAuthInput = (rawValue) => {
     if (authState) {
       return {
         authRaw: raw,
-        authState
+        authState,
       };
     }
   } catch {
@@ -122,7 +131,7 @@ const parseAuthInput = (rawValue) => {
 
   return {
     authRaw: raw,
-    authState: normalizeAuthState({ idToken: raw })
+    authState: normalizeAuthState({ idToken: raw }),
   };
 };
 
@@ -130,15 +139,17 @@ const readSettings = async () => {
   const stored = await chrome.storage.local.get([
     STORAGE_KEYS.apiBaseUrl,
     STORAGE_KEYS.authRaw,
-    STORAGE_KEYS.authState
+    STORAGE_KEYS.authState,
   ]);
 
   const legacyRaw = String(stored[STORAGE_KEYS.authRaw] || "").trim();
-  const authState = normalizeAuthState(stored[STORAGE_KEYS.authState]) || parseAuthInput(legacyRaw).authState;
+  const authState =
+    normalizeAuthState(stored[STORAGE_KEYS.authState]) ||
+    parseAuthInput(legacyRaw).authState;
 
   return {
     apiBaseUrl: normalizeApiBaseUrl(stored[STORAGE_KEYS.apiBaseUrl]),
-    authState
+    authState,
   };
 };
 
@@ -191,18 +202,21 @@ const mapProviderLabel = (providerId) => {
 const toAuthSummary = (authState, authenticated) => ({
   authenticated: Boolean(authenticated),
   email: authState?.email || "",
-  expiresAtMs: typeof authState?.expiresAtMs === "number" ? authState.expiresAtMs : null,
+  expiresAtMs:
+    typeof authState?.expiresAtMs === "number" ? authState.expiresAtMs : null,
   providerId: normalizeProviderId(authState?.providerId),
   providerLabel: mapProviderLabel(authState?.providerId),
-  userId: authState?.userId || ""
+  userId: authState?.userId || "",
 });
 
 const writeSettings = async (nextSettings) => {
   await chrome.storage.local.set(nextSettings);
-  if (Object.prototype.hasOwnProperty.call(nextSettings, STORAGE_KEYS.authState)) {
+  if (
+    Object.prototype.hasOwnProperty.call(nextSettings, STORAGE_KEYS.authState)
+  ) {
     // Clear legacy/raw token payloads once parsed to reduce secret duplication in extension storage.
     await chrome.storage.local.set({
-      [STORAGE_KEYS.authRaw]: ""
+      [STORAGE_KEYS.authRaw]: "",
     });
   }
 
@@ -216,15 +230,17 @@ const setBadgeForTab = async (tabId, detected) => {
 
   await chrome.action.setBadgeBackgroundColor({
     color: detected ? "#14916f" : "#4e5b70",
-    tabId
+    tabId,
   });
   await chrome.action.setBadgeText({
     text: detected ? "JOB" : "",
-    tabId
+    tabId,
   });
   await chrome.action.setTitle({
-    title: detected ? "CareerOS job detected. Click to save." : "CareerOS Capture",
-    tabId
+    title: detected
+      ? "CareerOS job detected. Click to save."
+      : "CareerOS Capture",
+    tabId,
   });
 };
 
@@ -238,13 +254,13 @@ const refreshIdToken = async (authState) => {
     {
       method: "POST",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
+        "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams({
         grant_type: "refresh_token",
-        refresh_token: authState.refreshToken
-      }).toString()
-    }
+        refresh_token: authState.refreshToken,
+      }).toString(),
+    },
   );
 
   if (!response.ok) {
@@ -256,13 +272,14 @@ const refreshIdToken = async (authState) => {
     apiKey: authState.apiKey,
     email: payload.email || authState.email,
     expiresAtMs:
-      typeof payload.expires_in === "string" && Number.isFinite(Number(payload.expires_in))
+      typeof payload.expires_in === "string" &&
+        Number.isFinite(Number(payload.expires_in))
         ? Date.now() + Number(payload.expires_in) * 1000
         : undefined,
     idToken: payload.id_token,
     providerId: authState.providerId,
     refreshToken: payload.refresh_token || authState.refreshToken,
-    userId: payload.user_id || authState.userId
+    userId: payload.user_id || authState.userId,
   });
 
   if (!nextState) {
@@ -270,7 +287,7 @@ const refreshIdToken = async (authState) => {
   }
 
   await chrome.storage.local.set({
-    [STORAGE_KEYS.authState]: nextState
+    [STORAGE_KEYS.authState]: nextState,
   });
 
   return nextState.idToken;
@@ -284,7 +301,10 @@ const getValidAuthToken = async () => {
   }
 
   const nowMs = Date.now();
-  if (authState.expiresAtMs && authState.expiresAtMs - TOKEN_REFRESH_MARGIN_MS > nowMs) {
+  if (
+    authState.expiresAtMs &&
+    authState.expiresAtMs - TOKEN_REFRESH_MARGIN_MS > nowMs
+  ) {
     return authState.idToken;
   }
 
@@ -295,7 +315,7 @@ const getValidAuthToken = async () => {
 const signOut = async () => {
   await chrome.storage.local.set({
     [STORAGE_KEYS.authRaw]: "",
-    [STORAGE_KEYS.authState]: null
+    [STORAGE_KEYS.authState]: null,
   });
 
   detectionByTab.clear();
@@ -304,11 +324,11 @@ const signOut = async () => {
     tabs
       .map((tab) => tab.id)
       .filter(Boolean)
-      .map((tabId) => setBadgeForTab(tabId, false))
+      .map((tabId) => setBadgeForTab(tabId, false)),
   );
 
   return {
-    ok: true
+    ok: true,
   };
 };
 
@@ -317,7 +337,7 @@ const getAuthStatus = async () => {
   const settings = await readSettings();
   return {
     auth: toAuthSummary(settings.authState, Boolean(token)),
-    ok: true
+    ok: true,
   };
 };
 
@@ -327,8 +347,9 @@ const saveJob = async (payload) => {
   if (!idToken) {
     return {
       code: "AUTH_REQUIRED",
-      error: "Paste your extension token package in the popup before saving jobs.",
-      ok: false
+      error:
+        "Paste your extension token package in the popup before saving jobs.",
+      ok: false,
     };
   }
 
@@ -336,9 +357,9 @@ const saveJob = async (payload) => {
     method: "POST",
     headers: {
       Authorization: `Bearer ${idToken}`,
-      "Content-Type": "application/json"
+      "Content-Type": "application/json",
     },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
   });
 
   const body = await response.json().catch(() => ({}));
@@ -346,13 +367,145 @@ const saveJob = async (payload) => {
     return {
       code: response.status === 401 ? "AUTH_REQUIRED" : "IMPORT_FAILED",
       error: body?.error || "Failed to save job.",
-      ok: false
+      ok: false,
     };
   }
 
   return {
     body,
-    ok: true
+    ok: true,
+  };
+};
+
+/**
+ * "Continue with Google/GitHub" - see apps/web/src/app/api/extension/oauth/[provider]/route.ts for the server
+ * half of this flow. The extension never holds a client secret: chrome.identity.launchWebAuthFlow only ever
+ * hands us back a short-lived authorization CODE, which we immediately forward to our own backend to exchange
+ * for a real Firebase session.
+ */
+
+const buildAuthorizeUrl = (provider, clientId, redirectUri) => {
+  if (provider === "google") {
+    const params = new URLSearchParams({
+      access_type: "online",
+      client_id: clientId,
+      prompt: "select_account",
+      redirect_uri: redirectUri,
+      response_type: "code",
+      scope: "openid email profile",
+    });
+    return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  }
+
+  const params = new URLSearchParams({
+    allow_signup: "true",
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    scope: "read:user user:email",
+  });
+  return `https://github.com/login/oauth/authorize?${params.toString()}`;
+};
+
+const fetchOauthProviders = async (apiBaseUrl) => {
+  const response = await fetch(`${apiBaseUrl}/api/extension/oauth-config`);
+  if (!response.ok) {
+    throw new Error("Could not reach CareerOS to check sign-in options.");
+  }
+
+  const payload = await response.json().catch(() => ({}));
+  if (!payload?.ok) {
+    throw new Error("Could not read CareerOS sign-in configuration.");
+  }
+
+  return payload.providers;
+};
+
+const extractCodeFromRedirect = (redirectUrl) => {
+  const url = new URL(redirectUrl);
+  const errorParam = url.searchParams.get("error");
+  if (errorParam) {
+    throw new Error(url.searchParams.get("error_description") || errorParam);
+  }
+
+  const code = url.searchParams.get("code");
+  if (!code) {
+    throw new Error("Sign-in did not return an authorization code.");
+  }
+
+  return code;
+};
+
+const launchProviderAuthFlow = (authorizeUrl) =>
+  new Promise((resolve, reject) => {
+    chrome.identity.launchWebAuthFlow(
+      { interactive: true, url: authorizeUrl },
+      (responseUrl) => {
+        if (chrome.runtime.lastError || !responseUrl) {
+          reject(
+            new Error(
+              chrome.runtime.lastError?.message ||
+                "Sign-in was cancelled or the popup was blocked.",
+            ),
+          );
+          return;
+        }
+
+        resolve(responseUrl);
+      },
+    );
+  });
+
+const startOauthSignIn = async (provider) => {
+  if (provider !== "google" && provider !== "github") {
+    throw new Error(`Unsupported provider "${provider}".`);
+  }
+
+  const settings = await readSettings();
+  const providers = await fetchOauthProviders(settings.apiBaseUrl);
+  const providerConfig = providers?.[provider];
+  if (!providerConfig?.enabled || !providerConfig.clientId) {
+    const label = provider === "google" ? "Google" : "GitHub";
+    throw new Error(
+      `${label} sign-in isn't configured yet on this CareerOS deployment. Paste a token package instead, or ask whoever manages CareerOS to finish setup.`,
+    );
+  }
+
+  const redirectUri = chrome.identity.getRedirectURL();
+  const authorizeUrl = buildAuthorizeUrl(
+    provider,
+    providerConfig.clientId,
+    redirectUri,
+  );
+  const redirectResult = await launchProviderAuthFlow(authorizeUrl);
+  const code = extractCodeFromRedirect(redirectResult);
+
+  const exchangeResponse = await fetch(
+    `${settings.apiBaseUrl}/api/extension/oauth/${provider}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code, redirectUri }),
+    },
+  );
+
+  const exchangePayload = await exchangeResponse.json().catch(() => ({}));
+  if (!exchangeResponse.ok || !exchangePayload?.ok) {
+    throw new Error(exchangePayload?.error || "Could not complete sign-in.");
+  }
+
+  const authState = normalizeAuthState(exchangePayload.auth);
+  if (!authState) {
+    throw new Error("CareerOS did not return a usable session.");
+  }
+
+  await chrome.storage.local.set({
+    [STORAGE_KEYS.authState]: authState,
+    [STORAGE_KEYS.authRaw]: "",
+  });
+
+  return {
+    auth: toAuthSummary(authState, hasUsableAuthState(authState)),
+    ok: true,
   };
 };
 
@@ -378,15 +531,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         sendResponse({
           authenticated,
-          ok: true
+          ok: true,
         });
       })
       .catch((error) =>
         sendResponse({
           authenticated: false,
           error: error.message,
-          ok: false
-        })
+          ok: false,
+        }),
       );
     return true;
   }
@@ -395,7 +548,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const tabId = message.tabId;
     sendResponse({
       ok: true,
-      payload: tabId ? detectionByTab.get(tabId) || null : null
+      payload: tabId ? detectionByTab.get(tabId) || null : null,
     });
     return true;
   }
@@ -405,10 +558,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .then((settings) =>
         sendResponse({
           authenticated: hasUsableAuthState(settings.authState),
-          ok: true
-        })
+          ok: true,
+        }),
       )
-      .catch((error) => sendResponse({ authenticated: false, error: error.message, ok: false }));
+      .catch((error) =>
+        sendResponse({ authenticated: false, error: error.message, ok: false }),
+      );
     return true;
   }
 
@@ -419,8 +574,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({
           auth: toAuthSummary(null, false),
           error: error.message,
-          ok: false
-        })
+          ok: false,
+        }),
       );
     return true;
   }
@@ -431,8 +586,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .catch((error) =>
         sendResponse({
           error: error.message,
-          ok: false
-        })
+          ok: false,
+        }),
       );
     return true;
   }
@@ -443,10 +598,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({
           ok: true,
           settings: {
-            apiBaseUrl: settings.apiBaseUrl
+            apiBaseUrl: settings.apiBaseUrl,
           },
-          auth: toAuthSummary(settings.authState, hasUsableAuthState(settings.authState))
-        })
+          auth: toAuthSummary(
+            settings.authState,
+            hasUsableAuthState(settings.authState),
+          ),
+        }),
       )
       .catch((error) => sendResponse({ ok: false, error: error.message }));
     return true;
@@ -455,7 +613,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "CAREEROS_UPDATE_SETTINGS") {
     const nextApiBaseUrl = normalizeApiBaseUrl(message.apiBaseUrl);
     const nextSettings = {
-      [STORAGE_KEYS.apiBaseUrl]: nextApiBaseUrl
+      [STORAGE_KEYS.apiBaseUrl]: nextApiBaseUrl,
     };
 
     if (Object.prototype.hasOwnProperty.call(message, "authToken")) {
@@ -469,12 +627,41 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({
           ok: true,
           settings: {
-            apiBaseUrl: settings.apiBaseUrl
+            apiBaseUrl: settings.apiBaseUrl,
           },
-          auth: toAuthSummary(settings.authState, hasUsableAuthState(settings.authState))
-        })
+          auth: toAuthSummary(
+            settings.authState,
+            hasUsableAuthState(settings.authState),
+          ),
+        }),
       )
       .catch((error) => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
+
+  if (message.type === "CAREEROS_OAUTH_START") {
+    startOauthSignIn(message.provider)
+      .then((result) => sendResponse(result))
+      .catch((error) =>
+        sendResponse({
+          error: error.message,
+          ok: false,
+        }),
+      );
+    return true;
+  }
+
+  if (message.type === "CAREEROS_GET_OAUTH_CONFIG") {
+    readSettings()
+      .then((settings) => fetchOauthProviders(settings.apiBaseUrl))
+      .then((providers) =>
+        sendResponse({
+          ok: true,
+          providers,
+          redirectUri: chrome.identity.getRedirectURL(),
+        }),
+      )
+      .catch((error) => sendResponse({ error: error.message, ok: false }));
     return true;
   }
 
@@ -485,8 +672,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({
           code: "IMPORT_FAILED",
           error: error.message,
-          ok: false
-        })
+          ok: false,
+        }),
       );
     return true;
   }

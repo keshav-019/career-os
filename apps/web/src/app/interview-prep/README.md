@@ -7,7 +7,9 @@ Interview War Room front door for track/role exploration and test selection.
 Track cards, AI role flow, attempted/not-attempted filtering, and navigation into test room.
 
 ## Integration Points
-Uses compiled question bank templates and user attempt history from Firestore.
+Uses compiled question bank templates and user attempt history from Firestore. The Coding track renders
+`CodingArenaBrowser` (desktop-only, gated by `isDesktopAppEnabled()`) instead of the MCQ template library, linking out
+to `/coding-room/[problemId]` for the actual solve view.
 
 ## Files In This Folder
 - `page.tsx`

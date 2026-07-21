@@ -1,6 +1,6 @@
 {
   "name": "careeros",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "workspaces": [
     "apps/*",
@@ -9,11 +9,23 @@
   "scripts": {
     "dev": "npm run dev --workspace @careeros/web",
     "build": "npm run build --workspace @careeros/web",
+    "build:desktop": "npm run build:web --workspace @careeros/desktop",
     "lint": "npm run lint --workspace @careeros/web",
     "start": "npm run start --workspace @careeros/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "desktop:dev": "npm run dev --workspace @careeros/desktop",
-    "desktop:dist": "npm run dist --workspace @careeros/desktop"
+    "desktop:build-web": "npm run build:web --workspace @careeros/desktop",
+    "desktop:prepare-ai": "npm run prepare:ai --workspace @careeros/desktop",
+    "desktop:prepare-ai:linux": "npm run prepare:ai:linux --workspace @careeros/desktop",
+    "desktop:prepare-latex": "npm run prepare:latex --workspace @careeros/desktop",
+    "desktop:dist": "npm run dist --workspace @careeros/desktop",
+    "desktop:dist:win": "npm run dist:win --workspace @careeros/desktop",
+    "desktop:dist:linux": "npm run dist:linux --workspace @careeros/desktop",
+    "mobile:start": "npm run start --workspace @careeros/mobile",
+    "mobile:android": "npm run android --workspace @careeros/mobile",
+    "mobile:android:emulator": "npm run android:emulator --workspace @careeros/mobile",
+    "mobile:typecheck": "npm run typecheck --workspace @careeros/mobile",
+    "format": "prettier --write ."
   },
   "engines": {
     "node": "20.x"
@@ -24,6 +36,10 @@
     "@types/react-dom": "latest",
     "eslint": "latest",
     "eslint-config-next": "latest",
+    "prettier": "^3.9.5",
     "typescript": "latest"
+  },
+  "dependencies": {
+    "expo-image-picker": "~57.0.5"
   }
 }

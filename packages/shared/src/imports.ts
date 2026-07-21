@@ -39,6 +39,6 @@ export function normalizeJobImport(payload: JobSourcePayload): JobImportDraft {
     status: "saved",
     priority: "medium",
     tags: ["new"],
-    jdText: payload.description?.trim()
+    jdText: payload.description?.trim(),
   };
 }
