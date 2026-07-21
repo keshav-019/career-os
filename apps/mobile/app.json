@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "CareerOS",
+    "slug": "careeros-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0b1020"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0b1020"
+      },
+      "package": "com.careeros.mobile",
+      "permissions": []
+    },
+    "plugins": [
+      "expo-status-bar",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "CareerOS needs access to your photos so you can set a profile picture."
+        }
+      ],
+      "expo-sharing",
+      "@react-native-community/datetimepicker"
+    ]
+  }
+}

@@ -1,10 +1,5 @@
 export type JobStatus =
-  | "saved"
-  | "applied"
-  | "interviewing"
-  | "offer"
-  | "rejected"
-  | "archived";
+  "saved" | "applied" | "interviewing" | "offer" | "rejected" | "archived";
 
 export type JobSource =
   | "manual"
@@ -17,12 +12,7 @@ export type JobSource =
   | "other";
 
 export type EmailSignal =
-  | "recruiter"
-  | "interview"
-  | "rejection"
-  | "offer"
-  | "follow-up"
-  | "unknown";
+  "recruiter" | "interview" | "rejection" | "offer" | "follow-up" | "unknown";
 
 export type InterviewStage =
   | "recruiter-screen"

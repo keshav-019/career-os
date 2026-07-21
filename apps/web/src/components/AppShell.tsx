@@ -6,9 +6,11 @@ import {
   BookOpen,
   Briefcase,
   CalendarDays,
+  CirclePlus,
   CircleUserRound,
   FileText,
   GraduationCap,
+  Laptop,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -18,14 +20,18 @@ import {
   Sparkles,
   Swords,
   Sun,
+  Workflow,
   X
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { auth, isFirebaseClientConfigured } from "@/lib/firebase/client";
+import { useIsAdmin } from "@/lib/firebase/user-profile";
 import {
+  LEARNING_PLAN_REQUEST_EVENT,
   PROFILE_CHANGE_EVENT,
   PROFILE_SAVE_REQUEST_EVENT,
   THEME_CHANGE_EVENT,
@@ -40,6 +46,7 @@ import {
   readLocalAdminSession,
   type LocalAdminSession
 } from "@/lib/local-admin-session";
+import { isDesktopAppEnabled } from "@/lib/desktop-mode";
 import { sanitizeExternalUrl } from "@/lib/url-safety";
 
 type NavItem = {
@@ -54,32 +61,60 @@ type NavSection = {
   items: NavItem[];
 };
 
-const navSections: NavSection[] = [
-  {
-    title: "Command",
-    items: [
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/applications", label: "Applications", icon: Briefcase },
-      { href: "/resumes", label: "Resume Studio", icon: FileText }
-    ]
-  },
-  {
-    title: "Mission Prep",
-    items: [
-      { href: "/interview-prep", label: "Interview War Room", icon: Swords },
-      { href: "/learning", label: "Learning Center", icon: GraduationCap }
-    ]
-  },
-  {
-    title: "Insight",
-    items: [
-      { href: "/analytics", label: "Analytics", icon: BarChart3 },
-      { href: "/calendar", label: "Calendar", icon: CalendarDays },
-      { href: "/profile", label: "Profile", icon: CircleUserRound },
-      { href: "/settings", label: "Settings", icon: Settings }
-    ]
-  }
-];
+const desktopAppEnabled = isDesktopAppEnabled();
+
+// Dark mode is the default brand mark everywhere outside the in-app UI (favicon, Electron taskbar/packaged icon -
+// see app/layout.tsx metadata and apps/desktop/src/main.js). Inside the app, the sidebar logo below swaps to match
+// whichever mode the user has toggled to.
+const DARK_MODE_LOGO_SRC = "/careeros-dark-mode.png";
+const LIGHT_MODE_LOGO_SRC = "/careeros-light-mode.png";
+
+function buildNavSections(isAdmin: boolean): NavSection[] {
+  return [
+    {
+      title: "Command",
+      items: [
+        { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+        { href: "/applications", label: "Applications", icon: Briefcase },
+        ...(desktopAppEnabled
+          ? [
+              { href: "/ai-match", label: "AI Match", icon: Sparkles },
+              { href: "/resumes", label: "Resume Studio", icon: FileText }
+            ]
+          : [{ href: "/desktop", label: "Desktop App", icon: Laptop }])
+      ]
+    },
+    {
+      title: "Mission Prep",
+      items: [
+        { href: "/interview-prep", label: "Interview War Room", icon: Swords },
+        { href: "/learning", label: "Learning Center", icon: GraduationCap }
+      ]
+    },
+    {
+      title: "Insight",
+      items: [
+        { href: "/analytics", label: "Analytics", icon: BarChart3 },
+        { href: "/calendar", label: "Calendar", icon: CalendarDays },
+        { href: "/integrations", label: "Extensions", icon: Sparkles },
+        { href: "/profile", label: "Profile", icon: CircleUserRound },
+        { href: "/settings", label: "Settings", icon: Settings }
+      ]
+    },
+    ...(isAdmin
+      ? [
+          {
+            title: "Admin",
+            items: [
+              { href: "/admin/coding-problems", label: "Add Coding Question", icon: CirclePlus },
+              { href: "/admin/system-design-problems", label: "Add System Design Question", icon: Workflow },
+              { href: "/admin/test-papers", label: "Add Test Paper", icon: Swords }
+            ]
+          }
+        ]
+      : [])
+  ];
+}
 
 type ApplicationPipelineStats = {
   applied: number;
@@ -108,13 +143,11 @@ function summarizeApplicationPipeline(stats: ApplicationPipelineStats): string {
 const routeCopy: Record<string, { title: string; subtitle: string; action?: string }> = {
   "/dashboard": {
     title: "Dashboard Overview",
-    subtitle: "Real-time intelligence for your career journey.",
-    action: "New Application"
+    subtitle: "Real-time intelligence for your career journey."
   },
   "/applications": {
     title: "Applications",
-    subtitle: "9 active / 1 offer pending / last sync 2m ago via Chrome Extension",
-    action: "New Application"
+    subtitle: "9 active / 1 offer pending / last sync 2m ago via Browser Extension"
   },
   "/jobs": {
     title: "Applications",
@@ -123,8 +156,7 @@ const routeCopy: Record<string, { title: string; subtitle: string; action?: stri
   },
   "/interview-prep": {
     title: "Interview War Room",
-    subtitle: "Zero-AI practice tracks, Firestore-backed attempts, and timed test launches.",
-    action: "Start Simulation"
+    subtitle: "Zero-AI practice tracks, Firestore-backed attempts, and timed test launches."
   },
   "/war-room": {
     title: "Interview War Room",
@@ -133,11 +165,15 @@ const routeCopy: Record<string, { title: string; subtitle: string; action?: stri
   },
   "/resumes": {
     title: "Resume Studio",
-    subtitle: "Desktop-exclusive workspace for resume creation, editing, and exports."
+    subtitle: desktopAppEnabled
+      ? "Local resume builder, LaTeX editor, compile, preview, and exports."
+      : "Desktop-exclusive workspace for resume creation, editing, and exports."
   },
   "/resumes/new": {
     title: "Resume Studio",
-    subtitle: "Open the Desktop app to create or edit resume versions."
+    subtitle: desktopAppEnabled
+      ? "Write LaTeX, compile locally, and preview the PDF without leaving CareerOS."
+      : "Open the Desktop app to create or edit resume versions."
   },
   "/analytics": {
     title: "Analytics",
@@ -157,23 +193,51 @@ const routeCopy: Record<string, { title: string; subtitle: string; action?: stri
     subtitle: "AI-tailored learning paths for your top skill gaps.",
     action: "Generate Plan"
   },
+  "/ai-match": {
+    title: "AI Match",
+    subtitle: "Local resume review, job fit scoring, cover letters, and application strategy."
+  },
   "/test-room": {
     title: "Test Room",
     subtitle: "Immersive timer-based practice in progress."
+  },
+  "/coding-room": {
+    title: "Coding Arena",
+    subtitle: "Local judge workspace for problem practice and timed coding papers."
   },
   "/settings": {
     title: "Settings",
     subtitle: "Security, privacy, preferences, and account controls."
   },
+  "/integrations": {
+    title: "Extensions",
+    subtitle: "Install CareerOS Capture and connect job boards to your application pipeline."
+  },
   "/desktop": {
     title: "CareerOS Desktop",
-    subtitle: "Desktop helper setup for local LaTeX compile and advanced resume features."
+    subtitle: "Download CareerOS Desktop for local-only Resume Studio and compiler features."
+  },
+  "/admin/coding-problems": {
+    title: "Add Coding Question",
+    subtitle: "Admin-only tool for authoring coding-arena problems."
+  },
+  "/admin/system-design-problems": {
+    title: "Add System Design Question",
+    subtitle: "Admin-only tool for authoring system-design catalog problems."
+  },
+  "/admin/test-papers": {
+    title: "Add Test Paper",
+    subtitle: "Admin-only tool for authoring aptitude, computer science, and AI technical test papers."
   }
 };
 
 function getRouteCopy(pathname: string, pipelineStats: ApplicationPipelineStats) {
   if (pathname.startsWith("/test-room")) {
     return routeCopy["/test-room"] ?? routeCopy["/dashboard"];
+  }
+
+  if (pathname.startsWith("/coding-room")) {
+    return routeCopy["/coding-room"] ?? routeCopy["/dashboard"];
   }
 
   if (pathname === "/applications") {
@@ -228,6 +292,8 @@ function getUserDisplayName(user: ShellUser | null, profileNameOverride: string 
 
 function SidebarNav({
   applicationsInLineCount,
+  logoSrc,
+  navSections,
   pathname,
   onNavigate,
   profileNameOverride,
@@ -236,6 +302,8 @@ function SidebarNav({
   onSignOut
 }: {
   applicationsInLineCount: number;
+  logoSrc: string;
+  navSections: NavSection[];
   pathname: string;
   onNavigate?: () => void;
   profileNameOverride: string | null;
@@ -252,7 +320,7 @@ function SidebarNav({
     <>
       <Link className="career-brand" href="/dashboard" onClick={onNavigate}>
         <span className="career-brand-mark">
-          <Sparkles size={17} />
+          <Image alt="CareerOS" className="career-brand-logo" height={40} src={logoSrc} width={40} />
         </span>
         <span>
           <strong>CareerOS</strong>
@@ -312,6 +380,7 @@ function SidebarNav({
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { jobs } = useUserJobs();
+  const { isAdmin } = useIsAdmin();
   const pathname = usePathname();
   const router = useRouter();
   const initialLocalAdminSession = readLocalAdminSession();
@@ -348,11 +417,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
   }, [jobs]);
   const applicationsInLineCount = pipelineStats.saved + pipelineStats.applied + pipelineStats.interviewing;
+  const navSections = useMemo(() => buildNavSections(isAdmin), [isAdmin]);
+  const logoSrc = lightMode ? LIGHT_MODE_LOGO_SRC : DARK_MODE_LOGO_SRC;
   const copy = useMemo(() => getRouteCopy(pathname, pipelineStats), [pathname, pipelineStats]);
-  const isPrimaryActionDisabled =
-    copy.action === "Start Simulation" || copy.action === "Generate Plan";
+  const isPrimaryActionDisabled = false;
   const isAuthRoute = pathname.startsWith("/login");
   const isTestRoomRoute = pathname.startsWith("/test-room");
+  const isCodingRoomRoute = pathname.startsWith("/coding-room");
   const sidebarOpen = mobileMenuState.open && mobileMenuState.route === pathname;
 
   useEffect(() => {
@@ -488,7 +559,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (copy.action === "Start Simulation" || copy.action === "Generate Plan") {
+    if (copy.action === "Generate Plan") {
+      window.dispatchEvent(new Event(LEARNING_PLAN_REQUEST_EVENT));
       return;
     }
 
@@ -531,6 +603,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside className="career-sidebar">
         <SidebarNav
           applicationsInLineCount={applicationsInLineCount}
+          logoSrc={logoSrc}
+          navSections={navSections}
           pathname={pathname}
           profileNameOverride={profileNameOverride}
           profilePhotoOverride={profilePhotoOverride}
@@ -547,6 +621,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside className={sidebarOpen ? "mobile-sidebar open" : "mobile-sidebar"}>
         <SidebarNav
           applicationsInLineCount={applicationsInLineCount}
+          logoSrc={logoSrc}
+          navSections={navSections}
           pathname={pathname}
           onNavigate={closeSidebar}
           profileNameOverride={profileNameOverride}
@@ -556,7 +632,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         />
       </aside>
 
-      <main className="career-main">
+      <main className={isCodingRoomRoute ? "career-main career-main-coding-room" : "career-main"}>
         <header className="career-topbar">
           <div className="topbar-copy">
             <p className="eyebrow">CareerOS</p>
@@ -609,7 +685,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <div className="career-content">{children}</div>
+        <div className={isCodingRoomRoute ? "career-content career-content-coding-room" : "career-content"}>{children}</div>
       </main>
     </div>
   );

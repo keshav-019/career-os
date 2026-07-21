@@ -2,6 +2,7 @@
 
 import {
   ArrowLeft,
+  ArrowRight,
   BookOpen,
   BrainCircuit,
   FlaskConical,
@@ -13,11 +14,12 @@ import {
   Sparkles,
   Target,
   Upload,
+  Wand2,
   X
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type ClipboardEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type ReactNode } from "react";
 import {
   useUserPracticeAttempts,
   type PracticeAttemptRecord
@@ -27,6 +29,7 @@ import {
   getMcqQuestionById,
   type PracticeQuestion
 } from "@/lib/interview/question-bank";
+import { LEARNING_PLAN_REQUEST_EVENT } from "@/lib/preferences";
 import { sanitizeExternalUrl } from "@/lib/url-safety";
 
 type LearningTrackId = "computer-science" | "ai";
@@ -120,6 +123,22 @@ type WeakTopicRow = {
 type QuestionOutcome = {
   earned: number;
   total: number;
+};
+
+type AiLearningPlanModule = {
+  priority: number;
+  reason: string;
+  subjectId: string;
+  subjectTitle: string;
+  topicCount: number;
+  trackId: string;
+  trackTitle: string;
+};
+
+type AiLearningPlan = {
+  hasTestHistory: boolean;
+  modules: AiLearningPlanModule[];
+  summary: string;
 };
 
 type PendingEditorFigure = {
@@ -740,6 +759,10 @@ function computeWeakTopicRows(attempts: PracticeAttemptRecord[]): WeakTopicRow[]
     });
 }
 
+function isLearningTrackId(value: string): value is LearningTrackId {
+  return value === "computer-science" || value === "ai";
+}
+
 export default function LearningPage() {
   const { attempts: practiceAttempts, loading: practiceAttemptsLoading } = useUserPracticeAttempts();
   const topicEditorTextareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -763,6 +786,10 @@ export default function LearningPage() {
   const [imageDraftOpen, setImageDraftOpen] = useState(false);
   const [imageDraftError, setImageDraftError] = useState<string | null>(null);
   const [imageDraftLoading, setImageDraftLoading] = useState(false);
+  const [learningPlan, setLearningPlan] = useState<AiLearningPlan | null>(null);
+  const [learningPlanLoading, setLearningPlanLoading] = useState(false);
+  const [learningPlanError, setLearningPlanError] = useState<string | null>(null);
+  const [learningPlanRequested, setLearningPlanRequested] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -862,6 +889,95 @@ export default function LearningPage() {
   const weakestTopicRows = useMemo(() => computeWeakTopicRows(completedAttempts).slice(0, 5), [completedAttempts]);
 
   const selectedTopicDetail = selectedTopicId ? topicDetailsById[selectedTopicId] ?? null : null;
+
+  const handleGenerateLearningPlan = useCallback(async () => {
+    if (learningPlanLoading) {
+      return;
+    }
+
+    if (!library || tracks.length === 0) {
+      setLearningPlanError("Learning materials are still loading. Try again in a moment.");
+      return;
+    }
+
+    setLearningPlanRequested(true);
+    setLearningPlanLoading(true);
+    setLearningPlanError(null);
+
+    try {
+      const tracksPayload = tracks
+        .filter((track) => track.available && track.subjects.length > 0)
+        .map((track) => ({
+          id: track.id,
+          title: track.title,
+          subjects: track.subjects.map((subject) => ({
+            id: subject.id,
+            order: subject.order,
+            overview: subject.overview,
+            title: subject.title,
+            topicCount: subject.topicCount
+          }))
+        }));
+
+      const weakRowsPayload = computeWeakTopicRows(completedAttempts)
+        .slice(0, 12)
+        .map((row) => ({
+          earned: row.earned,
+          percentage: row.percentage,
+          subtopic: row.subtopic,
+          topic: row.topic,
+          total: row.total
+        }));
+
+      const response = await fetch("/api/ai/learning-plan", {
+        body: JSON.stringify({ tracks: tracksPayload, weakRows: weakRowsPayload }),
+        headers: {
+          "content-type": "application/json"
+        },
+        method: "POST"
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { plan?: AiLearningPlan }
+        | { error?: string }
+        | null;
+
+      if (!response.ok || !payload || !("plan" in payload) || !payload.plan) {
+        throw new Error(
+          payload && "error" in payload && typeof payload.error === "string"
+            ? payload.error
+            : "Unable to generate a learning plan."
+        );
+      }
+
+      setLearningPlan(payload.plan);
+    } catch (planError) {
+      setLearningPlanError(planError instanceof Error ? planError.message : "Unable to generate a learning plan.");
+    } finally {
+      setLearningPlanLoading(false);
+    }
+  }, [completedAttempts, learningPlanLoading, library, tracks]);
+
+  useEffect(() => {
+    const onLearningPlanRequested = () => {
+      void handleGenerateLearningPlan();
+    };
+
+    window.addEventListener(LEARNING_PLAN_REQUEST_EVENT, onLearningPlanRequested);
+    return () => window.removeEventListener(LEARNING_PLAN_REQUEST_EVENT, onLearningPlanRequested);
+  }, [handleGenerateLearningPlan]);
+
+  const handleOpenPlanModule = (module: AiLearningPlanModule) => {
+    if (!isLearningTrackId(module.trackId)) {
+      return;
+    }
+
+    resetTopicEditorState();
+    setSelectedTrackId(module.trackId);
+    setSelectedSubjectId(module.subjectId);
+    setSelectedTopicId(null);
+    setError(null);
+    resetLearningViewport();
+  };
 
   const resetTopicEditorState = () => {
     setIsTopicEditing(false);
@@ -1181,6 +1297,88 @@ export default function LearningPage() {
   return (
     <div className="page-stack">
       {error ? <p className="settings-feedback error">{error}</p> : null}
+      {!selectedTrack && !loading ? (
+        <section className="career-card learning-ai-plan-card">
+          <div className="card-header">
+            <div>
+              <p className="eyebrow">AI Study Plan</p>
+              <h2>What should I study first?</h2>
+              <p>
+                {practiceAttemptsLoading
+                  ? "Checking your test history..."
+                  : completedAttempts.length > 0
+                    ? "Career Intelligence reads your submitted test results and points you at the curriculum subjects worth the most right now."
+                    : "You haven't submitted any practice tests yet. Career Intelligence will build a full path from the basics to the advanced material instead."}
+              </p>
+            </div>
+            <Wand2 size={18} />
+          </div>
+
+          {learningPlanError ? <p className="settings-feedback error">{learningPlanError}</p> : null}
+
+          {!learningPlanRequested ? (
+            <button
+              className="primary-button learning-ai-plan-trigger"
+              disabled={practiceAttemptsLoading}
+              onClick={() => void handleGenerateLearningPlan()}
+              type="button"
+            >
+              <Wand2 size={15} />
+              Generate My Study Plan
+            </button>
+          ) : learningPlanLoading ? (
+            <div className="empty-drop">
+              <Loader2 className="spin" size={16} />
+              Analyzing your curriculum and test history...
+            </div>
+          ) : learningPlan ? (
+            <div className="learning-ai-plan-body">
+              <p className="learning-ai-plan-summary">{learningPlan.summary}</p>
+              <ol className="learning-ai-plan-list">
+                {learningPlan.modules.map((module, index) => (
+                  <li className="learning-ai-plan-module" key={`${module.trackId}-${module.subjectId}`}>
+                    <span className="learning-ai-plan-index">{index + 1}</span>
+                    <div className="learning-ai-plan-module-body">
+                      <div className="learning-ai-plan-module-head">
+                        <strong>{module.subjectTitle}</strong>
+                        <span className="pill brand">{module.trackTitle}</span>
+                      </div>
+                      <p>{module.reason}</p>
+                      <span className="learning-ai-plan-module-meta">{module.topicCount} subtopics</span>
+                    </div>
+                    <button
+                      className="ghost-button learning-ai-plan-module-open"
+                      onClick={() => handleOpenPlanModule(module)}
+                      type="button"
+                    >
+                      Start
+                      <ArrowRight size={14} />
+                    </button>
+                  </li>
+                ))}
+              </ol>
+              <button
+                className="ghost-button learning-ai-plan-regenerate"
+                disabled={learningPlanLoading}
+                onClick={() => void handleGenerateLearningPlan()}
+                type="button"
+              >
+                <Wand2 size={14} />
+                Regenerate plan
+              </button>
+            </div>
+          ) : (
+            <button
+              className="ghost-button learning-ai-plan-trigger"
+              onClick={() => void handleGenerateLearningPlan()}
+              type="button"
+            >
+              <Wand2 size={15} />
+              Try again
+            </button>
+          )}
+        </section>
+      ) : null}
       {!selectedTrack && !loading && !practiceAttemptsLoading && weakestTopicRows.length > 0 ? (
         <section className="career-card analytics-topic-card">
           <div className="card-header">

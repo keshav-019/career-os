@@ -1,0 +1,73 @@
+name: Release Desktop
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows
+            os: windows-latest
+            command: npm run desktop:dist:win
+            artifactName: careeros-windows
+            assetPath: apps/desktop/dist/*.exe
+          - platform: linux
+            os: ubuntu-latest
+            command: npm run desktop:dist:linux
+            artifactName: careeros-linux
+            assetPath: apps/desktop/dist/*.AppImage
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build desktop artifact
+        run: ${{ matrix.command }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifactName }}
+          path: ${{ matrix.assetPath }}
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download desktop artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Publish release assets
+        run: gh release create "${{ github.ref_name }}" release-assets/* --title "CareerOS ${{ github.ref_name }}" --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

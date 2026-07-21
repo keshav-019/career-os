@@ -10,14 +10,18 @@ import {
   FlaskConical,
   Laptop,
   Loader2,
+  Network,
   Play,
   Sparkles,
   Target
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import CodingArenaBrowser from "@/components/CodingArenaBrowser";
+import SystemDesignBrowser from "@/components/SystemDesignBrowser";
+import { isDesktopAppEnabled } from "@/lib/desktop-mode";
 import { useUserJobs } from "@/lib/firebase/jobs";
 import {
   createPracticeAttempt,
@@ -65,7 +69,7 @@ const TRACK_VISUALS: Record<InterviewTestType, { imageAlt: string; imageSrc: str
 };
 
 const TRACK_BACK_COPY: Record<InterviewTestType, string> = {
-  coding: "Classic LeetCode-style coding rounds with local compiler execution for C++, Java, and Python.",
+  coding: "Classic LeetCode-style coding rounds with local compiler execution for C, C++, Java, JavaScript, Python, and Rust.",
   aptitude: "Focused on arithmetic speed, pattern detection, and elimination strategy under timed pressure.",
   "computer-science": "Focused on OS, DBMS, networking, algorithms, and practical software engineering judgment.",
   ai: "Focused on ML and deep-learning foundations, GenAI, model evaluation, and responsible AI tradeoffs."
@@ -146,9 +150,11 @@ function hasAttemptStarted(attempt: PracticeAttemptRecord): boolean {
 
 export default function InterviewPrepPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { attempts, error: attemptsError, loading: attemptsLoading, user } = useUserPracticeAttempts();
   const { jobs } = useUserJobs();
   const [selectedTrack, setSelectedTrack] = useState<InterviewTestType | null>(null);
+  const [systemDesignActive, setSystemDesignActive] = useState(false);
   const [selectedAiRoleId, setSelectedAiRoleId] = useState<string | null>(null);
   const [aiEntryTransitioning, setAiEntryTransitioning] = useState(false);
   const [aiRoleTransitioningId, setAiRoleTransitioningId] = useState<string | null>(null);
@@ -158,6 +164,23 @@ export default function InterviewPrepPage() {
   const [launchingTemplateId, setLaunchingTemplateId] = useState<string | null>(null);
   const aiEntryTimerRef = useRef<number | null>(null);
   const aiRoleTimerRef = useRef<number | null>(null);
+
+  /**
+   * Restores the correct sub-view when arriving via a deep link like /interview-prep?track=system-design or
+   * ?track=coding - used by the "Go Back" cards on /system-design/[problemId] and /coding-room/[problemId] so
+   * returning from a solve page lands back on the right track instead of the bare outer grid. Reads once on
+   * mount only (a plain query param, not kept in sync afterward - navigating between tracks in-page never
+   * touches the URL, same as before this change).
+   */
+  useEffect(() => {
+    const track = searchParams.get("track");
+    if (track === "system-design") {
+      setSystemDesignActive(true);
+    } else if (track === "coding" || track === "aptitude" || track === "computer-science" || track === "ai") {
+      setSelectedTrack(track);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const tracks = useMemo(() => listInterviewTracks(), []);
   const aiRoles = useMemo(() => listAiInterviewRoles(), []);
@@ -445,6 +468,48 @@ export default function InterviewPrepPage() {
     []
   );
 
+  if (systemDesignActive) {
+    return (
+      <div className="page-stack">
+        <section className="war-room-ai-stage" aria-label="System design track">
+          <div className="war-room-ai-top-grid">
+            <article className="career-card highlight war-room-ai-anchor-card" data-track="system-design">
+              <div className="card-header">
+                <div>
+                  <p className="eyebrow">System Design</p>
+                  <h2>Drag-and-drop architecture practice</h2>
+                  <p>
+                    Build out the canonical component tree for real interview prompts, then check estimation,
+                    tradeoff, and failure-mode questions.
+                  </p>
+                </div>
+                <Network size={20} />
+              </div>
+              <div className="tag-cloud">
+                <span>Classic + ML/MLOps</span>
+                <span>Estimation, tradeoff & failure quizzes</span>
+              </div>
+            </article>
+
+            <button
+              aria-label="Back to interview categories"
+              className="career-card war-room-go-back-card instant-tooltip-wrap"
+              onClick={() => setSystemDesignActive(false)}
+              type="button"
+            >
+              <span className="war-room-go-back-orbit" aria-hidden>
+                <ArrowLeft size={28} />
+              </span>
+              <span className="instant-tooltip">Go Back</span>
+            </button>
+          </div>
+
+          <SystemDesignBrowser />
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="page-stack">
       {attemptsError ? <p className="settings-feedback error">{attemptsError}</p> : null}
@@ -636,57 +701,97 @@ export default function InterviewPrepPage() {
               </button>
             );
           })}
+
+          <button
+            aria-pressed={false}
+            className="war-room-flip-card"
+            data-track="system-design"
+            disabled={aiEntryTransitioning}
+            onClick={() => setSystemDesignActive(true)}
+            type="button"
+          >
+            <span className="war-room-flip-inner">
+              <span className="war-room-flip-face war-room-flip-front">
+                <span className="war-room-flip-visual">
+                  <Image alt="System design interview visual" fill sizes="(max-width: 680px) 100vw, 25vw" src="/war-room/system-design-card.svg" />
+                </span>
+                <span className="war-room-flip-content">
+                  <span className="eyebrow">Interactive Track</span>
+                  <strong>System Design</strong>
+                  <span>Drag components into a top-down architecture.</span>
+                </span>
+              </span>
+
+              <span className="war-room-flip-face war-room-flip-back">
+                <span className="war-room-flip-back-head">
+                  <span className="metric-icon">
+                    <Network size={16} />
+                  </span>
+                  <strong>16 real architectures</strong>
+                </span>
+                <p>Build each design top-down, one drag at a time.</p>
+                <p>
+                  Google, Amazon, Meta, Uber, and Stripe favorites - plus a few originals - with hidden hints for every
+                  wrong placement.
+                </p>
+              </span>
+            </span>
+          </button>
         </section>
       )}
 
       {selectedTrack === "coding" ? (
-        <section className="career-card highlight desktop-exclusive-card war-room-coding-desktop-card" data-track="coding">
-          <div className="card-header">
-            <div>
-              <p className="eyebrow">Coding Track</p>
-              <h2>Coding experience is available only on CareerOS Desktop</h2>
-              <p>
-                Coding tests need local compilers and secure on-device execution, so this track is reserved for the Desktop
-                app. Web will continue to support Aptitude, Computer Science, and AI tests.
-              </p>
+        isDesktopAppEnabled() ? (
+          <CodingArenaBrowser />
+        ) : (
+          <section className="career-card highlight desktop-exclusive-card war-room-coding-desktop-card" data-track="coding">
+            <div className="card-header">
+              <div>
+                <p className="eyebrow">Coding Track</p>
+                <h2>Coding experience is available only on CareerOS Desktop</h2>
+                <p>
+                  Coding tests need local compilers and secure on-device execution, so this track is reserved for the Desktop
+                  app. Web will continue to support Aptitude, Computer Science, and AI tests.
+                </p>
+              </div>
+              <Laptop size={22} />
             </div>
-            <Laptop size={22} />
-          </div>
 
-          <div className="desktop-exclusive-actions">
-            <Link className="primary-button" href="/desktop">
-              <Download size={14} />
-              Open Desktop Setup
-            </Link>
-            <button
-              className="ghost-button"
-              onClick={() => {
-                setSelectedAiRoleId(null);
-                setSelectedTrack("aptitude");
-                setFilter("all");
-                setTemplatePage(1);
-              }}
-              type="button"
-            >
-              Open Web MCQ Tracks
-            </button>
-          </div>
+            <div className="desktop-exclusive-actions">
+              <Link className="primary-button" href="/desktop">
+                <Download size={14} />
+                Open Desktop Setup
+              </Link>
+              <button
+                className="ghost-button"
+                onClick={() => {
+                  setSelectedAiRoleId(null);
+                  setSelectedTrack("aptitude");
+                  setFilter("all");
+                  setTemplatePage(1);
+                }}
+                type="button"
+              >
+                Open Web MCQ Tracks
+              </button>
+            </div>
 
-          <div className="topic-list war-room-coding-desktop-list">
-            <div className="desktop-exclusive-row">
-              <CheckCircle2 size={15} />
-              <p>LeetCode-style coding flow with 1 easy, 1 medium, and 1 hard in a 90-minute round.</p>
+            <div className="topic-list war-room-coding-desktop-list">
+              <div className="desktop-exclusive-row">
+                <CheckCircle2 size={15} />
+                <p>LeetCode-style arena with 28 hard Google &amp; Amazon interview problems.</p>
+              </div>
+              <div className="desktop-exclusive-row">
+                <CheckCircle2 size={15} />
+                <p>Local compiler stack for C, C++, Java, JavaScript, Python, and Rust to keep execution instant and reliable.</p>
+              </div>
+              <div className="desktop-exclusive-row">
+                <CheckCircle2 size={15} />
+                <p>Desktop-first setup ensures consistent environment parity for future proctoring and analytics.</p>
+              </div>
             </div>
-            <div className="desktop-exclusive-row">
-              <CheckCircle2 size={15} />
-              <p>Local compiler stack for C++, Java, and Python to keep execution instant and reliable.</p>
-            </div>
-            <div className="desktop-exclusive-row">
-              <CheckCircle2 size={15} />
-              <p>Desktop-first setup ensures consistent environment parity for future proctoring and analytics.</p>
-            </div>
-          </div>
-        </section>
+          </section>
+        )
       ) : selectedTrack && selectedTrackMeta && (selectedTrack !== "ai" || Boolean(selectedAiRole)) ? (
         <section className="career-card war-room-library-shell" data-track={selectedTrack}>
           <div className="card-header">

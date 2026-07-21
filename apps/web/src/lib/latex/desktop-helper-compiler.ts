@@ -1,8 +1,11 @@
 "use client";
 
+import { LatexCompileError, type LatexRuntimeStatus } from "@/lib/latex-compiler";
+
 export type DesktopHelperHealth = {
   app: string;
   latexAvailable: boolean;
+  latexRuntime: LatexRuntimeStatus;
   message: string;
   ok: boolean;
   version: string;
@@ -10,7 +13,7 @@ export type DesktopHelperHealth = {
 
 const DEFAULT_HELPER_URL = "http://127.0.0.1:43823";
 const HEALTH_TIMEOUT_MS = 2_500;
-const COMPILE_TIMEOUT_MS = 120_000;
+const COMPILE_TIMEOUT_MS = 300_000;
 
 function getDesktopHelperUrl(): string {
   const configured = process.env.NEXT_PUBLIC_DESKTOP_HELPER_URL?.trim();
@@ -52,9 +55,18 @@ export async function checkDesktopHelperStatus(): Promise<DesktopHelperHealth> {
     throw new Error("Desktop helper did not return a valid health payload.");
   }
 
+  const latexRuntime: LatexRuntimeStatus = payload.latexRuntime ?? {
+    available: Boolean(payload.latexAvailable),
+    installMessage: payload.message ?? "",
+    installState: payload.latexAvailable ? "installed" : "idle",
+    kind: payload.latexAvailable ? "pdflatex" : "missing",
+    name: payload.latexAvailable ? "Local LaTeX" : "Portable LaTeX compiler"
+  };
+
   return {
     app: payload.app ?? "unknown",
-    latexAvailable: Boolean(payload.latexAvailable),
+    latexAvailable: Boolean(payload.latexAvailable || latexRuntime.available),
+    latexRuntime,
     message: payload.message ?? "",
     ok: true,
     version: payload.version ?? "unknown"
@@ -81,13 +93,18 @@ export async function compileLatexWithDesktopHelper(sourceCode: string): Promise
   );
 
   const payload = (await response.json()) as {
+    engine?: string;
     error?: string;
+    log?: string;
     ok?: boolean;
     pdfBase64?: string;
   };
 
   if (!response.ok || payload.ok !== true || !payload.pdfBase64) {
-    throw new Error(payload.error || `Desktop compile failed (${response.status}).`);
+    throw new LatexCompileError(payload.error || `Desktop compile failed (${response.status}).`, {
+      engine: payload.engine,
+      log: payload.log || payload.error
+    });
   }
 
   return `data:application/pdf;base64,${payload.pdfBase64}`;

@@ -10,7 +10,12 @@ Minimal user-facing desktop window chrome and content.
 Loaded by electron main process during app startup.
 
 ## Files In This Folder
+- `error.html` - shown if the bundled web app runtime fails to start.
 - `index.html`
+- `loading.html` - shown briefly while the bundled web app runtime boots.
+- `logo.png` - copy of `apps/web/public/careeros-dark-mode.png`, shown on the loading/error screens above. Kept in
+  sync manually with the web app's asset (see `apps/desktop/build/README.md` for the same note about the
+  electron-builder icon copy).
 
 ## Child Folders
 - No direct child folders.
