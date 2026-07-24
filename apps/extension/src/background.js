@@ -1261,8 +1261,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           // relay, same as GitHub everywhere.
           providers: {
             ...config.providers,
+            // popup.js's configureProviderButton() requires a truthy clientId too, not just enabled - this
+            // isn't actually sent anywhere for the Chrome-native flow (it's baked into manifest.json's own
+            // "oauth2" key instead), it just needs to be non-empty so the button enables correctly.
             google: IS_CHROME_NATIVE_IDENTITY
-              ? { clientId: null, enabled: true }
+              ? { clientId: "chrome-native-identity", enabled: true }
               : config.providers?.google,
           },
           redirectUri: getExtensionRedirectUri(),
