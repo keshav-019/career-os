@@ -10,6 +10,13 @@
     "storage",
     "identity"
   ],
+  "oauth2": {
+    "client_id": "718498812867-p52c7gpu88knteg1lrrne317vac6l44o.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile"
+    ]
+  },
   "host_permissions": [
     "http://localhost:3000/*",
     "http://127.0.0.1:3000/*",
