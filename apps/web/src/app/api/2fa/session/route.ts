@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
 import { TWO_FACTOR_SESSION_HEADER, TWO_FACTOR_SESSION_TTL_MS } from "@/lib/two-factor-session";
+import { extensionCorsPreflight, jsonWithExtensionCors } from "@/lib/server/extension-cors";
 import { validateTwoFactorSession } from "@/lib/server/two-factor-session";
 import { getUserTwoFactorSettings, updateUserTwoFactorSettings } from "@/lib/server/two-factor-store";
 import { verifyRequestAuth } from "@/lib/server/verify-request-auth";
@@ -14,12 +14,16 @@ function toErrorMessage(error: unknown): string {
   return "Failed to validate two-factor session.";
 }
 
+export async function OPTIONS(request: Request) {
+  return extensionCorsPreflight(request, ["GET", "OPTIONS"]);
+}
+
 export async function GET(request: Request) {
   try {
     const auth = await verifyRequestAuth(request.headers.get("authorization"));
 
     if (auth.signInProvider === "google.com" || auth.signInProvider === "github.com") {
-      return NextResponse.json({
+      return jsonWithExtensionCors(request, {
         reason: "oauth-provider-session",
         required: false,
         valid: true
@@ -29,7 +33,7 @@ export async function GET(request: Request) {
     const settings = await getUserTwoFactorSettings(auth.idToken, auth.userId);
 
     if (!settings.twoFactorEnabled) {
-      return NextResponse.json({
+      return jsonWithExtensionCors(request, {
         required: false,
         valid: true
       });
@@ -44,7 +48,7 @@ export async function GET(request: Request) {
         twoFactorSessionIssuedAt: null
       });
 
-      return NextResponse.json({
+      return jsonWithExtensionCors(request, {
         required: false,
         valid: true
       });
@@ -59,17 +63,18 @@ export async function GET(request: Request) {
     });
 
     if (!validation.valid) {
-      return NextResponse.json(
+      return jsonWithExtensionCors(
+        request,
         {
           reason: validation.reason,
           required: true,
           valid: false
         },
-        { status: 401 }
+        401
       );
     }
 
-    return NextResponse.json({
+    return jsonWithExtensionCors(request, {
       expiresAtMs: (settings.twoFactorSessionIssuedAtMs ?? 0) + TWO_FACTOR_SESSION_TTL_MS,
       required: true,
       valid: true
@@ -84,9 +89,10 @@ export async function GET(request: Request) {
         : 500;
     const safeMessage = status === 401 ? "Invalid or expired authentication token." : "Failed to validate two-factor session.";
 
-    return NextResponse.json(
+    return jsonWithExtensionCors(
+      request,
       { error: safeMessage },
-      { status }
+      status
     );
   }
 }

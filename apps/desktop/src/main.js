@@ -1,5 +1,6 @@
 const path = require("node:path");
 const { app, BrowserWindow } = require("electron");
+const { URL } = require("node:url");
 const log = require("electron-log");
 const { createWebAppRuntime } = require("./web-app");
 const { createDesktopHelperServer } = require("./helper-server");
@@ -41,6 +42,23 @@ async function createWindow() {
 
     mainWindow.once("ready-to-show", () => {
         mainWindow.show();
+    });
+
+    // Only the main window's own local origin (127.0.0.1:<web port>, and the "file://.../renderer/*.html" loading
+    // shells) should ever be a main-frame navigation target. This doesn't touch window.open()/popups (Google/GitHub
+    // sign-in relies on those) - it only stops the main window itself from navigating away, e.g. via a redirect bug
+    // or a link that isn't opened as target="_blank" - flagged in a security review as a gap worth closing.
+    mainWindow.webContents.on("will-navigate", (event, targetUrl) => {
+        try {
+            const target = new URL(targetUrl);
+            const isLocalHttp = target.protocol === "http:" && target.hostname === HELPER_HOST;
+            const isLocalFile = target.protocol === "file:";
+            if (!isLocalHttp && !isLocalFile) {
+                event.preventDefault();
+            }
+        } catch {
+            event.preventDefault();
+        }
     });
 
     await mainWindow.loadFile(path.join(__dirname, "renderer", "loading.html"));

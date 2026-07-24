@@ -1,5 +1,6 @@
-import { CalendarDays, CheckCircle2, Database, Download, Mail, PanelTop, ShieldCheck, Smartphone } from "lucide-react";
+import { CalendarDays, CheckCircle2, Database, Mail, PanelTop, ShieldCheck, Smartphone } from "lucide-react";
 import Link from "next/link";
+import { ExtensionDownloadButton } from "@/components/ExtensionDownloadButton";
 import { isFirebaseAdminConfigured } from "@/lib/firebase/admin";
 
 const integrations = [
@@ -52,19 +53,17 @@ export default function IntegrationsPage() {
           </div>
         </div>
         <div className="extension-hero-actions">
-          <button
-            className="primary-button"
-            disabled
-            title="Chrome direct install requires a Chrome Web Store or enterprise deployment channel."
-            type="button"
-          >
-            <Download size={15} />
-            Chrome Install
-          </button>
-          <Link className="ghost-button" href="/api/extension/download?browser=firefox">
-            <Download size={15} />
-            Firefox XPI
-          </Link>
+          <ExtensionDownloadButton
+            browser="chrome"
+            fileName="careeros-capture-chrome.zip"
+            label="Chrome ZIP"
+          />
+          <ExtensionDownloadButton
+            browser="firefox"
+            className="ghost-button"
+            fileName="careeros-capture-firefox.xpi"
+            label="Firefox XPI"
+          />
           <Link className="ghost-button" href="/settings">
             <ShieldCheck size={15} />
             Connect Account
@@ -76,8 +75,8 @@ export default function IntegrationsPage() {
         {[
           {
             title: "Chrome",
-            detail: "Direct installs are parked until the extension has a compliant Chrome install channel.",
-            action: "Pending"
+            detail: "Download the Chrome ZIP for Web Store upload or local unpacked testing.",
+            action: "ZIP ready"
           },
           {
             title: "Firefox",

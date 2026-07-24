@@ -15,6 +15,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase/client";
 import {
   clearStoredTwoFactorSessionToken,
+  getStoredTwoFactorSessionToken,
   setStoredTwoFactorSessionToken
 } from "@/lib/two-factor-session";
 import {
@@ -555,11 +556,16 @@ export default function SettingsPage() {
       }
 
       const idToken = await activeUser.getIdToken(true);
+      const providerId = activeUser.providerData[0]?.providerId || "password";
       const extensionToken = JSON.stringify({
         apiKey,
         apiBaseUrl: window.location.origin,
+        email: activeUser.email ?? "",
         idToken,
-        refreshToken: activeUser.refreshToken ?? ""
+        providerId,
+        refreshToken: activeUser.refreshToken ?? "",
+        twoFactorSessionToken: getStoredTwoFactorSessionToken() ?? "",
+        userId: activeUser.uid
       });
       await navigator.clipboard.writeText(extensionToken);
       setTokenNotice("Extension auth package copied. Paste it once in the Chrome extension.");

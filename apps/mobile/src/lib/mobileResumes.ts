@@ -42,7 +42,9 @@ export async function saveMobileResume(
   label: string,
   templateId: ResumeTemplateId,
   data: ResumeData,
-  createdAt?: string
+  createdAt?: string,
+  jobId?: string,
+  jobLabel?: string
 ): Promise<void> {
   const now = new Date().toISOString();
   await setDoc(doc(db, "users", userId, firestoreCollections.mobileResumes, resumeId), {
@@ -51,7 +53,9 @@ export async function saveMobileResume(
     templateId,
     data,
     createdAt: createdAt ?? now,
-    updatedAt: now
+    updatedAt: now,
+    ...(jobId ? { jobId } : {}),
+    ...(jobLabel ? { jobLabel } : {})
   });
 }
 

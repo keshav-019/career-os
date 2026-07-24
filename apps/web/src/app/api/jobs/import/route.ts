@@ -2,7 +2,13 @@ import { normalizeJobImport, type JobSource, type JobSourcePayload } from "@care
 import { NextResponse } from "next/server";
 import { getAdminDb, isFirebaseAdminConfigured } from "@/lib/firebase/admin";
 import { checkSlidingWindowRateLimit } from "@/lib/server/rate-limit";
+import { validateTwoFactorSession } from "@/lib/server/two-factor-session";
+import {
+  getUserTwoFactorSettings,
+  updateUserTwoFactorSettings
+} from "@/lib/server/two-factor-store";
 import { verifyRequestAuth } from "@/lib/server/verify-request-auth";
+import { TWO_FACTOR_SESSION_HEADER } from "@/lib/two-factor-session";
 
 export const runtime = "nodejs";
 
@@ -56,11 +62,7 @@ const CONFIGURED_ALLOWED_EXTENSION_IDS = new Set(
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const ALLOWED_CORS_ORIGINS = new Set([...DEFAULT_ALLOWED_ORIGINS, ...CONFIGURED_ALLOWED_ORIGINS]);
 
-const FIREBASE_PROJECT_ID = (process.env.FIREBASE_PROJECT_ID ?? process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? "").trim();
-
-const FIRESTORE_BASE_URL = FIREBASE_PROJECT_ID
-  ? `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(FIREBASE_PROJECT_ID)}/databases/(default)/documents`
-  : "";
+const CONFIGURED_FIREBASE_PROJECT_ID = (process.env.FIREBASE_PROJECT_ID ?? process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? "").trim();
 
 const MAX_IMPORT_BODY_BYTES = 500_000;
 const KNOWN_SKILLS = [
@@ -88,11 +90,42 @@ const KNOWN_SKILLS = [
 
 const MAX_HTML_SNAPSHOT_LENGTH = 120000;
 
+function decodeProjectIdFromIdToken(idToken: string): string {
+  const [, payloadRaw] = idToken.split(".");
+  if (!payloadRaw) {
+    return "";
+  }
+
+  try {
+    const normalizedPayload = payloadRaw.replace(/-/g, "+").replace(/_/g, "/");
+    const paddedPayload = normalizedPayload.padEnd(
+      normalizedPayload.length + ((4 - (normalizedPayload.length % 4)) % 4),
+      "="
+    );
+    const decodedPayload = Buffer.from(paddedPayload, "base64").toString("utf8");
+    const parsedPayload = JSON.parse(decodedPayload) as { aud?: unknown };
+    return typeof parsedPayload.aud === "string" ? parsedPayload.aud.trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+function firestoreBaseUrl(idToken: string): string {
+  const projectId = CONFIGURED_FIREBASE_PROJECT_ID || decodeProjectIdFromIdToken(idToken);
+  return projectId
+    ? `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents`
+    : "";
+}
+
 function isAllowedCorsOrigin(origin: string): boolean {
-  const extensionId = getChromeExtensionId(origin);
+  const extensionId = getBrowserExtensionId(origin);
   if (extensionId) {
+    if (extensionId.protocol === "moz-extension") {
+      return true;
+    }
+
     if (CONFIGURED_ALLOWED_EXTENSION_IDS.size > 0) {
-      return CONFIGURED_ALLOWED_EXTENSION_IDS.has(extensionId);
+      return CONFIGURED_ALLOWED_EXTENSION_IDS.has(extensionId.id);
     }
 
     // During local development we allow unpacked extension ids when an explicit allow-list is not configured.
@@ -102,14 +135,17 @@ function isAllowedCorsOrigin(origin: string): boolean {
   return ALLOWED_CORS_ORIGINS.has(origin);
 }
 
-function getChromeExtensionId(origin: string): string | null {
+function getBrowserExtensionId(origin: string): { id: string; protocol: "chrome-extension" | "moz-extension" } | null {
   try {
     const parsed = new URL(origin);
-    if (parsed.protocol !== "chrome-extension:") {
+    if (parsed.protocol !== "chrome-extension:" && parsed.protocol !== "moz-extension:") {
       return null;
     }
 
-    return parsed.hostname;
+    return {
+      id: parsed.hostname,
+      protocol: parsed.protocol === "moz-extension:" ? "moz-extension" : "chrome-extension"
+    };
   } catch {
     return null;
   }
@@ -129,7 +165,7 @@ function isAllowedCorsOriginForRequest(request: Request, origin: string): boolea
 
 function buildCorsHeaders(request: Request): Headers {
   const headers = new Headers({
-    "Access-Control-Allow-Headers": "Authorization, Content-Type",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type, X-2FA-Session",
     "Access-Control-Allow-Methods": "OPTIONS, POST",
     Vary: "Origin"
   });
@@ -174,6 +210,52 @@ function validateImportRequest(request: Request): string | null {
   }
 
   return null;
+}
+
+async function validateTwoFactorForImport(
+  request: Request,
+  auth: Awaited<ReturnType<typeof verifyRequestAuth>>
+): Promise<NextResponse | null> {
+  if (auth.signInProvider === "google.com" || auth.signInProvider === "github.com") {
+    return null;
+  }
+
+  const settings = await getUserTwoFactorSettings(auth.idToken, auth.userId);
+  if (!settings.twoFactorEnabled) {
+    return null;
+  }
+
+  if (!settings.twoFactorSecret) {
+    await updateUserTwoFactorSettings(auth.idToken, auth.userId, {
+      twoFactorEnabled: false,
+      twoFactorPendingSecret: null,
+      twoFactorSessionHash: null,
+      twoFactorSessionIssuedAt: null
+    });
+
+    return null;
+  }
+
+  const validation = validateTwoFactorSession({
+    authTimeMs: auth.authTimeMs,
+    issuedAtMs: settings.twoFactorSessionIssuedAtMs,
+    providedToken: request.headers.get(TWO_FACTOR_SESSION_HEADER),
+    storedTokenHash: settings.twoFactorSessionHash
+  });
+
+  if (validation.valid) {
+    return null;
+  }
+
+  return jsonWithCors(
+    request,
+    {
+      code: "TWO_FACTOR_REQUIRED",
+      error: "Authenticator verification is required before saving jobs from the extension.",
+      reason: validation.reason
+    },
+    401
+  );
 }
 
 function readUtf8ByteLength(value: string): number {
@@ -493,16 +575,22 @@ async function persistImportedJob(
   record: Record<string, unknown>
 ): Promise<void> {
   if (isFirebaseAdminConfigured) {
-    await getAdminDb()
-      .collection("users")
-      .doc(userId)
-      .collection("jobs")
-      .doc(jobId)
-      .set(record, { merge: true });
-    return;
+    try {
+      await getAdminDb()
+        .collection("users")
+        .doc(userId)
+        .collection("jobs")
+        .doc(jobId)
+        .set(record, { merge: true });
+      return;
+    } catch {
+      // Fall back to the signed-in user's REST write below. This keeps imports working when
+      // local/prod Admin SDK credentials can verify auth but cannot write Firestore documents.
+    }
   }
 
-  if (!FIRESTORE_BASE_URL) {
+  const documentsBaseUrl = firestoreBaseUrl(idToken);
+  if (!documentsBaseUrl) {
     throw new Error("Firestore project is not configured for import route.");
   }
 
@@ -513,7 +601,7 @@ async function persistImportedJob(
   });
 
   const response = await fetch(
-    `${FIRESTORE_BASE_URL}/users/${encodeURIComponent(userId)}/jobs/${encodeURIComponent(jobId)}?${updateMask.toString()}`,
+    `${documentsBaseUrl}/users/${encodeURIComponent(userId)}/jobs/${encodeURIComponent(jobId)}?${updateMask.toString()}`,
     {
       method: "PATCH",
       headers: {
@@ -555,6 +643,10 @@ export async function POST(request: Request) {
     }
 
     const auth = await verifyRequestAuth(request.headers.get("authorization"));
+    const twoFactorResponse = await validateTwoFactorForImport(request, auth);
+    if (twoFactorResponse) {
+      return twoFactorResponse;
+    }
 
     const rateLimit = checkSlidingWindowRateLimit({
       key: `jobs-import:${auth.userId}`,
@@ -685,6 +777,13 @@ export async function POST(request: Request) {
         : 500;
 
     const safeMessage = status === 401 ? "Invalid or expired authentication token." : "Failed to import job.";
-    return jsonWithCors(request, { error: safeMessage }, status);
+    return jsonWithCors(
+      request,
+      {
+        error: safeMessage,
+        ...(process.env.NODE_ENV === "production" ? {} : { detail: message })
+      },
+      status
+    );
   }
 }

@@ -1,7 +1,18 @@
-import { NextResponse } from "next/server";
+import { extensionCorsPreflight, jsonWithExtensionCors } from "@/lib/server/extension-cors";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+function readFirstEnv(...names: string[]): string {
+  for (const name of names) {
+    const value = (process.env[name] ?? "").trim();
+    if (value) {
+      return value;
+    }
+  }
+
+  return "";
+}
 
 /**
  * Public, unauthenticated (there's no user yet - this is consulted BEFORE sign-in). Tells the Chrome extension
@@ -9,15 +20,32 @@ export const dynamic = "force-dynamic";
  * to build each provider's authorize URL. The matching client SECRETS never leave this server - see
  * /api/extension/oauth/[provider]/route.ts, which is the only place they're read.
  */
-export async function GET() {
-  const googleClientId = (process.env.GOOGLE_OAUTH_CLIENT_ID ?? "").trim();
-  const githubClientId = (process.env.GITHUB_OAUTH_CLIENT_ID ?? "").trim();
+export async function OPTIONS(request: Request) {
+  return extensionCorsPreflight(request, ["GET", "OPTIONS"]);
+}
 
-  return NextResponse.json({
+export async function GET(request: Request) {
+  const firebaseApiKey = readFirstEnv("FIREBASE_API_KEY", "NEXT_PUBLIC_FIREBASE_API_KEY");
+  const googleClientId = readFirstEnv("GOOGLE_OAUTH_CLIENT_ID", "NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID");
+  const googleClientSecret = readFirstEnv("GOOGLE_OAUTH_CLIENT_SECRET");
+  const githubClientId = readFirstEnv("GITHUB_OAUTH_CLIENT_ID", "NEXT_PUBLIC_GITHUB_OAUTH_CLIENT_ID");
+  const githubClientSecret = readFirstEnv("GITHUB_OAUTH_CLIENT_SECRET");
+
+  return jsonWithExtensionCors(request, {
+    auth: {
+      emailPasswordEnabled: Boolean(firebaseApiKey),
+      firebaseApiKey
+    },
     ok: true,
     providers: {
-      google: googleClientId ? { enabled: true, clientId: googleClientId } : { enabled: false, clientId: null },
-      github: githubClientId ? { enabled: true, clientId: githubClientId } : { enabled: false, clientId: null }
+      google:
+        googleClientId && googleClientSecret
+          ? { enabled: true, clientId: googleClientId }
+          : { enabled: false, clientId: googleClientId || null },
+      github:
+        githubClientId && githubClientSecret
+          ? { enabled: true, clientId: githubClientId }
+          : { enabled: false, clientId: githubClientId || null }
     }
   });
 }

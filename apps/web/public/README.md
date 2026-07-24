@@ -14,7 +14,8 @@ Referenced by route UIs, interview question metadata, and resume tooling.
   app is in dark mode). This is the default everywhere outside the app; see `AppShell.tsx` for the in-app light-mode
   swap.
 - `careeros-light-mode.png` - sidebar logo shown only when the in-app theme toggle is set to light mode.
-- `careeros-logo-128.png` - superseded by the two files above; kept only because nothing currently deletes it.
+- `careeros-logo-128.png` - 128x128 derivative generated from `careeros-dark-mode.png` for small icon surfaces such
+  as 2FA setup and extension/store assets.
 - `favicon.ico` - superseded by the PNG favicon declared in `app/layout.tsx` metadata; browsers that ignore the
   `<link rel="icon">` tag fall back to this.
 

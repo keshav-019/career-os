@@ -1,0 +1,26 @@
+appId: com.careeros.CareerOS
+productName: CareerOS
+executableName: careeros
+artifactName: CareerOS-${version}-${arch}.${ext}
+icon: build/icon.png
+files:
+  - src/**/*
+  - build/icon.png
+  - package.json
+  - "!src/**/*.test.js"
+extraResources:
+  - from: ../web/.next/standalone
+    to: web
+    filter:
+      - "**/*"
+directories:
+  output: dist
+linux:
+  target:
+    - dir
+  icon: build/icon.png
+  category: Office
+  desktop:
+    StartupWMClass: CareerOS
+  synopsis: Career workspace for resumes, jobs, interviews, and applications.
+  description: CareerOS is a desktop career workspace for managing resumes, jobs, interview preparation, coding practice, and AI-assisted application workflows.

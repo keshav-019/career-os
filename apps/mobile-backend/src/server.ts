@@ -6,7 +6,11 @@ import systemDesignRouter from "./routes/systemDesign";
 
 const app = express();
 
-app.use(cors());
+// This backend has no legitimate browser-based caller - only the mobile app's native fetch, which CORS doesn't
+// apply to at all (CORS is a browser-enforced mechanism; it's a no-op for RN/curl/server-to-server requests that
+// never send an Origin header). Disabling it here just stops the previous default of reflecting every browser
+// origin, which was flagged in a security review, with zero effect on the mobile app.
+app.use(cors({ origin: false }));
 app.use(express.json({ limit: "5mb" }));
 
 app.get("/", (_req, res) => {

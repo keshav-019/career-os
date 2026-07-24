@@ -1,4 +1,4 @@
-import rawBank from "@/lib/interview/ai-role-questions.min.json";
+import { getR2Json } from "@/lib/r2/client";
 
 type OptionId = "a" | "b" | "c" | "d";
 type Difficulty = "easy" | "medium" | "hard";
@@ -23,6 +23,12 @@ export type ExternalAiQuestion = {
   prompt: string;
   roleId: string;
   roleName: string;
+};
+
+type AiRoleBank = {
+  externalAiRoles: ExternalAiRoleDefinition[];
+  externalAiQuestions: ExternalAiQuestion[];
+  hasExternalAiRoleBank: boolean;
 };
 
 function asString(value: unknown): string {
@@ -177,8 +183,27 @@ function parseBank(value: unknown): {
   };
 }
 
-const parsed = parseBank(rawBank);
+// This used to be a static `import rawBank from "./ai-role-questions.min.json"` (5.6MB), which meant every server
+// bundle (and, transitively before Part 5's client rerouting, every browser bundle that imported question-bank.ts)
+// paid for the full parsed bank up front. It's now fetched from R2 on first use and cached in-process - see
+// ensureAiRoleBankLoaded().
+let cache: AiRoleBank | null = null;
+let loadPromise: Promise<AiRoleBank> | null = null;
 
-export const externalAiRoles = parsed.roles;
-export const externalAiQuestions = parsed.questions;
-export const hasExternalAiRoleBank = externalAiRoles.length > 0 && externalAiQuestions.length > 0;
+export async function ensureAiRoleBankLoaded(): Promise<AiRoleBank> {
+  if (cache) {
+    return cache;
+  }
+  if (!loadPromise) {
+    loadPromise = getR2Json<unknown>("interview-content/ai-role-questions.json").then((rawBank) => {
+      const parsed = parseBank(rawBank);
+      return {
+        externalAiRoles: parsed.roles,
+        externalAiQuestions: parsed.questions,
+        hasExternalAiRoleBank: parsed.roles.length > 0 && parsed.questions.length > 0
+      };
+    });
+  }
+  cache = await loadPromise;
+  return cache;
+}

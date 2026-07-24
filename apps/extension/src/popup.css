@@ -15,6 +15,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   width: 376px;
   margin: 0;
@@ -176,6 +180,53 @@ textarea:focus {
   gap: 8px;
 }
 
+.email-auth-form,
+.mfa-form {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(186, 212, 248, 0.14);
+}
+
+.field-row {
+  display: grid;
+  gap: 5px;
+}
+
+.password-input-wrap {
+  position: relative;
+}
+
+.password-input-wrap input {
+  padding-right: 42px;
+}
+
+.password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  display: grid;
+  width: 30px;
+  min-height: 30px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #cbe0ff;
+  transform: translateY(-50%);
+}
+
+.password-toggle:hover {
+  background: rgba(188, 209, 243, 0.14);
+  transform: translateY(-50%);
+}
+
+.password-toggle-icon {
+  width: 16px;
+  height: 16px;
+}
+
 .provider-button {
   display: flex;
   align-items: center;
@@ -193,22 +244,24 @@ textarea:focus {
 .provider-icon {
   display: inline-grid;
   place-items: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1;
-  color: #0b1a2f;
-  background: #eef4ff;
+  width: 19px;
+  height: 19px;
+  border-radius: 999px;
+  background: #f8fbff;
 }
 
-.provider-google .provider-icon {
-  background: linear-gradient(145deg, #4285f4, #34a853);
-  color: #fff;
+.provider-icon svg {
+  display: block;
+  width: 14px;
+  height: 14px;
 }
 
-.provider-github .provider-icon {
+.provider-icon-google svg {
+  width: 15px;
+  height: 15px;
+}
+
+.provider-icon-github {
   background: #24292f;
   color: #fff;
 }
