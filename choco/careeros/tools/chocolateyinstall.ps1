@@ -3,8 +3,7 @@ $ErrorActionPreference = 'Stop'
 $packageName = 'careeros'
 $toolsDir    = "$(Split-Path -Parent $MyInvocation.MyCommand.Definition)"
 $url         = 'https://github.com/keshav-019/career-os/releases/download/v1.0.0/CareerOS-1.0.0-x64.exe'
-# TODO: replace with the real SHA-256 from checksums.txt on the v1.0.0 release once the build finishes.
-$checksum    = 'REPLACE_WITH_SHA256'
+$checksum    = '12f0eea8b60ae755415f5c506043c944c88463516574d67eea5c2b09e0edf9cd'
 $checksumType = 'sha256'
 
 $packageArgs = @{

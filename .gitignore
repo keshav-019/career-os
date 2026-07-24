@@ -17,6 +17,7 @@ apps/extension.crx
 apps/extension.pem
 apps/extension.zip
 release-assets/
+*.nupkg
 logs/
 node_modules/
 npm-debug.log*
