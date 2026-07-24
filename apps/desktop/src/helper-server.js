@@ -2,6 +2,7 @@ const cors = require("cors");
 const express = require("express");
 const { createLatexRuntime } = require("./latex-runtime");
 const { createCodingArena } = require("./coding");
+const { registerOAuthRoutes } = require("./oauth");
 
 function extractBearerToken(authorizationHeader) {
   if (typeof authorizationHeader !== "string") return null;
@@ -54,6 +55,8 @@ function createDesktopHelperServer({ app, host = "127.0.0.1", log, port = 43823 
   api.get("/health", (_req, res) => {
     res.json(buildHealthPayload());
   });
+
+  registerOAuthRoutes(api, { host, port, log });
 
   api.post("/latex/install", async (_req, res) => {
     try {
