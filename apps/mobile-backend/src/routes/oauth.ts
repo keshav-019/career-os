@@ -2,23 +2,15 @@ import { Router } from "express";
 import { checkSlidingWindowRateLimit } from "@/lib/server/rate-limit";
 
 /**
- * Server-side half of the mobile app's "Continue with Google/GitHub" flow (see apps/mobile/src/lib/oauth.ts for
- * the client half). Mirrors apps/web/src/app/api/extension/oauth/[provider]/route.ts's reasoning: a public app
- * bundle can't safely hold a Google/GitHub OAuth client secret, so the client only ever gets an authorization
- * CODE and hands it here for the actual token exchange.
+ * Server-side half of the mobile app's "Continue with GitHub" flow (see apps/mobile/src/lib/oauth.ts for the
+ * client half). GitHub OAuth Apps have no public/native client type - code exchange always requires a client
+ * secret, so this app can't do it alone. Google sign-in does NOT go through here: it uses a dedicated
+ * Android-type OAuth client (public, PKCE, no secret) entirely client-side - see oauth.ts.
  *
- * Unlike the extension route, this does NOT also mint a Firebase idToken/refreshToken via accounts:signInWithIdp
- * - the mobile app already has the full Firebase JS SDK loaded, so it signs in itself via
- * GoogleAuthProvider.credential()/GithubAuthProvider.credential() + signInWithCredential() once it has the
+ * This does NOT also mint a Firebase idToken/refreshToken - the mobile app already has the full Firebase JS SDK
+ * loaded, so it signs in itself via GithubAuthProvider.credential() + signInWithCredential() once it has the
  * provider access token from /exchange below. That's the officially supported SDK path (same call
  * signInWithPopup makes internally on web) and keeps the SDK's own persistence/refresh timers in charge.
- *
- * Also reuses the *same* Google/GitHub OAuth app registrations as the web app and extension (same env vars) -
- * both are "confidential" client types (Google "Web application", GitHub OAuth App) that require a secret for
- * code exchange, so mobile goes through this relay instead of registering new native OAuth clients. Google and
- * GitHub also don't allow a custom URI scheme (careeros://) as an authorized redirect for that client type, so
- * /callback below is a plain https URL that the provider redirects to, which then 302s onward to the app's
- * careeros:// scheme - see the GET handler.
  */
 
 const router = Router();
@@ -33,19 +25,7 @@ function readFirstEnv(...names: string[]): string {
   return "";
 }
 
-type ProviderId = "google" | "github";
-
-function isProviderId(value: string): value is ProviderId {
-  return value === "google" || value === "github";
-}
-
-function providerCredentials(provider: ProviderId): { clientId: string; clientSecret: string } {
-  if (provider === "google") {
-    return {
-      clientId: readFirstEnv("GOOGLE_OAUTH_CLIENT_ID", "NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID"),
-      clientSecret: readFirstEnv("GOOGLE_OAUTH_CLIENT_SECRET")
-    };
-  }
+function githubCredentials(): { clientId: string; clientSecret: string } {
   return {
     clientId: readFirstEnv("GITHUB_OAUTH_CLIENT_ID", "NEXT_PUBLIC_GITHUB_OAUTH_CLIENT_ID"),
     clientSecret: readFirstEnv("GITHUB_OAUTH_CLIENT_SECRET")
@@ -59,19 +39,16 @@ function clientIp(req: import("express").Request): string {
 }
 
 router.get("/config", (_req, res) => {
-  const google = providerCredentials("google");
-  const github = providerCredentials("github");
+  const { clientId, clientSecret } = githubCredentials();
   res.json({
     ok: true,
     providers: {
-      google: google.clientId && google.clientSecret ? { enabled: true, clientId: google.clientId } : { enabled: false },
-      github: github.clientId && github.clientSecret ? { enabled: true, clientId: github.clientId } : { enabled: false }
+      github: clientId && clientSecret ? { enabled: true, clientId } : { enabled: false }
     }
   });
 });
 
-router.get("/:provider/callback", (req, res) => {
-  const provider = req.params.provider;
+router.get("/github/callback", (req, res) => {
   const params = new URLSearchParams();
   if (typeof req.query.code === "string") params.set("code", req.query.code);
   if (typeof req.query.state === "string") params.set("state", req.query.state);
@@ -79,77 +56,10 @@ router.get("/:provider/callback", (req, res) => {
   if (typeof req.query.error_description === "string") {
     params.set("error_description", req.query.error_description);
   }
-  if (!isProviderId(provider) && !params.has("error")) {
-    params.set("error", "unsupported_provider");
-  }
   res.redirect(`careeros://oauthredirect?${params.toString()}`);
 });
 
-type TokenExchangeResult = { accessToken: string } | { error: string };
-
-async function exchangeGoogleCode(code: string, redirectUri: string): Promise<TokenExchangeResult> {
-  const { clientId, clientSecret } = providerCredentials("google");
-  if (!clientId || !clientSecret) {
-    return { error: "Google sign-in isn't configured on this server yet." };
-  }
-
-  const response = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      code,
-      grant_type: "authorization_code",
-      redirect_uri: redirectUri
-    }).toString()
-  });
-
-  const payload = (await response.json().catch(() => ({}))) as {
-    access_token?: string;
-    error_description?: string;
-    error?: string;
-  };
-  if (!response.ok || !payload.access_token) {
-    return { error: payload.error_description || payload.error || "Google rejected that sign-in attempt." };
-  }
-  return { accessToken: payload.access_token };
-}
-
-async function exchangeGithubCode(code: string, redirectUri: string): Promise<TokenExchangeResult> {
-  const { clientId, clientSecret } = providerCredentials("github");
-  if (!clientId || !clientSecret) {
-    return { error: "GitHub sign-in isn't configured on this server yet." };
-  }
-
-  const response = await fetch("https://github.com/login/oauth/access_token", {
-    method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      code,
-      redirect_uri: redirectUri
-    }).toString()
-  });
-
-  const payload = (await response.json().catch(() => ({}))) as {
-    access_token?: string;
-    error_description?: string;
-    error?: string;
-  };
-  if (!response.ok || !payload.access_token) {
-    return { error: payload.error_description || payload.error || "GitHub rejected that sign-in attempt." };
-  }
-  return { accessToken: payload.access_token };
-}
-
-router.post("/:provider/exchange", async (req, res) => {
-  const provider = req.params.provider;
-  if (!isProviderId(provider)) {
-    return res.status(400).json({ ok: false, error: `Unsupported provider "${provider}".` });
-  }
-
+router.post("/github/exchange", async (req, res) => {
   const rateLimit = checkSlidingWindowRateLimit({
     key: `oauth-exchange:${clientIp(req)}`,
     maxRequests: 20,
@@ -166,14 +76,38 @@ router.post("/:provider/exchange", async (req, res) => {
     return res.status(400).json({ ok: false, error: "Expected { code, redirectUri }." });
   }
 
+  const { clientId, clientSecret } = githubCredentials();
+  if (!clientId || !clientSecret) {
+    return res.status(400).json({ ok: false, error: "GitHub sign-in isn't configured on this server yet." });
+  }
+
   try {
-    const exchanged = provider === "google" ? await exchangeGoogleCode(code, redirectUri) : await exchangeGithubCode(code, redirectUri);
-    if ("error" in exchanged) {
-      return res.status(400).json({ ok: false, error: exchanged.error });
+    const response = await fetch("https://github.com/login/oauth/access_token", {
+      method: "POST",
+      headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json" },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        code,
+        redirect_uri: redirectUri
+      }).toString()
+    });
+
+    const payload = (await response.json().catch(() => ({}))) as {
+      access_token?: string;
+      error_description?: string;
+      error?: string;
+    };
+    if (!response.ok || !payload.access_token) {
+      return res.status(400).json({
+        ok: false,
+        error: payload.error_description || payload.error || "GitHub rejected that sign-in attempt."
+      });
     }
-    res.json({ ok: true, accessToken: exchanged.accessToken });
+
+    res.json({ ok: true, accessToken: payload.access_token });
   } catch (error) {
-    console.error("Mobile OAuth exchange failed.", error);
+    console.error("Mobile GitHub OAuth exchange failed.", error);
     res.status(500).json({ ok: false, error: error instanceof Error ? error.message : "Unable to complete sign-in." });
   }
 });
