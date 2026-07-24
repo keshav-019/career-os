@@ -12,6 +12,29 @@ const MAX_SOURCE_LENGTH = 2_000_000;
 const MAX_LOG_CHARS = 22_000;
 const DISABLE_PORTABLE_LATEX_ENV = "CAREEROS_DISABLE_PORTABLE_LATEX";
 
+// Tectonic has no bundled TeX install - it fetches individual package/font files lazily over the network the
+// first time each one is needed, then caches them locally. A brand new install has an empty cache, so a user's
+// *first* real compile pays for all of that network I/O at once, which reads as "the app is really slow" with
+// no explanation. This document exercises the same packages apps/web/src/lib/resume-templates.ts's real resume
+// templates use (both templates' \usepackage lists, combined), so warming the cache with it up front - see
+// warmCache() below - covers the common case; anything a specific template needs beyond this still gets fetched
+// on that first real compile, just with less left to fetch.
+const WARMUP_SOURCE = `\\documentclass[10pt, letterpaper]{article}
+\\usepackage[margin=1cm]{geometry}
+\\usepackage{titlesec}
+\\usepackage{tabularx}
+\\usepackage{array}
+\\usepackage{xcolor}
+\\usepackage{enumitem}
+\\usepackage{fontawesome5}
+\\usepackage{hyperref}
+\\usepackage{charter}
+\\usepackage{paracol}
+\\begin{document}
+Warming up.
+\\end{document}
+`;
+
 const TECTONIC_TARGETS = {
   "darwin-arm64": {
     archiveName: `tectonic-${TECTONIC_VERSION}-aarch64-apple-darwin.tar.gz`,
@@ -481,6 +504,11 @@ function createLatexRuntime({ app, log }) {
     message: "Portable compiler has not been installed yet.",
     state: "idle",
   };
+  let warmPromise = null;
+  let warmState = {
+    message: "",
+    state: "idle",
+  };
 
   const target = getTectonicTarget();
   const portableLatexDisabled = process.env[DISABLE_PORTABLE_LATEX_ENV] === "1";
@@ -582,16 +610,17 @@ function createLatexRuntime({ app, log }) {
   function getStatus() {
     const tectonicRuntime = getTectonicRuntime();
     if (tectonicRuntime) {
-      return tectonicRuntime;
+      return { ...tectonicRuntime, bundleWarm: warmState };
     }
 
     const pdflatexRuntime = getPdflatexRuntime();
     if (pdflatexRuntime) {
-      return pdflatexRuntime;
+      return { ...pdflatexRuntime, bundleWarm: warmState };
     }
 
     return {
       available: false,
+      bundleWarm: warmState,
       installMessage: installState.message,
       installState: installState.state,
       kind: "missing",
@@ -648,6 +677,38 @@ function createLatexRuntime({ app, log }) {
       });
 
     return installPromise;
+  }
+
+  /** Fire-and-forget cache warm-up, meant to be called once when the app starts (see main.js) rather than
+   *  blocking anything - by the time the user actually opens Resume Studio, Tectonic's local cache is hopefully
+   *  already populated instead of them paying for it on their first real compile. Reuses compile() itself so it
+   *  gets the same install-if-needed + tectonic-with-pdflatex-fallback behavior as a real compile. */
+  function warmCache() {
+    if (warmPromise) {
+      return warmPromise;
+    }
+    if (warmState.state === "warm" || portableLatexDisabled) {
+      return Promise.resolve();
+    }
+
+    warmState = { message: "Preparing LaTeX for first use...", state: "warming" };
+    warmPromise = compile(WARMUP_SOURCE)
+      .then(() => {
+        warmState = { message: "LaTeX is ready.", state: "warm" };
+      })
+      .catch((error) => {
+        // Not fatal - a real compile will just retry this work itself and surface any real error there.
+        warmState = {
+          message: error instanceof Error ? error.message : "Could not prepare LaTeX ahead of time.",
+          state: "failed",
+        };
+        log?.warn?.("LaTeX cache warm-up failed (will retry on first real compile).", error);
+      })
+      .finally(() => {
+        warmPromise = null;
+      });
+
+    return warmPromise;
   }
 
   async function compileWithTectonic(runtime, source) {
@@ -853,6 +914,7 @@ function createLatexRuntime({ app, log }) {
     getStatus,
     installCompiler,
     maxSourceLength: MAX_SOURCE_LENGTH,
+    warmCache,
   };
 }
 
