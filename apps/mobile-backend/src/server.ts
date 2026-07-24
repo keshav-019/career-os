@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import aiRouter from "./routes/ai";
 import interviewRouter from "./routes/interview";
+import oauthRouter from "./routes/oauth";
 import systemDesignRouter from "./routes/systemDesign";
 
 const app = express();
@@ -20,6 +21,7 @@ app.get("/", (_req, res) => {
 app.use("/api/interview", interviewRouter);
 app.use("/api/system-design", systemDesignRouter);
 app.use("/api/ai", aiRouter);
+app.use("/api/oauth", oauthRouter);
 
 const port = Number(process.env.PORT) || 8080;
 app.listen(port, () => {
