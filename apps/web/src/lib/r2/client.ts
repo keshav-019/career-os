@@ -66,11 +66,27 @@ export async function getR2SignedUrl(key: string, expiresInSeconds = 3600): Prom
   return getSignedUrl(getClient(), command, { expiresIn: expiresInSeconds });
 }
 
-/** Fetches a private JSON object straight off R2 (no signed URL round trip needed - this is server-only code, the
- *  bucket credentials already grant direct read access). Used by lib/interview/*-bank.ts and
- *  lib/learning/material-library.ts to lazily load the big question-bank/learning-material JSON that used to be
- *  bundled at build time via a static `import ... from "*.json"` - see each module's ensure*Loaded() function. */
+/** Fetches a JSON object from R2. Used by lib/interview/*-bank.ts and lib/learning/material-library.ts to lazily
+ *  load the big question-bank/learning-material JSON that used to be bundled at build time via a static
+ *  `import ... from "*.json"` - see each module's ensure*Loaded() function. None of this content is sensitive
+ *  (unlike resumes, which must stay on the presigned-URL path in getR2SignedUrl), so this tries the bucket's
+ *  public r2.dev URL first - a plain fetch, no S3 credentials needed at all. That matters beyond just avoiding
+ *  an unnecessary signed request: the desktop app's packaged build has no way to safely ship real R2 API
+ *  credentials (unlike NEXT_PUBLIC_R2_PUBLIC_BASE_URL, which is public by design), so without this fallback
+ *  order, every one of these lazy-loaded content banks would silently fail to load in the desktop app. Falls
+ *  back to the authenticated API if the public fetch fails or no public base URL is configured. */
 export async function getR2Json<T>(key: string): Promise<T> {
+  if (R2_PUBLIC_BASE_URL) {
+    try {
+      const response = await fetch(r2PublicUrl(key));
+      if (response.ok) {
+        return (await response.json()) as T;
+      }
+    } catch {
+      // Fall through to the authenticated API below.
+    }
+  }
+
   const response = await getClient().send(new GetObjectCommand({ Bucket: R2_BUCKET_NAME, Key: key }));
   const body = await response.Body?.transformToString();
   if (!body) {
