@@ -1,5 +1,5 @@
 {
-  "name": "@careeros/desktop",
+  "name": "careeros-desktop",
   "version": "1.0.0",
   "private": true,
   "desktopName": "com.careeros.CareerOS.desktop",
