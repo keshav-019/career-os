@@ -48,7 +48,7 @@ modules:
         ELECTRON_CACHE: /run/build/careeros/flatpak-node/electron-cache
     build-commands:
       - npm ci --offline
-      - npm run dist:flatpak:dir --workspace @careeros/desktop
+      - npm run dist:flatpak:dir --workspace careeros-desktop
       - cp -a apps/desktop/dist/linux-unpacked ${FLATPAK_DEST}/careeros
       - install -Dm755 ../careeros-flatpak ${FLATPAK_DEST}/bin/careeros
       - install -Dm755 ../latex/careeros-latex-env ${FLATPAK_DEST}/share/careeros/latex/careeros-latex-env
