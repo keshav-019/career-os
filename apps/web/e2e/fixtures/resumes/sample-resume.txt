@@ -1,0 +1,16 @@
+JORDAN LEE
+Email: jordan.lee.sample@example.com | Mobile: +1-555-0100
+
+EDUCATION
+Example State University - B.S. in Computer Science, 2018-2022
+
+SKILLS SUMMARY
+Languages: Java, JavaScript, TypeScript, Python, SQL
+Backend: Spring Boot, Node.js, REST APIs
+
+EXPERIENCE
+Software Engineer, Example Tech Inc, Jun 2022 - Present
+Built and maintained REST APIs serving 50k+ daily active users.
+
+PROJECTS
+Sample Task Tracker - A full-stack task management app.
