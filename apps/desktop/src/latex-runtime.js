@@ -238,26 +238,48 @@ function escapeXml(value) {
     .replace(/"/g, "&quot;");
 }
 
-async function createTectonicEnvironment(workDirectory) {
-  if (process.platform !== "win32") {
-    return process.env;
+/** Font directories to point an isolated fonts.conf at, per platform - the actual font *files* on the system,
+ *  not its fontconfig *configuration* (see below for why those are kept separate). */
+function getSystemFontDirectories() {
+  if (process.platform === "win32") {
+    const windowsDirectory = process.env.WINDIR || "C:\\Windows";
+    return [path.join(windowsDirectory, "Fonts").replace(/\\/g, "/")];
   }
 
+  if (process.platform === "darwin") {
+    return ["/System/Library/Fonts", "/Library/Fonts", path.join(os.homedir(), "Library", "Fonts")];
+  }
+
+  return [
+    "/usr/share/fonts",
+    "/usr/local/share/fonts",
+    path.join(os.homedir(), ".local", "share", "fonts"),
+    path.join(os.homedir(), ".fonts"),
+  ];
+}
+
+async function createTectonicEnvironment(workDirectory) {
   const fontConfigDirectory = path.join(workDirectory, "fontconfig");
   const fontCacheDirectory = path.join(workDirectory, "font-cache");
-  const windowsDirectory = process.env.WINDIR || "C:\\Windows";
-  const windowsFontDirectory = path
-    .join(windowsDirectory, "Fonts")
-    .replace(/\\/g, "/");
   const fontConfigPath = path.join(fontConfigDirectory, "fonts.conf");
 
   await fsp.mkdir(fontConfigDirectory, { recursive: true });
   await fsp.mkdir(fontCacheDirectory, { recursive: true });
+  // A minimal, hand-written fonts.conf pointed only at font *directories* - deliberately never <include>s the
+  // system's own fontconfig config (e.g. Linux's /etc/fonts/fonts.conf and everything under conf.d/), since
+  // rolling-release distros (confirmed on Garuda) ship fontconfig XML using newer syntax/attributes than
+  // whatever fontconfig version Tectonic's binary links against, and parsing that mismatch corrupts memory and
+  // crashes the process (SIGABRT / "free(): invalid pointer", surfaced to us as exit code null - no signal
+  // info is available through Node's child_process on a stock spawn()). Setting FONTCONFIG_FILE to this file
+  // instead of leaving it unset means fontconfig never touches the real system config at all, while still
+  // finding the same actual font files.
   await fsp.writeFile(
     fontConfigPath,
     `<?xml version="1.0"?>
 <fontconfig>
-  <dir>${escapeXml(windowsFontDirectory)}</dir>
+${getSystemFontDirectories()
+  .map((dir) => `  <dir>${escapeXml(dir)}</dir>`)
+  .join("\n")}
   <cachedir>${escapeXml(fontCacheDirectory.replace(/\\/g, "/"))}</cachedir>
 </fontconfig>
 `,
@@ -304,10 +326,11 @@ function runProcess(command, args, options = {}) {
       reject(error);
     });
 
-    child.on("close", (code) => {
+    child.on("close", (code, signal) => {
       clearTimeout(timeoutId);
       resolve({
         code,
+        signal,
         stderr,
         stdout,
       });
@@ -744,7 +767,9 @@ function createLatexRuntime({ app, log }) {
         const logText = await fsp
           .readFile(path.join(outputDirectory, "resume.log"), "utf8")
           .catch(() => "");
-        const exitSummary = `${runtime.name} exited with code ${result.code}.`;
+        const exitSummary = result.signal
+          ? `${runtime.name} crashed (killed by ${result.signal}).`
+          : `${runtime.name} exited with code ${result.code}.`;
         const fullLog = trimLog(
           [logText, result.stderr, result.stdout, exitSummary]
             .filter(Boolean)
