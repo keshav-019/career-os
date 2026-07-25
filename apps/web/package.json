@@ -27,7 +27,7 @@
     "@uiw/react-codemirror": "^4.25.11",
     "codemirror-lang-latex": "^0.4.2",
     "firebase": "latest",
-    "firebase-admin": "latest",
+    "firebase-admin": "^13.10.0",
     "html2pdf.js": "^0.14.0",
     "lucide-react": "latest",
     "mammoth": "^1.12.0",
