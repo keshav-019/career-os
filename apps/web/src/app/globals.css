@@ -80,10 +80,7 @@ body {
     linear-gradient(180deg, rgba(79, 140, 255, 0.08), transparent 270px),
     var(--bg);
   color: var(--text);
-  font-family:
-    Arial,
-    Helvetica,
-    sans-serif;
+  font-family: Arial, Helvetica, sans-serif;
   letter-spacing: 0;
   -webkit-font-smoothing: antialiased;
 }
@@ -545,7 +542,8 @@ input:focus-visible {
   left: 50%;
   top: 100%;
   transform: translateX(-50%);
-  border-top: 6px solid color-mix(in srgb, var(--surface-elevated) 94%, transparent);
+  border-top: 6px solid
+    color-mix(in srgb, var(--surface-elevated) 94%, transparent);
   border-left: 6px solid transparent;
   border-right: 6px solid transparent;
 }
@@ -707,7 +705,11 @@ input:focus-visible {
 .career-card.highlight {
   border-color: color-mix(in srgb, var(--brand) 38%, var(--border));
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--brand) 10%, transparent), transparent 42%),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--brand) 10%, transparent),
+      transparent 42%
+    ),
     var(--surface);
 }
 
@@ -1583,8 +1585,16 @@ input:focus-visible {
   position: relative;
   overflow: hidden;
   background:
-    radial-gradient(115% 90% at 0% 0%, color-mix(in srgb, var(--brand) 16%, transparent) 0%, transparent 58%),
-    radial-gradient(105% 95% at 100% 0%, color-mix(in srgb, var(--success) 15%, transparent) 0%, transparent 60%),
+    radial-gradient(
+      115% 90% at 0% 0%,
+      color-mix(in srgb, var(--brand) 16%, transparent) 0%,
+      transparent 58%
+    ),
+    radial-gradient(
+      105% 95% at 100% 0%,
+      color-mix(in srgb, var(--success) 15%, transparent) 0%,
+      transparent 60%
+    ),
     var(--card-bg);
 }
 
@@ -1967,7 +1977,9 @@ input:focus-visible {
   background: #0f172a;
   color: #e2e8f0;
   padding: 12px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    monospace;
   font-size: 12px;
   line-height: 1.5;
 }
@@ -2108,7 +2120,11 @@ input:focus-visible {
   border: 1px solid color-mix(in srgb, var(--danger) 38%, var(--border));
   border-radius: 8px;
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--danger) 10%, transparent), transparent 48%),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--danger) 10%, transparent),
+      transparent 48%
+    ),
     color-mix(in srgb, var(--surface) 96%, transparent);
   color: var(--text);
   padding: 14px;
@@ -2146,12 +2162,7 @@ input:focus-visible {
   white-space: pre-wrap;
   word-break: break-word;
   font-family:
-    ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    Monaco,
-    Consolas,
-    "Liberation Mono",
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
     monospace;
   font-size: 12px;
   line-height: 1.55;
@@ -2226,12 +2237,7 @@ input:focus-visible {
 
 .latex-code-mirror .cm-scroller {
   font-family:
-    ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    Monaco,
-    Consolas,
-    "Liberation Mono",
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
     monospace;
 }
 
@@ -2303,7 +2309,11 @@ input:focus-visible {
   display: grid;
   place-items: start center;
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--brand) 7%, transparent), transparent 45%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--brand) 7%, transparent),
+      transparent 45%
+    ),
     color-mix(in srgb, var(--surface-elevated) 94%, transparent);
 }
 
@@ -2335,7 +2345,7 @@ input:focus-visible {
 }
 
 .resume-visual-page-break::before {
-  content: '';
+  content: "";
   position: absolute;
   left: 0;
   right: 0;
@@ -2385,7 +2395,11 @@ input:focus-visible {
   border: 1px solid var(--border);
   border-radius: 8px;
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--brand) 8%, transparent), transparent 55%),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--brand) 8%, transparent),
+      transparent 55%
+    ),
     color-mix(in srgb, var(--surface-elevated) 90%, transparent);
   padding: 14px;
 }
@@ -2598,9 +2612,9 @@ input:focus-visible {
   color: var(--muted);
 }
 
-.resume-form input[type='text'],
-.resume-form input[type='email'],
-.resume-form input[type='url'],
+.resume-form input[type="text"],
+.resume-form input[type="email"],
+.resume-form input[type="url"],
 .resume-form input:not([type]),
 .resume-form textarea {
   width: 100%;
@@ -2778,6 +2792,40 @@ input:focus-visible {
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+}
+
+.extension-download-control {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  min-width: 136px;
+}
+
+.extension-download-status {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  max-width: 190px;
+}
+
+.extension-download-status.success {
+  color: var(--success);
+}
+
+.extension-download-status.error {
+  color: var(--danger);
+}
+
+.spin-icon {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .extension-install-grid {
@@ -3459,7 +3507,15 @@ input:focus-visible {
 .profile-status-badges {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
+}
+
+.profile-save-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 12px;
 }
 
 .profile-photo-shell {
@@ -3544,14 +3600,141 @@ input:focus-visible {
   cursor: pointer;
 }
 
-.light-theme .profile-field input[type="date"]::-webkit-calendar-picker-indicator,
-.light-theme .profile-field input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+.light-theme
+  .profile-field
+  input[type="date"]::-webkit-calendar-picker-indicator,
+.light-theme
+  .profile-field
+  input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   filter: invert(0) brightness(0.3);
 }
 
 .profile-field textarea {
   min-height: 84px;
   resize: vertical;
+}
+
+.profile-suggest-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.profile-suggestion-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.profile-suggestion-list button {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-muted) 76%, transparent);
+  color: var(--muted-strong);
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.profile-suggestion-list button:hover {
+  border-color: var(--brand);
+  color: var(--text);
+}
+
+.profile-rich-editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.profile-rich-editor-toolbar button {
+  min-height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-muted);
+  color: var(--muted-strong);
+  padding: 0 9px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.profile-rich-editor {
+  min-height: 132px;
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-elevated) 90%, transparent);
+  color: var(--text);
+  padding: 10px 12px;
+  line-height: 1.55;
+}
+
+.profile-rich-editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--muted);
+}
+
+.profile-rich-editor:focus {
+  outline: 2px solid color-mix(in srgb, var(--brand) 65%, white);
+  outline-offset: 2px;
+}
+
+.profile-rich-editor ul,
+.profile-rich-editor ol {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.profile-attachment-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.profile-attachment-chip {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface-muted) 78%, transparent);
+  color: var(--muted-strong);
+  padding: 0 8px 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.profile-attachment-chip a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.profile-attachment-chip small {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.profile-attachment-chip button {
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+}
+
+.profile-attachment-chip button:hover {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
 }
 
 .profile-entry-list {
@@ -4016,7 +4199,11 @@ input:focus-visible {
   border: 1px solid var(--border);
   border-radius: 14px;
   background:
-    linear-gradient(160deg, color-mix(in srgb, var(--brand) 12%, transparent), transparent 38%),
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--brand) 12%, transparent),
+      transparent 38%
+    ),
     var(--surface);
   box-shadow: var(--shadow);
 }
@@ -4069,6 +4256,34 @@ input:focus-visible {
 
 .auth-form input::placeholder {
   color: var(--muted);
+}
+
+.auth-password-field {
+  position: relative;
+}
+
+.auth-password-field input {
+  padding-right: 46px;
+}
+
+.auth-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: grid;
+  width: 34px;
+  min-height: 34px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted-strong);
+  transform: translateY(-50%);
+}
+
+.auth-password-toggle:hover {
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  color: var(--text);
 }
 
 .auth-submit {
@@ -4146,7 +4361,11 @@ input:focus-visible {
 .test-room-immersive-shell {
   min-height: 100vh;
   background:
-    radial-gradient(circle at top, color-mix(in srgb, var(--brand) 15%, transparent), transparent 48%),
+    radial-gradient(
+      circle at top,
+      color-mix(in srgb, var(--brand) 15%, transparent),
+      transparent 48%
+    ),
     var(--bg);
   color: var(--text);
 }
@@ -4171,14 +4390,20 @@ input:focus-visible {
 
 .war-room-ai-anchor-card {
   border-color: color-mix(in srgb, var(--violet) 42%, var(--border));
-  background:
-    linear-gradient(145deg, color-mix(in srgb, var(--violet) 12%, transparent), color-mix(in srgb, var(--surface) 96%, transparent));
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--violet) 12%, transparent),
+    color-mix(in srgb, var(--surface) 96%, transparent)
+  );
 }
 
 .war-room-ai-role-focus {
   border-color: color-mix(in srgb, var(--brand) 38%, var(--border));
-  background:
-    linear-gradient(145deg, color-mix(in srgb, var(--brand) 10%, transparent), color-mix(in srgb, var(--surface) 96%, transparent));
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--brand) 10%, transparent),
+    color-mix(in srgb, var(--surface) 96%, transparent)
+  );
 }
 
 .war-room-go-back-card {
@@ -4188,7 +4413,11 @@ input:focus-visible {
   border: 1px dashed color-mix(in srgb, var(--border-strong) 72%, transparent);
   border-radius: 10px;
   background:
-    radial-gradient(circle at top right, color-mix(in srgb, var(--brand) 9%, transparent), transparent 58%),
+    radial-gradient(
+      circle at top right,
+      color-mix(in srgb, var(--brand) 9%, transparent),
+      transparent 58%
+    ),
     color-mix(in srgb, var(--surface-elevated) 90%, transparent);
   color: var(--text);
   min-height: 150px;
@@ -4212,8 +4441,11 @@ input:focus-visible {
   border-radius: 999px;
   display: grid;
   place-items: center;
-  background:
-    radial-gradient(circle at center, color-mix(in srgb, var(--brand) 10%, transparent), transparent 68%);
+  background: radial-gradient(
+    circle at center,
+    color-mix(in srgb, var(--brand) 10%, transparent),
+    transparent 68%
+  );
   color: var(--brand);
   transition:
     transform 180ms ease,
@@ -4240,7 +4472,9 @@ input:focus-visible {
 .war-room-go-back-orbit svg {
   position: relative;
   z-index: 1;
-  filter: drop-shadow(0 2px 8px color-mix(in srgb, var(--brand) 30%, transparent));
+  filter: drop-shadow(
+    0 2px 8px color-mix(in srgb, var(--brand) 30%, transparent)
+  );
 }
 
 .war-room-role-grid {
@@ -4365,7 +4599,8 @@ input:focus-visible {
 
 .war-room-flip-card.transitioning-focus {
   z-index: 5;
-  animation: war-room-track-slide-left 760ms cubic-bezier(0.2, 0.82, 0.2, 1) both;
+  animation: war-room-track-slide-left 760ms cubic-bezier(0.2, 0.82, 0.2, 1)
+    both;
 }
 
 .war-room-flip-card:focus-visible {
@@ -4432,12 +4667,11 @@ input:focus-visible {
   display: grid;
   gap: 6px;
   padding: 12px;
-  background:
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--track-accent) 10%, transparent),
-      color-mix(in srgb, var(--surface) 96%, transparent)
-    );
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--track-accent) 10%, transparent),
+    color-mix(in srgb, var(--surface) 96%, transparent)
+  );
 }
 
 .war-room-flip-content strong {
@@ -4460,12 +4694,11 @@ input:focus-visible {
   align-content: start;
   gap: 10px;
   padding: 14px;
-  background:
-    linear-gradient(
-      140deg,
-      color-mix(in srgb, var(--track-accent) 18%, var(--surface-elevated)),
-      color-mix(in srgb, var(--surface) 96%, transparent)
-    );
+  background: linear-gradient(
+    140deg,
+    color-mix(in srgb, var(--track-accent) 18%, var(--surface-elevated)),
+    color-mix(in srgb, var(--surface) 96%, transparent)
+  );
 }
 
 .war-room-flip-back p {
@@ -4556,12 +4789,11 @@ input:focus-visible {
 .learning-library-anchor {
   --track-accent: var(--brand);
   border-color: color-mix(in srgb, var(--track-accent) 38%, var(--border));
-  background:
-    linear-gradient(
-      145deg,
-      color-mix(in srgb, var(--track-accent) 10%, transparent),
-      color-mix(in srgb, var(--surface) 96%, transparent)
-    );
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--track-accent) 10%, transparent),
+    color-mix(in srgb, var(--surface) 96%, transparent)
+  );
 }
 
 .learning-library-anchor[data-track="aptitude"] {
@@ -5279,7 +5511,11 @@ input:focus-visible {
 .war-room-library-hint {
   border: 1px dashed color-mix(in srgb, var(--border-strong) 65%, transparent);
   background:
-    radial-gradient(circle at top right, color-mix(in srgb, var(--brand) 8%, transparent), transparent 58%),
+    radial-gradient(
+      circle at top right,
+      color-mix(in srgb, var(--brand) 8%, transparent),
+      transparent 58%
+    ),
     color-mix(in srgb, var(--surface-elevated) 92%, transparent);
 }
 
@@ -5490,7 +5726,8 @@ input:focus-visible {
 }
 
 .test-room-question-chip.answered {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--success) 45%, transparent);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--success) 45%, transparent);
 }
 
 .test-room-side-meta {
@@ -5685,12 +5922,7 @@ input:focus-visible {
   margin: 8px 0 0;
   white-space: pre-wrap;
   color: var(--text);
-  font-family:
-    Menlo,
-    Monaco,
-    Consolas,
-    "Liberation Mono",
-    monospace;
+  font-family: Menlo, Monaco, Consolas, "Liberation Mono", monospace;
   font-size: 12px;
   line-height: 1.5;
 }
@@ -5777,7 +6009,11 @@ input:focus-visible {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--brand) 86%, #4f8cff), #4f8cff);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--brand) 86%, #4f8cff),
+    #4f8cff
+  );
 }
 
 .test-room-topic-breakdown {
@@ -5938,12 +6174,11 @@ input:focus-visible {
   margin: 0 auto;
   border: 1px solid var(--border);
   border-radius: 10px;
-  background:
-    linear-gradient(
-      to top,
-      color-mix(in srgb, var(--surface-elevated) 94%, transparent) 0%,
-      color-mix(in srgb, var(--surface-elevated) 90%, transparent) 100%
-    );
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--surface-elevated) 94%, transparent) 0%,
+    color-mix(in srgb, var(--surface-elevated) 90%, transparent) 100%
+  );
   padding: 14px 12px;
   min-height: 278px;
   overflow: hidden;
@@ -5977,12 +6212,11 @@ input:focus-visible {
   height: 174px;
   border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
   border-radius: 8px;
-  background:
-    linear-gradient(
-      to top,
-      color-mix(in srgb, var(--surface) 92%, transparent),
-      color-mix(in srgb, var(--surface-elevated) 96%, transparent)
-    );
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--surface) 92%, transparent),
+    color-mix(in srgb, var(--surface-elevated) 96%, transparent)
+  );
   overflow: hidden;
 }
 
@@ -5997,7 +6231,11 @@ input:focus-visible {
   right: 0;
   bottom: 0;
   border-radius: 6px 6px 0 0;
-  background: linear-gradient(180deg, color-mix(in srgb, #4f8cff 75%, white), #3f87ff);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, #4f8cff 75%, white),
+    #3f87ff
+  );
 }
 
 .analytics-bar-slot strong {
@@ -6853,7 +7091,11 @@ input:focus-visible {
   border: 1px solid var(--border);
   border-radius: 8px;
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--brand) 8%, transparent), transparent 44%),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--brand) 8%, transparent),
+      transparent 44%
+    ),
     color-mix(in srgb, var(--surface) 95%, transparent);
   padding: 16px;
 }
@@ -7146,7 +7388,9 @@ input:focus-visible {
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    monospace;
   font-size: 12px;
   line-height: 1.5;
 }
@@ -7213,7 +7457,9 @@ input:focus-visible {
   background: #0d1117;
   color: #f4f7fb;
   padding: 12px 14px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    monospace;
   font-size: 13px;
   line-height: 1.55;
   outline: none;
@@ -7256,7 +7502,9 @@ input:focus-visible {
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    monospace;
   font-size: 11px;
   line-height: 1.4;
 }
@@ -7285,7 +7533,9 @@ input:focus-visible {
   background: color-mix(in srgb, var(--bg) 90%, black);
   color: var(--text);
   padding: 8px 10px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    monospace;
   font-size: 12px;
 }
 
@@ -7346,7 +7596,9 @@ input:focus-visible {
 .coding-room-result-detail pre {
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    monospace;
   font-size: 12px;
   margin: 4px 0 10px;
 }
@@ -7585,7 +7837,8 @@ input:focus-visible {
   overflow: auto;
   padding: 12px;
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--border-strong) 66%, transparent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--border-strong) 66%, transparent)
+    transparent;
 }
 
 .coding-room-testcase-editor,
@@ -7658,7 +7911,9 @@ input:focus-visible {
   padding: 11px 12px;
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    monospace;
   font-size: 12px;
   line-height: 1.5;
 }
@@ -7830,7 +8085,10 @@ input:focus-visible {
 
 .sd-room-workbench {
   display: grid;
-  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr) minmax(230px, 290px);
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr) minmax(
+      230px,
+      290px
+    );
   gap: 14px;
   align-items: stretch;
 }
@@ -7982,7 +8240,11 @@ input:focus-visible {
   border: 1px solid var(--border);
   border-radius: 10px;
   background:
-    radial-gradient(color-mix(in srgb, var(--border-strong) 40%, transparent) 1px, transparent 1px) 0 0/24px 24px,
+    radial-gradient(
+        color-mix(in srgb, var(--border-strong) 40%, transparent) 1px,
+        transparent 1px
+      )
+      0 0/24px 24px,
     color-mix(in srgb, var(--bg) 94%, black);
   overflow: hidden;
   cursor: grab;
@@ -8107,7 +8369,11 @@ input:focus-visible {
 .sd-node-root {
   border-color: color-mix(in srgb, var(--brand) 55%, var(--border));
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--brand) 16%, transparent), transparent 60%),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--brand) 16%, transparent),
+      transparent 60%
+    ),
     var(--surface);
   color: var(--brand);
 }

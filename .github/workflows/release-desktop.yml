@@ -21,12 +21,20 @@ jobs:
             os: windows-latest
             command: npm run desktop:dist:win
             artifactName: careeros-windows
-            assetPath: apps/desktop/dist/*.exe
+            assetPath: |
+              apps/desktop/dist/*.exe
+              apps/desktop/dist/*.zip
+              apps/desktop/dist/*.blockmap
           - platform: linux
             os: ubuntu-latest
             command: npm run desktop:dist:linux
             artifactName: careeros-linux
-            assetPath: apps/desktop/dist/*.AppImage
+            assetPath: |
+              apps/desktop/dist/*.AppImage
+              apps/desktop/dist/*.deb
+              apps/desktop/dist/*.rpm
+              apps/desktop/dist/*.pacman
+              apps/desktop/dist/*.blockmap
 
     steps:
       - name: Checkout
@@ -38,6 +46,12 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Install Linux packaging tools
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm libarchive-tools
+
       - name: Install dependencies
         run: npm ci
 
@@ -45,6 +59,7 @@ jobs:
         run: ${{ matrix.command }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GOOGLE_DESKTOP_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_OAUTH_CLIENT_SECRET }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -61,13 +76,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download desktop artifacts
         uses: actions/download-artifact@v4
         with:
           path: release-assets
           merge-multiple: true
 
+      - name: Generate checksums
+        working-directory: release-assets
+        run: sha256sum * > checksums.txt
+
+      - name: List release assets
+        run: find release-assets -maxdepth 1 -type f -printf "%f  %s bytes\n" | sort
+
       - name: Publish release assets
-        run: gh release create "${{ github.ref_name }}" release-assets/* --title "CareerOS ${{ github.ref_name }}" --generate-notes
+        run: |
+          gh release create "${{ github.ref_name }}" release-assets/* \
+            --title "CareerOS ${{ github.ref_name }}" \
+            --notes-file apps/desktop/RELEASE_NOTES.md
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

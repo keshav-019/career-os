@@ -7,7 +7,9 @@
  */
 
 import { PlusCircle, Trash2 } from "lucide-react";
-import { listAiInterviewRoles } from "@/lib/interview/question-bank";
+import { useEffect, useState } from "react";
+import { fetchAiInterviewRoles } from "@/lib/interview/client";
+import type { AiInterviewRole } from "@/lib/interview/question-bank";
 import { DIFFICULTIES, TRACK_LABELS, emptyQuestionRow, type FormState, type QuestionRow, type TestPaperTrack } from "./shared";
 
 type Props = {
@@ -15,9 +17,26 @@ type Props = {
   onChange: (updater: (current: FormState) => FormState) => void;
 };
 
-const AI_ROLES = listAiInterviewRoles();
-
 export default function TestPaperFieldForm({ form, onChange }: Props) {
+  // AI role list used to come from a synchronous listAiInterviewRoles() call - that function now lazily loads its
+  // data from R2 with real bucket credentials, server-side only, so it's fetched via /api/interview/ai-roles
+  // instead (see lib/interview/client.ts's fetchAiInterviewRoles()).
+  const [aiRoles, setAiRoles] = useState<AiInterviewRole[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAiInterviewRoles()
+      .then((roles) => {
+        if (!cancelled) setAiRoles(roles);
+      })
+      .catch(() => {
+        if (!cancelled) setAiRoles([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const updateQuestionRow = (index: number, patch: Partial<QuestionRow>) => {
     onChange((current) => ({
       ...current,
@@ -58,7 +77,7 @@ export default function TestPaperFieldForm({ form, onChange }: Props) {
             <span className="admin-coding-field-label">AI role</span>
             <select onChange={(event) => onChange((c) => ({ ...c, roleId: event.target.value }))} value={form.roleId}>
               <option value="">Select a role...</option>
-              {AI_ROLES.map((role) => (
+              {aiRoles.map((role) => (
                 <option key={role.id} value={role.id}>
                   {role.name}
                 </option>

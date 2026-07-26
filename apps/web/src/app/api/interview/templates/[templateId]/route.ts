@@ -7,6 +7,7 @@ import {
   type PracticeQuestion
 } from "@/lib/interview/question-bank";
 import { getCustomTestPaperRecordSafe } from "@/lib/interview/custom-test-papers";
+import { requireAuthAndRateLimit } from "@/lib/server/require-auth-rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,16 +18,21 @@ function isTestType(value: string): value is InterviewTestType {
   return TEST_TYPES.includes(value as InterviewTestType);
 }
 
-/** Returns a single template plus its fully-built (seeded, deterministic) question set - the mobile equivalent of
- *  what web's own createPracticeAttempt() does in-process via buildPracticeAttemptSeed(). See
- *  apps/mobile/src/lib/practiceAttempts.ts's fetchTemplateQuestions() for the consumer. Note: for the "ai" track,
- *  the role is encoded directly in templateId (format ai_{roleId}_test_{index}), so no separate roleId param is
- *  needed to resolve the template or its questions.
+/** Returns a single template plus its fully-built (seeded, deterministic) question set. buildPracticeAttemptSeed()
+ *  used to be called in-process by both platforms; now that it (and the question bank behind it) lazily loads from
+ *  R2 with real bucket credentials server-side only, both mobile (practiceAttempts.ts's fetchTemplateQuestions())
+ *  and web (lib/firebase/interview-war-room.ts's createPracticeAttempt(), via
+ *  lib/interview/client.ts's fetchInterviewTestTemplateWithQuestions()) go through this route. Note: for the "ai"
+ *  track, the role is encoded directly in templateId (format ai_{roleId}_test_{index}), so no separate roleId param
+ *  is needed to resolve the template or its questions.
  *
  *  Checks Firestore-backed custom test papers (see /admin/test-papers) before falling back to the compiled bank,
  *  since a custom paper's id doesn't match the compiled id pattern anyway. The answer key is stripped here exactly
  *  like the compiled path - correctOptionId/explanation only ever come back through /api/interview/mcq-review. */
 export async function GET(request: NextRequest, context: { params: Promise<{ templateId: string }> }) {
+  const gate = await requireAuthAndRateLimit(request, "interview-template-detail", { maxRequests: 60 });
+  if (!gate.ok) return gate.response;
+
   try {
     const { templateId } = await context.params;
     const { searchParams } = new URL(request.url);
@@ -74,12 +80,12 @@ export async function GET(request: NextRequest, context: { params: Promise<{ tem
       }
     }
 
-    const template = getInterviewTestTemplate(testType, templateId);
+    const template = await getInterviewTestTemplate(testType, templateId);
     if (!template) {
       return NextResponse.json({ ok: false, error: "Template not found." }, { status: 404 });
     }
 
-    const seed = buildPracticeAttemptSeed(testType, templateId);
+    const seed = await buildPracticeAttemptSeed(testType, templateId);
     return NextResponse.json({ ok: true, template, questions: seed.questions });
   } catch (error) {
     return NextResponse.json(

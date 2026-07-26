@@ -1,0 +1,15 @@
+# Shell scripts must keep LF line endings regardless of checkout platform - a CRLF shebang line breaks
+# execution on Linux ("bad interpreter" or silent no-op), and these scripts are specifically meant to run
+# on Linux test machines (linux-compat-check.sh, submit-flathub-pr.sh).
+*.sh text eol=lf
+
+apps/desktop/vendor/latex/** export-ignore
+apps/desktop/dist/** export-ignore
+dist/** export-ignore
+node_modules/** export-ignore
+.env export-ignore
+.env.local export-ignore
+.secrets/** export-ignore
+apps/extension.crx export-ignore
+apps/extension.pem export-ignore
+apps/extension.zip export-ignore

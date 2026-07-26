@@ -52,6 +52,10 @@ export type ResumeData = {
     issuer: string;
     date: string;
   }[];
+  /** 1-3 columns for rendering the skills section. A single skill group with an empty `category` renders as a
+   *  flat bullet list with no heading ("just a bunch of skills") - multiple groups with categories render each
+   *  as its own labeled column/section. Optional and defaults to 2 for resumes saved before this field existed. */
+  skillsColumns?: 1 | 2 | 3;
 };
 
 export function createEmptyResumeData(): ResumeData {
@@ -72,7 +76,8 @@ export function createEmptyResumeData(): ResumeData {
     experience: [],
     skills: [],
     projects: [],
-    certifications: []
+    certifications: [],
+    skillsColumns: 2
   };
 }
 
@@ -126,7 +131,10 @@ export const RESUME_VISUAL_TEMPLATES: ResumeTemplateMeta[] = [
 
 export const DEFAULT_RESUME_TEMPLATE_ID: ResumeTemplateId = "swiss";
 
-/** Firestore document shape for a saved mobile resume (users/{uid}/mobileResumes/{id}). */
+/** Firestore document shape for a saved mobile resume (users/{uid}/mobileResumes/{id}). jobId/jobLabel are set
+ *  when this resume was produced by "Generate resume" for a specific saved job (see ResumeScreen.tsx) - shown in
+ *  the resume list so the user can see which version was tailored for which role, and stay unset for resumes
+ *  built from scratch or edited freely afterward. */
 export type MobileResumeRecord = {
   id: string;
   label: string;
@@ -134,6 +142,8 @@ export type MobileResumeRecord = {
   data: ResumeData;
   createdAt: string;
   updatedAt: string;
+  jobId?: string;
+  jobLabel?: string;
 };
 
 // ResumeVersion - the web's Firestore-backed resume shape used by AI Match (apps/web/src/lib/firebase/resumes.ts).

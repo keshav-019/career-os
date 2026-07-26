@@ -1,15 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import aiTextbookCurriculum from "../../../../../learning-material/ai_textbook_curriculum_clean.min.json";
-import algorithmsTextbook from "../../../../../learning-material/algorithms_textbook_clean.min.json";
-import cProgrammingTextbook from "../../../../../learning-material/c_programming_textbook_clean.min.json";
-import computerNetworksTextbook from "../../../../../learning-material/computer_networks_textbook_clean.min.json";
-import dataStructuresTextbook from "../../../../../learning-material/data_structures_textbook_clean.min.json";
-import computerScienceMaterials from "../../../../../learning-material/cse_detailed_reading_material_minified.json";
-import databaseSystemsTextbook from "../../../../../learning-material/database_systems_textbook_clean.min.json";
-import operatingSystemsTextbook from "../../../../../learning-material/operating_systems_textbook_clean.min.json";
-import pythonProgrammingTextbook from "../../../../../learning-material/python_programming_textbook_clean.min.json";
-import systemDesignInterviewTextbook from "../../../../../learning-material/system_design_interview_textbook_clean.min.json";
+import { learningAssetUrl } from "@/lib/learning/asset-url";
+import { getR2Json, uploadToR2 } from "@/lib/r2/client";
 import osFigureDimensions from "./os-figure-dimensions.json";
 
 export type LearningTrackId = "computer-science" | "ai";
@@ -865,25 +857,33 @@ function parseMaterialFile(entryName: string, rawRecord: JsonRecord): ParsedMate
   );
 }
 
-const RAW_MATERIAL_DATASETS: Array<{ entryName: string; raw: unknown }> = [
-  { entryName: "algorithms_textbook_clean.min.json", raw: algorithmsTextbook },
-  { entryName: "operating_systems_textbook_clean.min.json", raw: operatingSystemsTextbook },
-  { entryName: "database_systems_textbook_clean.min.json", raw: databaseSystemsTextbook },
-  { entryName: "computer_networks_textbook_clean.min.json", raw: computerNetworksTextbook },
-  { entryName: "system_design_interview_textbook_clean.min.json", raw: systemDesignInterviewTextbook },
-  { entryName: "python_programming_textbook_clean.min.json", raw: pythonProgrammingTextbook },
-  { entryName: "c_programming_textbook_clean.min.json", raw: cProgrammingTextbook },
-  { entryName: "data_structures_textbook_clean.min.json", raw: dataStructuresTextbook },
-  { entryName: "cse_detailed_reading_material_minified.json", raw: computerScienceMaterials },
-  { entryName: "ai_textbook_curriculum_clean.min.json", raw: aiTextbookCurriculum }
-];
+// These 10 files used to be statically `import`ed straight from the repo-root learning-material/ directory
+// (~14MB total) - that bloated both the git repo and this module's parsed size at build/import time even though
+// it's server-only code. They're now uploaded as-is to R2 under learning-material/<filename> and fetched lazily,
+// once per server process, the same pattern as lib/interview/{ai-role-bank,computer-science-bank}.ts.
+const MATERIAL_DATASET_ENTRY_NAMES = [
+  "algorithms_textbook_clean.min.json",
+  "operating_systems_textbook_clean.min.json",
+  "database_systems_textbook_clean.min.json",
+  "computer_networks_textbook_clean.min.json",
+  "system_design_interview_textbook_clean.min.json",
+  "python_programming_textbook_clean.min.json",
+  "c_programming_textbook_clean.min.json",
+  "data_structures_textbook_clean.min.json",
+  "cse_detailed_reading_material_minified.json",
+  "ai_textbook_curriculum_clean.min.json"
+] as const;
 
 let parsedMaterialCache: ParsedMaterialFile[] | null = null;
+let parsedMaterialLoadPromise: Promise<ParsedMaterialFile[]> | null = null;
 
-function resolveLearningMaterialFilePath(entryName: string): string | null {
-  const configuredDirectory = (process.env.LEARNING_MATERIAL_DIR ?? "").trim();
-  const materialDirectory = configuredDirectory || path.join(process.cwd(), "..", "..", "learning-material");
-  return path.join(/* turbopackIgnore: true */ materialDirectory, entryName);
+async function fetchRawMaterialDatasets(): Promise<Array<{ entryName: string; raw: unknown }>> {
+  return Promise.all(
+    MATERIAL_DATASET_ENTRY_NAMES.map(async (entryName) => ({
+      entryName,
+      raw: await getR2Json<unknown>(`learning-material/${entryName}`)
+    }))
+  );
 }
 
 async function loadMaterialFiles(): Promise<ParsedMaterialFile[]> {
@@ -891,24 +891,30 @@ async function loadMaterialFiles(): Promise<ParsedMaterialFile[]> {
     return parsedMaterialCache;
   }
 
-  const files: ParsedMaterialFile[] = [];
+  if (!parsedMaterialLoadPromise) {
+    parsedMaterialLoadPromise = fetchRawMaterialDatasets().then((rawDatasets) => {
+      const files: ParsedMaterialFile[] = [];
 
-  RAW_MATERIAL_DATASETS.forEach((dataset) => {
-    const rawRecord = toRecord(dataset.raw);
-    if (!rawRecord) {
-      return;
-    }
+      rawDatasets.forEach((dataset) => {
+        const rawRecord = toRecord(dataset.raw);
+        if (!rawRecord) {
+          return;
+        }
 
-    const parsed = parseMaterialFile(dataset.entryName, rawRecord);
-    if (!parsed) {
-      return;
-    }
+        const parsed = parseMaterialFile(dataset.entryName, rawRecord);
+        if (!parsed) {
+          return;
+        }
 
-    files.push(parsed);
-  });
+        files.push(parsed);
+      });
 
-  parsedMaterialCache = files;
-  return files;
+      return files;
+    });
+  }
+
+  parsedMaterialCache = await parsedMaterialLoadPromise;
+  return parsedMaterialCache;
 }
 
 function resolveTopicId(subjectId: string, topic: MaterialTopic, index: number): string {
@@ -992,7 +998,7 @@ export async function getLearningLibrarySummary(): Promise<LibrarySummary> {
       title: TRACK_DEFS[trackId].title,
       subtitle: TRACK_DEFS[trackId].subtitle,
       description: TRACK_DEFS[trackId].description,
-      imageSrc: TRACK_DEFS[trackId].imageSrc,
+      imageSrc: learningAssetUrl(TRACK_DEFS[trackId].imageSrc),
       imageAlt: TRACK_DEFS[trackId].imageAlt,
       available: subjects.length > 0,
       subjects,
@@ -1409,18 +1415,11 @@ export async function updateLearningTopicReadingContent(
     return null;
   }
 
-  const datasetEntry = RAW_MATERIAL_DATASETS.find((dataset) => dataset.entryName === targetFile.fileName);
-  if (!datasetEntry) {
-    throw new Error("Unable to locate source dataset entry.");
-  }
-
-  const filePath = resolveLearningMaterialFilePath(targetFile.fileName);
-  if (!filePath) {
-    throw new Error("Unable to locate learning material file on disk.");
-  }
-
-  const rawText = await fs.readFile(filePath, "utf8");
-  const rawRecord = JSON.parse(rawText) as MaterialFile;
+  // This used to read the source file straight off local disk (fs.readFile) and write the edit back the same way
+  // - now that learning-material/*.json lives in R2 (not the git repo), both the read and the write below go
+  // through R2 instead. Still gated by the editingEnabled check above (dev-only unless ALLOW_LEARNING_CONTENT_EDIT
+  // is set), so this stays a low-traffic admin path.
+  const rawRecord = await getR2Json<MaterialFile>(`learning-material/${targetFile.fileName}`);
   const rawSubjects = Array.isArray(rawRecord.subjects) ? rawRecord.subjects : [];
   const rawSubject =
     rawSubjects.find((subject, index) => resolveSubjectId(targetFile.datasetKey, subject, index) === subjectId)
@@ -1461,10 +1460,14 @@ export async function updateLearningTopicReadingContent(
     rawTopic.figures = upsertEditedFigures(rawTopic.figures, normalizedFigures);
   }
 
-  await fs.writeFile(filePath, JSON.stringify(rawRecord), "utf8");
+  await uploadToR2(
+    `learning-material/${targetFile.fileName}`,
+    Buffer.from(JSON.stringify(rawRecord), "utf-8"),
+    "application/json"
+  );
 
-  datasetEntry.raw = rawRecord;
   parsedMaterialCache = null;
+  parsedMaterialLoadPromise = null;
 
   return getLearningTopicDetail(trackId, subjectId, topicId);
 }

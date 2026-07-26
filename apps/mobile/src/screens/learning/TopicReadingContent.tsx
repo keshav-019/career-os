@@ -1,3 +1,4 @@
+import type { JSX } from "react";
 import { Image, Linking, Text, View } from "react-native";
 import { useTheme } from "../../theme/ThemeContext";
 import { resolveAssetUrl } from "../../lib/learningClient";

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getMcqQuestionById } from "@/lib/interview/question-bank";
 import { getCustomTestPaperRecordSafe, parseCustomQuestionId } from "@/lib/interview/custom-test-papers";
+import { requireAuthAndRateLimit } from "@/lib/server/require-auth-rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,10 +14,13 @@ type ReviewRequestBody = {
 type CanonicalAnswer = { correctOptionId: string; explanation: string };
 
 /** Scores MCQ answers and returns the canonical correct option + explanation per question, entirely server-side -
- *  mobile never receives the answer key up front (its /api/interview/templates/[templateId] response is the same
- *  answer-stripped PracticeQuestion shape web uses before a test is submitted). This is the mobile equivalent of
- *  what web's test-room page does in-browser via the bundled question bank (getMcqQuestionById) once a test is
- *  submitted - see apps/mobile/src/lib/practiceAttempts.ts's submitPracticeAttempt().
+ *  neither platform receives the answer key up front (the /api/interview/templates/[templateId] response is the
+ *  answer-stripped PracticeQuestion shape both use before a test is submitted). getMcqQuestionById() now lazily
+ *  loads the question bank from R2 with real bucket credentials, server-side only, so this is the only place
+ *  correctOptionId/explanation ever get resolved - see apps/mobile/src/lib/practiceAttempts.ts's
+ *  submitPracticeAttempt() and apps/web/src/lib/interview/client.ts's fetchMcqReview() for the two consumers
+ *  (web also uses this for post-submit review screens and analytics/topic-breakdown recomputation, not just
+ *  scoring at submit time).
  *
  *  Question ids from a custom test paper (see /admin/test-papers) don't exist in the in-memory compiled lookup, so
  *  those fall back to fetching the source paper from Firestore - one fetch per distinct paper, cached for the
@@ -25,7 +29,7 @@ async function resolveCanonicalAnswer(
   questionId: string,
   paperCache: Map<string, Awaited<ReturnType<typeof getCustomTestPaperRecordSafe>>>
 ): Promise<CanonicalAnswer | null> {
-  const compiled = getMcqQuestionById(questionId);
+  const compiled = await getMcqQuestionById(questionId);
   if (compiled) {
     return { correctOptionId: compiled.correctOptionId, explanation: compiled.explanation };
   }
@@ -46,6 +50,9 @@ async function resolveCanonicalAnswer(
 }
 
 export async function POST(request: NextRequest) {
+  const gate = await requireAuthAndRateLimit(request, "interview-mcq-review", { maxRequests: 120 });
+  if (!gate.ok) return gate.response;
+
   try {
     const body = (await request.json().catch(() => null)) as ReviewRequestBody | null;
     const questionIds = Array.isArray(body?.questionIds) ? body!.questionIds : [];

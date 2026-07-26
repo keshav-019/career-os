@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=CareerOS
+Comment=Career workspace for resumes, jobs, interviews, and applications
+Exec=careeros %U
+Icon=com.careeros.CareerOS
+Terminal=false
+Categories=Office;ProjectManagement;
+StartupWMClass=CareerOS

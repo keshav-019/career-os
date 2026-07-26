@@ -20,15 +20,17 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ClipboardEvent, type ReactNode } from "react";
+import { auth } from "@/lib/firebase/client";
 import {
   useUserPracticeAttempts,
   type PracticeAttemptRecord
 } from "@/lib/firebase/interview-war-room";
+import { fetchMcqReview, type McqReviewEntry } from "@/lib/interview/client";
 import {
   formatInterviewTestType,
-  getMcqQuestionById,
   type PracticeQuestion
 } from "@/lib/interview/question-bank";
+import { learningAssetUrl } from "@/lib/learning/asset-url";
 import { LEARNING_PLAN_REQUEST_EVENT } from "@/lib/preferences";
 import { sanitizeExternalUrl } from "@/lib/url-safety";
 
@@ -503,9 +505,10 @@ function renderInlineFigure(
 ): ReactNode {
   const versionSuffix =
     typeof figure.width === "number" && typeof figure.height === "number" ? `${figure.width}x${figure.height}` : "";
+  const resolvedFigureSrc = learningAssetUrl(figure.src);
   const figureSrc = versionSuffix
-    ? `${figure.src}${figure.src.includes("?") ? "&" : "?"}v=${versionSuffix}`
-    : figure.src;
+    ? `${resolvedFigureSrc}${resolvedFigureSrc.includes("?") ? "&" : "?"}v=${versionSuffix}`
+    : resolvedFigureSrc;
 
   return (
     <figure className="learning-figure-card learning-figure-inline" key={`${topicId}-${figure.id}-${index}`}>
@@ -698,11 +701,12 @@ function percentageFromMarks(earned: number, total: number): number {
 
 function computeQuestionOutcome(
   attempt: PracticeAttemptRecord,
-  question: PracticeQuestion
+  question: PracticeQuestion,
+  mcqReviews: Record<string, McqReviewEntry>
 ): QuestionOutcome {
   if (question.kind === "mcq") {
     const selected = (attempt.mcqAnswers[question.id] ?? "").trim().toLowerCase();
-    const canonical = getMcqQuestionById(question.id);
+    const canonical = mcqReviews[question.id];
     const earned = canonical && selected && selected === canonical.correctOptionId ? 1 : 0;
     return {
       earned,
@@ -716,7 +720,10 @@ function computeQuestionOutcome(
   };
 }
 
-function computeWeakTopicRows(attempts: PracticeAttemptRecord[]): WeakTopicRow[] {
+function computeWeakTopicRows(
+  attempts: PracticeAttemptRecord[],
+  mcqReviews: Record<string, McqReviewEntry>
+): WeakTopicRow[] {
   const tracker = new Map<string, WeakTopicRow>();
 
   attempts.forEach((attempt) => {
@@ -725,7 +732,7 @@ function computeWeakTopicRows(attempts: PracticeAttemptRecord[]): WeakTopicRow[]
     attempt.questions.forEach((question) => {
       const subtopic = question.category || "General";
       const key = `${topic}::${subtopic}`;
-      const outcome = computeQuestionOutcome(attempt, question);
+      const outcome = computeQuestionOutcome(attempt, question, mcqReviews);
       const current = tracker.get(key) ?? {
         key,
         topic,
@@ -886,7 +893,43 @@ export default function LearningPage() {
     () => practiceAttempts.filter((attempt) => attempt.status === "submitted" || attempt.status === "timed_out"),
     [practiceAttempts]
   );
-  const weakestTopicRows = useMemo(() => computeWeakTopicRows(completedAttempts).slice(0, 5), [completedAttempts]);
+
+  const [mcqReviews, setMcqReviews] = useState<Record<string, McqReviewEntry>>({});
+
+  // getMcqQuestionById() used to run in-browser for the weak-topic breakdown below - that function is now async
+  // (question content is fetched from R2 server-side), so the canonical answer key for every MCQ question
+  // referenced by a completed attempt is fetched up front via /api/interview/mcq-review instead.
+  useEffect(() => {
+    const mcqQuestionIds = Array.from(
+      new Set(
+        completedAttempts.flatMap((attempt) =>
+          attempt.questions.filter((question) => question.kind === "mcq").map((question) => question.id)
+        )
+      )
+    );
+
+    if (mcqQuestionIds.length === 0) {
+      setMcqReviews({});
+      return;
+    }
+
+    let cancelled = false;
+    fetchMcqReview(mcqQuestionIds)
+      .then((result) => {
+        if (!cancelled) setMcqReviews(result.reviews);
+      })
+      .catch(() => {
+        if (!cancelled) setMcqReviews({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [completedAttempts]);
+
+  const weakestTopicRows = useMemo(
+    () => computeWeakTopicRows(completedAttempts, mcqReviews).slice(0, 5),
+    [completedAttempts, mcqReviews]
+  );
 
   const selectedTopicDetail = selectedTopicId ? topicDetailsById[selectedTopicId] ?? null : null;
 
@@ -919,7 +962,7 @@ export default function LearningPage() {
           }))
         }));
 
-      const weakRowsPayload = computeWeakTopicRows(completedAttempts)
+      const weakRowsPayload = computeWeakTopicRows(completedAttempts, mcqReviews)
         .slice(0, 12)
         .map((row) => ({
           earned: row.earned,
@@ -929,10 +972,12 @@ export default function LearningPage() {
           total: row.total
         }));
 
+      const idToken = await auth?.currentUser?.getIdToken().catch(() => null);
       const response = await fetch("/api/ai/learning-plan", {
         body: JSON.stringify({ tracks: tracksPayload, weakRows: weakRowsPayload }),
         headers: {
-          "content-type": "application/json"
+          "content-type": "application/json",
+          ...(idToken ? { authorization: `Bearer ${idToken}` } : {})
         },
         method: "POST"
       });
@@ -955,7 +1000,7 @@ export default function LearningPage() {
     } finally {
       setLearningPlanLoading(false);
     }
-  }, [completedAttempts, learningPlanLoading, library, tracks]);
+  }, [completedAttempts, learningPlanLoading, library, mcqReviews, tracks]);
 
   useEffect(() => {
     const onLearningPlanRequested = () => {
@@ -1735,7 +1780,7 @@ export default function LearningPage() {
                               <ul>
                                 {selectedTopicDetail.figures.map((figure, index) => (
                                   <li key={`topic-figure-ref-${figure.id}`}>
-                                    <a href={figure.src} rel="noopener noreferrer" target="_blank">
+                                    <a href={learningAssetUrl(figure.src)} rel="noopener noreferrer" target="_blank">
                                       {figure.caption || `Image ${index + 1}`}
                                     </a>
                                   </li>
@@ -1821,7 +1866,10 @@ export default function LearningPage() {
               {imageDraft.dataUrl || imageDraft.src ? (
                 <div className="learning-image-preview">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img alt="Pending learning figure preview" src={imageDraft.dataUrl || imageDraft.src} />
+                  <img
+                    alt="Pending learning figure preview"
+                    src={imageDraft.dataUrl || learningAssetUrl(imageDraft.src ?? "")}
+                  />
                   <span>{imageDraft.fileName || imageDraft.src || "Pasted image"}</span>
                 </div>
               ) : (

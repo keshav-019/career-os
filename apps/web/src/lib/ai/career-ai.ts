@@ -346,7 +346,14 @@ function parseJsonObject(content: string): Record<string, unknown> {
 }
 
 function stripHtml(value: string): string {
-  return value.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return value
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|li|div|h[1-6])>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\s+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]+/g, " ")
+    .trim();
 }
 
 function truncate(value: string, maxLength: number): string {
@@ -879,8 +886,9 @@ function experienceToAiText(entries: TaggedExperienceRecord[]): string {
         `company: ${entry.company || "Not listed"}`,
         `role: ${entry.role || "Not listed"}`,
         `dates: ${entry.startDate || "?"} to ${entry.isCurrent ? "present" : entry.endDate || "?"}`,
-        `original description: ${entry.description || "Not listed"}`,
-        `skills gained: ${entry.skillsGained || "Not listed"}`
+        `original description: ${entry.description ? stripHtml(entry.description) : "Not listed"}`,
+        `skills gained: ${entry.skillsGained || "Not listed"}`,
+        `achievements: ${entry.achievements?.length ? entry.achievements.join("; ") : "Not listed"}`
       ].join("\n")
     )
     .join("\n---\n");
@@ -894,7 +902,7 @@ function projectsToAiText(entries: ProjectRecord[]): string {
         `title: ${entry.title || "Not listed"}`,
         `type: ${entry.projectType}`,
         `tech stack: ${entry.techStack || "Not listed"}`,
-        `original description: ${entry.description || "Not listed"}`,
+        `original description: ${entry.description ? stripHtml(entry.description) : "Not listed"}`,
         `skills gained: ${entry.skillsGained || "Not listed"}`
       ].join("\n")
     )
@@ -976,7 +984,7 @@ export async function generateAtsResumeWithAi(
     current: entry.isCurrent,
     description:
       aiExperienceBullets.get(entry.id) ??
-      (entry.description ? [entry.description] : entry.skillsGained ? [entry.skillsGained] : [])
+      (entry.description ? [stripHtml(entry.description)] : entry.skillsGained ? [entry.skillsGained] : [])
   }));
 
   const projectsByRefId = new Map<string, ProjectRecord>(allProjects.map((entry) => [entry.id, entry]));
@@ -993,7 +1001,7 @@ export async function generateAtsResumeWithAi(
     });
   }
 
-  const chosenProjects = aiProjectSelections.length > 0 ? aiProjectSelections.slice(0, 4) : allProjects.slice(0, 3).map((entry) => ({ refId: entry.id, description: entry.description }));
+  const chosenProjects = aiProjectSelections.length > 0 ? aiProjectSelections.slice(0, 4) : allProjects.slice(0, 3).map((entry) => ({ refId: entry.id, description: stripHtml(entry.description) }));
 
   const projects: ResumeData["projects"] = chosenProjects.map(({ refId, description }) => {
     const source = projectsByRefId.get(refId);
@@ -1038,7 +1046,7 @@ export async function generateAtsResumeWithAi(
     startDate: entry.startDate,
     endDate: entry.isPursuing ? "" : entry.endDate,
     gpa: entry.score ? `${entry.score} ${entry.gradingType}` : "",
-    description: ""
+    description: entry.summary
   }));
 
   const certifications: ResumeData["certifications"] = profile.certifications

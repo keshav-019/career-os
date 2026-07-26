@@ -79,6 +79,15 @@ export async function requireAdmin(authorizationHeader: string | null): Promise<
     return verifiedAuth;
   }
 
+  // The non_admin fallback below is self-grantable by any signed-in user (see hasNonAdminFlagViaRest's own doc
+  // comment) - it exists only to unblock admin screens in local dev before a service account is set up. Never
+  // honor it in production: if the Admin SDK env vars are missing/misconfigured on a live deploy, fail closed
+  // (admin screens go dark) rather than let any user self-grant admin. This has happened in practice on this
+  // project - see the "Fix production 500s on Firebase Admin SDK routes" commit.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Admin access is required for this action.");
+  }
+
   const hasNonAdminFlag = await hasNonAdminFlagViaRest(verifiedAuth.idToken, verifiedAuth.userId);
   if (!hasNonAdminFlag) {
     throw new Error(

@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { BookOpen, BrainCircuit, ChevronRight, FlaskConical, Sparkles } from "lucide-react-native";
+import { useNavigation } from "@react-navigation/native";
+import { BookOpen, BrainCircuit, ChevronLeft, ChevronRight, FlaskConical, Sparkles } from "lucide-react-native";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../theme/ThemeContext";
 import { useUserPracticeAttempts } from "../../lib/practiceAttempts";
 import { computeWeakTopicRows, fetchLearningLibrary, fetchTopicDetail, generateLearningPlan } from "../../lib/learningClient";
 import type { AiLearningPlan, AiLearningPlanModule, LearningTrackId, TopicDetail, TrackSummary, WeakTopicRow } from "../../types/learning";
-import { Card, ErrorText, GhostButton, LoadingView, Pill, PrimaryButton, Screen, SectionHeader } from "../../components/ui/Primitives";
+import { Card, ErrorText, LoadingView, Pill, PrimaryButton, Screen, SectionHeader } from "../../components/ui/Primitives";
 import { TopicReadingContent } from "./TopicReadingContent";
 
 const TRACK_ICONS: Record<LearningTrackId, typeof BookOpen> = {
@@ -14,10 +15,19 @@ const TRACK_ICONS: Record<LearningTrackId, typeof BookOpen> = {
   ai: BrainCircuit
 };
 
+function HeaderBackButton({ color, onPress }: { color: string; onPress: () => void }) {
+  return (
+    <Pressable hitSlop={12} onPress={onPress} style={{ paddingHorizontal: 4 }}>
+      <ChevronLeft color={color} size={24} />
+    </Pressable>
+  );
+}
+
 export default function LearningScreen() {
   const { colors, fontSize } = useTheme();
   const { user } = useAuth();
   const { attempts } = useUserPracticeAttempts(user?.uid);
+  const navigation = useNavigation();
 
   const [tracks, setTracks] = useState<TrackSummary[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -33,6 +43,23 @@ export default function LearningScreen() {
   const [plan, setPlan] = useState<AiLearningPlan | null>(null);
   const [planLoading, setPlanLoading] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
+
+  /** This screen fakes drill-down navigation (Tracks -> Subjects -> Topics) with local state instead of a real
+   *  nested stack (see navigation/types.ts), so there's no automatic header back button the way War Room's stack
+   *  gets one - without this, the only way back was an in-body "Back to X" button, which isn't how Android screens
+   *  behave and was inconsistent with the rest of the app. This drives the header's back arrow (replacing the
+   *  Drawer's default hamburger only while drilled in) to match. */
+  useLayoutEffect(() => {
+    if (selectedTopicId) {
+      navigation.setOptions({ headerLeft: () => <HeaderBackButton color={colors.text} onPress={() => setSelectedTopicId(null)} /> });
+    } else if (selectedSubjectId) {
+      navigation.setOptions({ headerLeft: () => <HeaderBackButton color={colors.text} onPress={() => setSelectedSubjectId(null)} /> });
+    } else if (selectedTrackId) {
+      navigation.setOptions({ headerLeft: () => <HeaderBackButton color={colors.text} onPress={() => setSelectedTrackId(null)} /> });
+    } else {
+      navigation.setOptions({ headerLeft: undefined });
+    }
+  }, [navigation, colors.text, selectedTopicId, selectedSubjectId, selectedTrackId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -118,7 +145,6 @@ export default function LearningScreen() {
   if (selectedTopicId && selectedSubject) {
     return (
       <Screen>
-        <GhostButton label="Back to subject" onPress={() => setSelectedTopicId(null)} />
         {topicLoading ? <LoadingView label="Loading topic..." /> : null}
         {topicError ? <ErrorText text={topicError} /> : null}
         {topicDetail ? (
@@ -139,7 +165,6 @@ export default function LearningScreen() {
   if (selectedTrackId && selectedSubject) {
     return (
       <Screen>
-        <GhostButton label="Back to subjects" onPress={() => setSelectedSubjectId(null)} />
         <SectionHeader eyebrow={selectedTrack?.title} title={selectedSubject.title} subtitle={selectedSubject.overview} />
         {selectedSubject.topics.map((topic) => (
           <Pressable
@@ -171,7 +196,6 @@ export default function LearningScreen() {
   if (selectedTrackId && selectedTrack) {
     return (
       <Screen>
-        <GhostButton label="Back to tracks" onPress={() => setSelectedTrackId(null)} />
         <SectionHeader eyebrow="Learning Center" title={selectedTrack.title} subtitle={selectedTrack.description} />
         {selectedTrack.subjects.map((subject) => (
           <Pressable

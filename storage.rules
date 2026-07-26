@@ -1,0 +1,14 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Uploaded resume files (PDF/DOCX) - see apps/mobile/src/lib/resumeUpload.ts. Mirrors firestore.rules'
+    // per-user pattern: a signed-in user can only read/write files under their own uid, and files are capped at
+    // 12MB to match the existing /api/resume/extract route's MAX_RESUME_FILE_BYTES limit.
+    match /users/{userId}/resumes/{fileName} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId
+        && request.resource.size < 12 * 1024 * 1024;
+    }
+  }
+}

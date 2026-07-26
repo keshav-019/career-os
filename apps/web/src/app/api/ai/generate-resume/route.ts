@@ -1,10 +1,14 @@
 import type { JobRecord } from "@careeros/shared";
 import { generateAtsResumeWithAi } from "@/lib/ai/career-ai";
 import { sanitizeProfileData } from "@/lib/profile-data";
+import { requireAuthAndRateLimit } from "@/lib/server/require-auth-rate-limit";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const gate = await requireAuthAndRateLimit(request, "ai-generate-resume");
+  if (!gate.ok) return gate.response;
+
   try {
     const body = (await request.json()) as {
       job?: Partial<JobRecord> & Record<string, unknown>;

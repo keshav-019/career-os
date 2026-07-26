@@ -18,21 +18,20 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import CodingArenaBrowser from "@/components/CodingArenaBrowser";
 import SystemDesignBrowser from "@/components/SystemDesignBrowser";
 import { isDesktopAppEnabled } from "@/lib/desktop-mode";
+import { learningAssetUrl } from "@/lib/learning/asset-url";
 import { useUserJobs } from "@/lib/firebase/jobs";
 import {
   createPracticeAttempt,
   useUserPracticeAttempts,
   type PracticeAttemptRecord
 } from "@/lib/firebase/interview-war-room";
+import { fetchAiInterviewRoles, fetchInterviewTestTemplates } from "@/lib/interview/client";
 import {
   formatInterviewTestType,
-  getInterviewTestTemplateCount,
-  listInterviewTestTemplates,
-  listAiInterviewRoles,
   listInterviewTracks,
   type AiInterviewRole,
   type InterviewTestTemplate,
@@ -51,19 +50,19 @@ const TRACK_ICONS: Record<InterviewTestType, typeof Target> = {
 
 const TRACK_VISUALS: Record<InterviewTestType, { imageAlt: string; imageSrc: string }> = {
   coding: {
-    imageSrc: "/war-room/coding-card.svg",
+    imageSrc: learningAssetUrl("/war-room/coding-card.svg"),
     imageAlt: "Coding interview visual"
   },
   aptitude: {
-    imageSrc: "/war-room/aptitude-card.svg",
+    imageSrc: learningAssetUrl("/war-room/aptitude-card.svg"),
     imageAlt: "Aptitude interview visual"
   },
   "computer-science": {
-    imageSrc: "/war-room/cs-card.svg",
+    imageSrc: learningAssetUrl("/war-room/cs-card.svg"),
     imageAlt: "Computer science interview visual"
   },
   ai: {
-    imageSrc: "/war-room/ai-card.svg",
+    imageSrc: learningAssetUrl("/war-room/ai-card.svg"),
     imageAlt: "Artificial intelligence interview visual"
   }
 };
@@ -148,7 +147,7 @@ function hasAttemptStarted(attempt: PracticeAttemptRecord): boolean {
   return Boolean(attempt.startedAt);
 }
 
-export default function InterviewPrepPage() {
+function InterviewPrepPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { attempts, error: attemptsError, loading: attemptsLoading, user } = useUserPracticeAttempts();
@@ -183,25 +182,69 @@ export default function InterviewPrepPage() {
   }, []);
 
   const tracks = useMemo(() => listInterviewTracks(), []);
-  const aiRoles = useMemo(() => listAiInterviewRoles(), []);
+  const [aiRoles, setAiRoles] = useState<AiInterviewRole[]>([]);
+  const [templateLibrary, setTemplateLibrary] = useState<InterviewTestTemplate[]>([]);
+  // Fixed-count tracks (aptitude/computer-science) show a "N compiled tests" badge on their unselected card, before
+  // the user has picked a track - fetched once up front since /api/interview/templates is the only place that
+  // count now lives (see lib/interview/client.ts's fetchInterviewTestTemplates(); the old synchronous
+  // getInterviewTestTemplateCount() call is gone - question-bank.ts's data is R2-backed and server-only now).
+  const [trackTemplateCounts, setTrackTemplateCounts] = useState<Partial<Record<InterviewTestType, number>>>({});
   const selectedAiRole = useMemo<AiInterviewRole | null>(
     () => (selectedAiRoleId ? aiRoles.find((role) => role.id === selectedAiRoleId) ?? null : null),
     [aiRoles, selectedAiRoleId]
   );
-  const templateLibrary = useMemo(
-    () => {
-      if (!selectedTrack) {
-        return [];
-      }
 
-      if (selectedTrack === "ai") {
-        return selectedAiRoleId ? listInterviewTestTemplates("ai", undefined, selectedAiRoleId) : [];
-      }
+  useEffect(() => {
+    let cancelled = false;
+    fetchAiInterviewRoles()
+      .then((roles) => {
+        if (!cancelled) setAiRoles(roles);
+      })
+      .catch(() => {
+        if (!cancelled) setAiRoles([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-      return listInterviewTestTemplates(selectedTrack);
-    },
-    [selectedAiRoleId, selectedTrack]
-  );
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all(
+      (["aptitude", "computer-science"] as const).map((testType) =>
+        fetchInterviewTestTemplates(testType).then((templates) => [testType, templates.length] as const)
+      )
+    )
+      .then((entries) => {
+        if (cancelled) return;
+        setTrackTemplateCounts(Object.fromEntries(entries));
+      })
+      .catch(() => {
+        if (!cancelled) setTrackTemplateCounts({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!selectedTrack || (selectedTrack === "ai" && !selectedAiRoleId)) {
+      setTemplateLibrary([]);
+      return;
+    }
+
+    let cancelled = false;
+    fetchInterviewTestTemplates(selectedTrack, selectedTrack === "ai" ? { roleId: selectedAiRoleId ?? undefined } : undefined)
+      .then((templates) => {
+        if (!cancelled) setTemplateLibrary(templates);
+      })
+      .catch(() => {
+        if (!cancelled) setTemplateLibrary([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedAiRoleId, selectedTrack]);
   const selectedTrackMeta = useMemo(
     () => (selectedTrack ? tracks.find((track) => track.id === selectedTrack) ?? null : null),
     [tracks, selectedTrack]
@@ -412,7 +455,7 @@ export default function InterviewPrepPage() {
       }
       visitedTracks.add(track);
 
-      const templates = listInterviewTestTemplates(track);
+      const templates = await fetchInterviewTestTemplates(track);
       if (templates.length === 0) {
         continue;
       }
@@ -610,7 +653,12 @@ export default function InterviewPrepPage() {
                   <span className="war-room-flip-inner">
                     <span className="war-room-flip-face war-room-flip-front">
                       <span className="war-room-flip-visual">
-                        <Image alt={role.imageAlt} fill sizes="(max-width: 680px) 100vw, (max-width: 1180px) 50vw, 25vw" src={role.imageSrc} />
+                        <Image
+                          alt={role.imageAlt}
+                          fill
+                          sizes="(max-width: 680px) 100vw, (max-width: 1180px) 50vw, 25vw"
+                          src={learningAssetUrl(role.imageSrc)}
+                        />
                       </span>
                       <span className="war-room-flip-content">
                         <span className="eyebrow">Role Track</span>
@@ -644,7 +692,7 @@ export default function InterviewPrepPage() {
             const Icon = TRACK_ICONS[track.id];
             const isSelected = selectedTrack === track.id;
             const visual = TRACK_VISUALS[track.id];
-            const templateCount = getInterviewTestTemplateCount(track.id);
+            const templateCount = trackTemplateCounts[track.id] ?? 0;
 
             return (
               <button
@@ -713,7 +761,12 @@ export default function InterviewPrepPage() {
             <span className="war-room-flip-inner">
               <span className="war-room-flip-face war-room-flip-front">
                 <span className="war-room-flip-visual">
-                  <Image alt="System design interview visual" fill sizes="(max-width: 680px) 100vw, 25vw" src="/war-room/system-design-card.svg" />
+                  <Image
+                    alt="System design interview visual"
+                    fill
+                    sizes="(max-width: 680px) 100vw, 25vw"
+                    src={learningAssetUrl("/war-room/system-design-card.svg")}
+                  />
                 </span>
                 <span className="war-room-flip-content">
                   <span className="eyebrow">Interactive Track</span>
@@ -1024,5 +1077,15 @@ export default function InterviewPrepPage() {
         </aside>
       </section>
     </div>
+  );
+}
+
+// useSearchParams() opts this page out of static generation unless wrapped in Suspense - this only surfaces
+// under the desktop build's standalone output mode (CAREEROS_DESKTOP_BUILD=1), not the default web build.
+export default function InterviewPrepPage() {
+  return (
+    <Suspense fallback={null}>
+      <InterviewPrepPageInner />
+    </Suspense>
   );
 }

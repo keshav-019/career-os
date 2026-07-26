@@ -76,12 +76,9 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
       items: [
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
         { href: "/applications", label: "Applications", icon: Briefcase },
-        ...(desktopAppEnabled
-          ? [
-              { href: "/ai-match", label: "AI Match", icon: Sparkles },
-              { href: "/resumes", label: "Resume Studio", icon: FileText }
-            ]
-          : [{ href: "/desktop", label: "Desktop App", icon: Laptop }])
+        { href: "/ai-match", label: "AI Match", icon: Sparkles },
+        { href: "/resumes", label: "Resume Studio", icon: FileText },
+        ...(desktopAppEnabled ? [] : [{ href: "/desktop", label: "Desktop App", icon: Laptop }])
       ]
     },
     {
@@ -108,7 +105,8 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
             items: [
               { href: "/admin/coding-problems", label: "Add Coding Question", icon: CirclePlus },
               { href: "/admin/system-design-problems", label: "Add System Design Question", icon: Workflow },
-              { href: "/admin/test-papers", label: "Add Test Paper", icon: Swords }
+              { href: "/admin/test-papers", label: "Add Test Paper", icon: Swords },
+              { href: "/admin/learning-content", label: "Add Learning Content", icon: GraduationCap }
             ]
           }
         ]
@@ -228,6 +226,10 @@ const routeCopy: Record<string, { title: string; subtitle: string; action?: stri
   "/admin/test-papers": {
     title: "Add Test Paper",
     subtitle: "Admin-only tool for authoring aptitude, computer science, and AI technical test papers."
+  },
+  "/admin/learning-content": {
+    title: "Add Learning Content",
+    subtitle: "Admin-only tool for authoring new Learning Center categories, subtopics, and topics."
   }
 };
 

@@ -14,6 +14,7 @@ import {
   Upload
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { auth } from "@/lib/firebase/client";
 import { useUserJobs, type CareerJob } from "@/lib/firebase/jobs";
 import { useUserResumes } from "@/lib/firebase/resumes";
 
@@ -198,10 +199,12 @@ function createLocalUploadedResume(label: string, fileName: string, text: string
 }
 
 async function postJson<T>(url: string, payload: unknown): Promise<T> {
+  const idToken = await auth?.currentUser?.getIdToken().catch(() => null);
   const response = await fetch(url, {
     body: JSON.stringify(payload),
     headers: {
-      "content-type": "application/json"
+      "content-type": "application/json",
+      ...(idToken ? { authorization: `Bearer ${idToken}` } : {})
     },
     method: "POST"
   });
@@ -332,8 +335,10 @@ export default function AiMatchPage() {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      const idToken = await auth?.currentUser?.getIdToken().catch(() => null);
       const response = await fetch("/api/resume/extract", {
         body: formData,
+        headers: idToken ? { authorization: `Bearer ${idToken}` } : undefined,
         method: "POST"
       });
       const body = (await response.json().catch(() => ({}))) as ResumeExtractResponse;

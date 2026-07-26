@@ -224,8 +224,31 @@ function createWebAppRuntime({ app, helperUrl, log }) {
   const webDevLockPath = path.join(webAppRoot, ".next", "dev", "lock");
   const webUrl = `http://${WEB_HOST}:${WEB_PORT}`;
 
+  // Public (non-secret) fallback config for the embedded Next.js server's runtime environment - mirrors
+  // apps/web/.env.production, which only covers *build*-time client-bundle inlining. Server-side code (API
+  // routes, lib/server/*) reads these same NEXT_PUBLIC_ vars again at actual runtime, and the packaged app has
+  // no .env file sitting next to its standalone server.js, so without this, sign-in and other server routes
+  // would work at build time but still break at runtime on every machine that installs the app. Every value
+  // here is genuinely public - see apps/web/.env.production's comment for why - and must stay in sync with that
+  // file and apps/mobile/src/config/env.ts.
+  const PUBLIC_CONFIG_FALLBACK = {
+    NEXT_PUBLIC_FIREBASE_API_KEY: "AIzaSyBEZap2qVQ9yZYWhaHBOaUXfJxB_rvMaCQ",
+    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "career-os-9aa87.firebaseapp.com",
+    NEXT_PUBLIC_FIREBASE_PROJECT_ID: "career-os-9aa87",
+    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "career-os-9aa87.firebasestorage.app",
+    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "730846222539",
+    NEXT_PUBLIC_FIREBASE_APP_ID: "1:730846222539:web:cdc52392353badf569234e",
+    NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: "G-76V7V21WDS",
+    NEXT_PUBLIC_R2_PUBLIC_BASE_URL: "https://pub-33382a89004f4a9f9dc850cbcac5fedd.r2.dev",
+    NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME: "depzyau1x",
+    NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: "profile_pics",
+    NEXT_PUBLIC_APP_URL: "https://keshav-019-career-os.vercel.app",
+    NEXT_PUBLIC_SITE_URL: "https://keshav-019-career-os.vercel.app"
+  };
+
   function getDesktopWebEnv() {
     return {
+      ...PUBLIC_CONFIG_FALLBACK,
       ...process.env,
       BROWSER: "none",
       CAREEROS_DESKTOP_APP: "1",

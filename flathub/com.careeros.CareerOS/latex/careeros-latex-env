@@ -1,0 +1,5 @@
+#!/bin/sh
+
+# CareerOS Flatpak uses the Flathub TeX Live extension instead of bundling a host-specific compiler binary.
+export CAREEROS_DISABLE_PORTABLE_LATEX=1
+export PATH="/app/texlive/bin/x86_64-linux:/app/texlive/bin/aarch64-linux:$PATH"

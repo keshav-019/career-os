@@ -1,11 +1,8 @@
-import { notFound } from "next/navigation";
 import ResumeStudio from "@/components/resume/ResumeStudio";
-import { isDesktopAppEnabled } from "@/lib/desktop-mode";
 
+// Visual Mode (and the Resume Gallery) work anywhere - only LaTeX compilation needs CareerOS Desktop's local
+// compiler, which ResumeStudio itself gates per-mode (see its "LaTeX (Desktop)" messaging). No reason to hide
+// the whole page from regular web users anymore.
 export default function ResumesPage() {
-  if (isDesktopAppEnabled()) {
-    return <ResumeStudio />;
-  }
-
-  notFound();
+  return <ResumeStudio />;
 }

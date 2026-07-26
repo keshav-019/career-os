@@ -184,7 +184,7 @@ export default function DashboardPage() {
                 </div>
 
                 {column.jobs.length > 0 ? (
-                  column.jobs.map((job) => (
+                  column.jobs.slice(0, 5).map((job) => (
                     <article className="pipeline-card" key={job.id}>
                       <div className="row-between">
                         <CompanyAvatar

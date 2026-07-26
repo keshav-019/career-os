@@ -5,6 +5,7 @@ import {
   type LearningTopicFigureEdit,
   type LearningTrackId
 } from "@/lib/learning/material-library";
+import { findAdminTopicDetailByIds } from "@/lib/learning/admin-content";
 import {
   LEARNING_ADMIN_SESSION_COOKIE,
   verifyLearningAdminSessionCookie
@@ -15,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 const TRACK_IDS: LearningTrackId[] = ["computer-science", "ai"];
 
-function isTrackId(value: string): value is LearningTrackId {
+function isBuiltInTrackId(value: string): value is LearningTrackId {
   return TRACK_IDS.includes(value as LearningTrackId);
 }
 
@@ -26,14 +27,20 @@ export async function GET(request: NextRequest) {
     const subjectId = searchParams.get("subjectId") ?? "";
     const topicId = searchParams.get("topicId") ?? "";
 
-    if (!isTrackId(track) || !subjectId || !topicId) {
+    if (!track || !subjectId || !topicId) {
       return NextResponse.json(
         { error: "Missing or invalid query params. Expected track, subjectId, and topicId." },
         { status: 400 }
       );
     }
 
-    const detail = await getLearningTopicDetail(track, subjectId, topicId);
+    // Built-in tracks (computer-science, ai) keep using the existing bundled content path untouched. Anything
+    // else is checked against admin-added categories (apps/web/src/app/admin/learning-content) instead - see
+    // lib/learning/admin-content.ts.
+    const detail = isBuiltInTrackId(track)
+      ? await getLearningTopicDetail(track, subjectId, topicId)
+      : await findAdminTopicDetailByIds(track, subjectId, topicId);
+
     if (!detail) {
       return NextResponse.json({ error: "Topic detail not found." }, { status: 404 });
     }
@@ -91,7 +98,7 @@ export async function PATCH(request: NextRequest) {
     const subjectId = payload?.subjectId ?? "";
     const topicId = payload?.topicId ?? "";
 
-    if (!isTrackId(track) || !subjectId || !topicId) {
+    if (!isBuiltInTrackId(track) || !subjectId || !topicId) {
       return NextResponse.json(
         { error: "Missing or invalid payload. Expected track, subjectId, and topicId." },
         { status: 400 }

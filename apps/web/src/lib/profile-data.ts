@@ -13,6 +13,17 @@ export type CareerPreference = "job" | "internship" | "both";
 export type ProjectType = "hobby" | "company";
 export type GradingType = "GPA" | "CGPA" | "Percentage";
 
+export type ProfileFileAttachment = {
+  id: string;
+  contentType: string;
+  kind: string;
+  name: string;
+  r2Key: string;
+  signedUrl?: string;
+  size: number;
+  uploadedAt: string;
+};
+
 export type EducationRecord = {
   id: string;
   institute: string;
@@ -23,6 +34,8 @@ export type EducationRecord = {
   isPursuing: boolean;
   gradingType: GradingType;
   score: string;
+  summary: string;
+  certificates: ProfileFileAttachment[];
 };
 
 export type ExperienceRecord = {
@@ -34,6 +47,8 @@ export type ExperienceRecord = {
   isCurrent: boolean;
   description: string;
   skillsGained: string;
+  achievements: string[];
+  certificates: ProfileFileAttachment[];
 };
 
 export type ProjectRecord = {
@@ -45,6 +60,7 @@ export type ProjectRecord = {
   description: string;
   techStack: string;
   skillsGained: string;
+  media: ProfileFileAttachment[];
 };
 
 export type CertificationRecord = {
@@ -52,7 +68,9 @@ export type CertificationRecord = {
   title: string;
   issuer: string;
   issueDate: string;
+  credentialUrl: string;
   fileName: string;
+  certificates: ProfileFileAttachment[];
 };
 
 export type ProfileData = {
@@ -93,6 +111,37 @@ function asStringArray(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 }
 
+function asNumber(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function asAttachmentArray(value: unknown): ProfileFileAttachment[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item): ProfileFileAttachment | null => {
+      if (!item || typeof item !== "object") return null;
+      const record = item as Record<string, unknown>;
+      const name = asString(record.name);
+      const r2Key = asString(record.r2Key);
+      if (!name || !r2Key) return null;
+      const attachment: ProfileFileAttachment = {
+        id: asString(record.id),
+        contentType: asString(record.contentType, "application/octet-stream"),
+        kind: asString(record.kind, "document"),
+        name,
+        r2Key,
+        size: asNumber(record.size),
+        uploadedAt: asString(record.uploadedAt)
+      };
+      const signedUrl = asString(record.signedUrl);
+      if (signedUrl) {
+        attachment.signedUrl = signedUrl;
+      }
+      return attachment;
+    })
+    .filter((item): item is ProfileFileAttachment => item !== null);
+}
+
 function asGradingType(value: unknown): GradingType {
   return value === "GPA" || value === "CGPA" || value === "Percentage" ? value : "CGPA";
 }
@@ -117,7 +166,9 @@ function toEducationRecord(raw: unknown): EducationRecord | null {
     endDate: asString(record.endDate),
     isPursuing: asBoolean(record.isPursuing),
     gradingType: asGradingType(record.gradingType),
-    score: asString(record.score)
+    score: asString(record.score),
+    summary: asString(record.summary),
+    certificates: asAttachmentArray(record.certificates)
   };
 }
 
@@ -132,7 +183,9 @@ function toExperienceRecord(raw: unknown): ExperienceRecord | null {
     endDate: asString(record.endDate),
     isCurrent: asBoolean(record.isCurrent),
     description: asString(record.description),
-    skillsGained: asString(record.skillsGained)
+    skillsGained: asString(record.skillsGained),
+    achievements: asStringArray(record.achievements),
+    certificates: asAttachmentArray(record.certificates)
   };
 }
 
@@ -147,7 +200,8 @@ function toProjectRecord(raw: unknown): ProjectRecord | null {
     endDate: asString(record.endDate),
     description: asString(record.description),
     techStack: asString(record.techStack),
-    skillsGained: asString(record.skillsGained)
+    skillsGained: asString(record.skillsGained),
+    media: asAttachmentArray(record.media)
   };
 }
 
@@ -159,7 +213,9 @@ function toCertificationRecord(raw: unknown): CertificationRecord | null {
     title: asString(record.title),
     issuer: asString(record.issuer),
     issueDate: asString(record.issueDate),
-    fileName: asString(record.fileName)
+    credentialUrl: asString(record.credentialUrl),
+    fileName: asString(record.fileName),
+    certificates: asAttachmentArray(record.certificates)
   };
 }
 

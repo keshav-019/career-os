@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.10.0.schema.json
+PackageIdentifier: KeshavJha.CareerOS
+PackageVersion: 1.0.0
+PackageLocale: en-US
+Publisher: Keshav Jha
+PublisherUrl: https://github.com/keshav-019
+PublisherSupportUrl: https://github.com/keshav-019/career-os/issues
+PackageName: CareerOS
+PackageUrl: https://github.com/keshav-019/career-os
+License: Proprietary
+ShortDescription: Career workspace for resumes, jobs, interviews, and applications.
+Description: >-
+  CareerOS is a desktop career workspace for managing resumes, jobs, interview
+  preparation, coding practice, and AI-assisted application workflows. This
+  desktop build additionally supports local LaTeX resume compilation (bundled
+  Tectonic engine, no upload required) and a Coding Arena that runs and
+  submits solutions in C, C++, Java, JavaScript, Python, or Rust entirely on
+  your machine. An internet connection is required for sign-in and AI
+  features.
+Moniker: careeros
+Tags:
+  - career
+  - job-search
+  - resume
+  - interview-prep
+  - productivity
+ReleaseNotesUrl: https://github.com/keshav-019/career-os/releases/tag/v1.0.0
+ManifestType: defaultLocale
+ManifestVersion: 1.10.0

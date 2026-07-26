@@ -6,6 +6,15 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Reads the caller's own admin flag directly from Firestore, independent of whether the Admin SDK is
+    // configured server-side (see lib/server/require-admin.ts's fallback path, which can fail open in a way
+    // this cannot - `admin` on users/{uid} can only ever be set via the Firebase console or Admin SDK, both of
+    // which bypass these rules entirely, so this get() is exactly as trustworthy as the field itself).
+    function isAdmin() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('admin', false) == true;
+    }
+
     // The root users/{userId} document carries account-level flags such as
     // `admin`. Clients may read and update their own document, but they can
     // never introduce or change the `admin` field themselves - it can only be
@@ -27,30 +36,41 @@ service cloud.firestore {
       allow read, write: if isSignedIn() && request.auth.uid == userId;
     }
 
-    // Coding-arena problems. The admin editor UI (app/admin/coding-problems) and the
-    // server-side requireAdmin() check are what actually gate who's allowed to reach the
-    // save API route in the first place - these rules are the fallback layer for when the
-    // Firebase Admin SDK isn't configured (see lib/firebase/admin.ts), so the same API routes
-    // can fall back to a plain authenticated Firestore REST write instead. Any signed-in user
-    // can write here; this is intentionally permissive (no extra flag required) since this is a
-    // single-admin personal project, not a multi-tenant product with untrusted end users.
+    // Coding-arena problems. The admin editor UI (app/admin/coding-problems) and the server-side requireAdmin()
+    // check gate the save API route, but those routes persist via a plain authenticated Firestore REST write
+    // (see lib/firebase/admin.ts's fallback for when the Admin SDK isn't configured) - so these rules are the
+    // REAL enforcement layer, not a fallback. Write is admin-only: a coding problem's `harness` field is
+    // executed verbatim by every other user's desktop app when they open the problem (see
+    // apps/desktop/src/coding/index.js's composeFullSource), so any signed-in writer here would be a
+    // cross-user remote-code-execution vector, not just catalog vandalism. Read stays open to any signed-in
+    // user since the catalog itself is meant to be public within the app.
     match /codingProblems/{problemId} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     // Mirrors codingProblems above, for the system-design catalog's admin editor.
     match /systemDesignProblems/{problemId} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     // Mirrors codingProblems above, for the aptitude/computer-science/AI technical test-paper admin editor
     // (app/admin/test-papers). Read access is needed by any signed-in user, not just admins, since these are
     // merged into the public /api/interview/templates* results that both web and mobile fetch to take a test.
+    // Write is admin-only so an ordinary user can't rewrite the answer key (correctOptionId) other users are
+    // scored against.
     match /customTestPapers/{paperId} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Admin-authored Learning Center categories (app/admin/learning-content). Mirrors codingProblems above -
+    // read access is needed by any signed-in user since these are merged into the public /api/learning/library
+    // and /api/learning/topic results both apps fetch. Write is admin-only.
+    match /learningCategories/{categoryId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     // Submission/attempt logs are append-only, per-user event logs (no
