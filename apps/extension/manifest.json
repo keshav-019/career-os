@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "CareerOS Capture",
   "description": "Save job posts into CareerOS.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyv6XrObjNKJMJL0jBHB+Gs/EVW/xmixyQbX00+bqc6MzQUB7MuU89qzPefDNPjC2ELLliG5YUgiOrOa586yGQr92maqlTkyiP+PB8LHRsXNd6/5D4nKXU6tVu6VjO65uTyyO8eNEu3sfHDbiAjMgstIoqOgQPbs/d7taro5D+Utm5OxoI5T9L881KtAy+gZCN0ssKaGNttfgBvqWky+DcBXVllHP5Jafn0WZGjqmDVXvKxjoHXWMpyG1g91+WwOLVoJnCLDoVNMqyw5xmRwlqKBSZ88rU2MKjHAKYZG6O12WdJX8HlWnoHrrFjs92p9hIqG84m/aWRiiT98SNAiOQwIDAQAB",
   "permissions": [
     "activeTab",
