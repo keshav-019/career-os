@@ -39,7 +39,20 @@ async function extractDocxFile(file: File): Promise<string> {
   return normalizeExtractedText(result.value || "");
 }
 
+/** pdfjs-dist's text-position math reaches for the browser's DOMMatrix API even for plain getTextContent() calls
+ *  (not just rendering). Node has no such global - whether that actually breaks depends on the exact Node
+ *  version/runtime (confirmed: fine on local Node 20, throws "DOMMatrix is not defined" on Vercel's Node 24),
+ *  so polyfill it defensively rather than depend on that. Safe everywhere: only fills the gap if it's missing. */
+async function ensureDomMatrixPolyfill(): Promise<void> {
+  if (typeof globalThis.DOMMatrix !== "undefined") {
+    return;
+  }
+  const { default: DOMMatrixPolyfill } = await import("dommatrix");
+  (globalThis as { DOMMatrix?: unknown }).DOMMatrix = DOMMatrixPolyfill;
+}
+
 async function extractPdfFile(file: File): Promise<string> {
+  await ensureDomMatrixPolyfill();
   const runtimeImport = new Function("specifier", "return import(specifier)") as (
     specifier: string
   ) => Promise<typeof import("pdfjs-dist/legacy/build/pdf.mjs")>;
