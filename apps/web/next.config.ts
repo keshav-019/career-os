@@ -25,6 +25,9 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@careeros/shared"],
   turbopack: {
     root: repoRoot
+  },
+  images: {
+    remotePatterns: [{ protocol: "https", hostname: "pub-33382a89004f4a9f9dc850cbcac5fedd.r2.dev" }]
   }
 };
 

@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "../config/env";
+import { LEGACY_WEB_BASE_URL, R2_PUBLIC_BASE_URL } from "../config/env";
 import { apiGet, apiPost } from "./apiClient";
 import { fetchMcqReview } from "./practiceAttempts";
 import type { PracticeAttemptRecord } from "../types/practiceAttempt";
@@ -10,26 +10,29 @@ import type {
   WeakTopicRow
 } from "../types/learning";
 
-/** Thin wrapper around the deployed web app's learning content routes - see
+/** Thin wrapper around the legacy web app's learning content routes - see
  *  apps/web/src/app/api/learning/library/route.ts and .../topic/route.ts. Both return the raw payload
- *  (no {ok,...} wrapper), matching web's own fetch usage exactly. */
+ *  (no {ok,...} wrapper), matching web's own fetch usage exactly. These two routes are the only calls in this app
+ *  that still target LEGACY_WEB_BASE_URL instead of the default API_BASE_URL (apps/mobile-backend) - see
+ *  config/env.ts for why. Their figure images are fetched separately, via resolveAssetUrl below, from
+ *  R2_PUBLIC_BASE_URL - not from LEGACY_WEB_BASE_URL. */
 
 export async function fetchLearningLibrary(): Promise<{ generatedAt: string; tracks: TrackSummary[] }> {
-  return apiGet("/api/learning/library");
+  return apiGet("/api/learning/library", LEGACY_WEB_BASE_URL);
 }
 
 export async function fetchTopicDetail(track: LearningTrackId, subjectId: string, topicId: string): Promise<TopicDetail> {
   const params = new URLSearchParams({ track, subjectId, topicId });
-  return apiGet(`/api/learning/topic?${params.toString()}`);
+  return apiGet(`/api/learning/topic?${params.toString()}`, LEGACY_WEB_BASE_URL);
 }
 
-/** Figure/track image `src` values are site-relative (e.g. "/learning/os/fig-2-1.png") since web's <Image>
- *  resolves them against its own origin automatically. RN has no such concept, so every relative asset path
- *  needs the deployed API_BASE_URL prefixed to become a loadable absolute URL. */
+/** Figure/track image `src` values are site-relative (e.g. "/learning/os/fig-2-1.png") - these now live in
+ *  Cloudflare R2's public bucket (R2_PUBLIC_BASE_URL), not on the web app's own origin, so every relative asset
+ *  path needs that base URL prefixed to become a loadable absolute URL. See config/env.ts. */
 export function resolveAssetUrl(src: string | undefined): string | undefined {
   if (!src) return undefined;
   if (src.startsWith("http://") || src.startsWith("https://")) return src;
-  return `${API_BASE_URL}${src.startsWith("/") ? "" : "/"}${src}`;
+  return `${R2_PUBLIC_BASE_URL}${src.startsWith("/") ? "" : "/"}${src}`;
 }
 
 type LearningPlanTrackInput = {

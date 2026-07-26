@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+
+if [ -f /app/share/careeros/latex/careeros-latex-env ]; then
+  . /app/share/careeros/latex/careeros-latex-env
+fi
+
+if [ -x /app/careeros/careeros ]; then
+  exec zypak-wrapper /app/careeros/careeros "$@"
+fi
+
+exec zypak-wrapper /app/careeros/CareerOS "$@"

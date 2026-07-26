@@ -86,10 +86,10 @@ function isValidTestType(value: string): value is Exclude<InterviewTestType, "co
 /** Validates and normalizes one admin-authored test paper into the stored record shape - shared by the single-save
  *  and bulk-import paths (bulk just calls this once per array entry). Throws with a human-readable message on any
  *  invalid input, since that message is shown directly in the admin UI. */
-export function buildCustomTestPaperRecord(
+export async function buildCustomTestPaperRecord(
   input: CustomTestPaperInput,
   context: { createdBy: string; existingCreatedAt?: string }
-): CustomTestPaperRecord {
+): Promise<CustomTestPaperRecord> {
   if (!isValidTestType(input.testType)) {
     throw new Error('testType must be one of "aptitude", "computer-science", or "ai".');
   }
@@ -110,7 +110,8 @@ export function buildCustomTestPaperRecord(
     if (!roleId) {
       throw new Error("roleId is required for AI Technical test papers.");
     }
-    const role = listAiInterviewRoles().find((candidate) => candidate.id === roleId);
+    const roles = await listAiInterviewRoles();
+    const role = roles.find((candidate) => candidate.id === roleId);
     if (!role) {
       throw new Error(`Unknown AI role id "${roleId}". Check /api/interview/ai-roles for valid ids.`);
     }

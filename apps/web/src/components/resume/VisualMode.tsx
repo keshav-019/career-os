@@ -2,11 +2,11 @@
 
 import { AlertTriangle, Download, LayoutTemplate, Loader2, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import html2pdf from 'html2pdf.js';
 import ResumeForm from './ResumeForm';
 import ResumeTemplateGallery from './ResumeTemplateGallery';
 import { DEFAULT_RESUME_TEMPLATE_ID, getResumeVisualTemplate, type ResumeVisualTemplateId } from './templates';
 import { ResumeData } from '@/lib/resume-types';
+import { auth } from '@/lib/firebase/client';
 import { useUserJobs, type CareerJob } from '@/lib/firebase/jobs';
 import { hasMeaningfulProfileContent, loadStoredProfile } from '@/lib/profile-data';
 
@@ -17,6 +17,13 @@ const PAGE_BREAK_CLASS = 'resume-visual-page-break';
 interface VisualModeProps {
   data: ResumeData;
   onChange: (data: ResumeData) => void;
+  /** Seeds the starting template when loading an existing saved resume from the Resume Gallery - falls back to
+   *  the last-used template from localStorage (existing behavior) when not provided (starting a brand-new
+   *  resume). */
+  initialTemplateId?: ResumeVisualTemplateId;
+  /** Fired once a "Generate resume for job" call succeeds, so the parent (ResumeStudio) can remember which job
+   *  this resume was tailored for and show/save that mapping in the Resume Gallery. */
+  onGeneratedForJob?: (jobId: string, jobLabel: string) => void;
 }
 
 function readStoredTemplateId(): ResumeVisualTemplateId | null {
@@ -81,7 +88,7 @@ function usePagePagination(pageRef: { current: HTMLDivElement | null }, deps: un
   return { pageCount, pageHeightPx };
 }
 
-export default function VisualMode({ data, onChange }: VisualModeProps) {
+export default function VisualMode({ data, onChange, initialTemplateId, onGeneratedForJob }: VisualModeProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState<ResumeVisualTemplateId | null>(null);
@@ -93,8 +100,11 @@ export default function VisualMode({ data, onChange }: VisualModeProps) {
   const [generateNotice, setGenerateNotice] = useState<string | null>(null);
 
   useEffect(() => {
-    setSelectedTemplateId(readStoredTemplateId());
+    setSelectedTemplateId(initialTemplateId ?? readStoredTemplateId());
     setHydrated(true);
+    // Only meant to seed state once per mount (e.g. when the Resume Gallery remounts this component via a `key`
+    // change to load a different resume) - not meant to fight the user's own in-session template changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const { pageCount, pageHeightPx } = usePagePagination(canvasRef, [data, selectedTemplateId]);
@@ -120,9 +130,10 @@ export default function VisualMode({ data, onChange }: VisualModeProps) {
     setGenerateNotice(null);
 
     try {
+      const idToken = await auth?.currentUser?.getIdToken().catch(() => null);
       const response = await fetch('/api/ai/generate-resume', {
         body: JSON.stringify({ job: jobToGenerateResumePayload(selectedJob), profile }),
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(idToken ? { authorization: `Bearer ${idToken}` } : {}) },
         method: 'POST'
       });
 
@@ -142,13 +153,14 @@ export default function VisualMode({ data, onChange }: VisualModeProps) {
           portfolio: data.personal.portfolio
         }
       });
-      setGenerateNotice(`Resume tailored for ${jobOptionLabel(selectedJob)}. Review it below, then download.`);
+      setGenerateNotice(`Resume tailored for ${jobOptionLabel(selectedJob)}. Review it below, then save or download.`);
+      onGeneratedForJob?.(selectedJob.id, jobOptionLabel(selectedJob));
     } catch (err) {
       setGenerateError(err instanceof Error ? err.message : 'Unable to generate a tailored resume.');
     } finally {
       setIsGenerating(false);
     }
-  }, [data.personal.github, data.personal.linkedin, data.personal.portfolio, onChange, selectedJob]);
+  }, [data.personal.github, data.personal.linkedin, data.personal.portfolio, onChange, onGeneratedForJob, selectedJob]);
 
   const handleSelectTemplate = useCallback((templateId: ResumeVisualTemplateId) => {
     setSelectedTemplateId(templateId);
@@ -181,6 +193,10 @@ export default function VisualMode({ data, onChange }: VisualModeProps) {
         margin: 0
       };
 
+      // Dynamically imported (not a top-level import) because html2pdf.js references browser globals
+      // (`self`) at module-evaluation time - a static import crashes Next.js's server-side prerendering
+      // of this page even though the component itself only ever calls it client-side.
+      const { default: html2pdf } = await import('html2pdf.js');
       await html2pdf().set(opt).from(canvasRef.current).save();
     } catch (err) {
       console.error('PDF download failed', err);

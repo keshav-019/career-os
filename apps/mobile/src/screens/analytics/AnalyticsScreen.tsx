@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Text, View } from "react-native";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../theme/ThemeContext";
-import { useUserPracticeAttempts, fetchMcqReview, type PracticeAttemptRecord } from "../../lib/practiceAttempts";
+import { useUserPracticeAttempts, fetchMcqReview, fetchAiRoles, type AiInterviewRole, type PracticeAttemptRecord } from "../../lib/practiceAttempts";
 import type { InterviewTestType } from "../../types/practiceAttempt";
 import { Card, EmptyState, GhostButton, LoadingView, MetricCard, MetricGrid, Pill, ProgressBar, Screen, SectionHeader } from "../../components/ui/Primitives";
 import { PickerField } from "../../components/ui/PickerField";
+import { DateTimeField } from "../../components/ui/DateTimeField";
 import { BarChart } from "../../components/ui/BarChart";
 
 type TrackFilter = "all" | InterviewTestType;
@@ -17,6 +18,14 @@ const TRACK_OPTIONS: { value: TrackFilter; label: string }[] = [
   { value: "computer-science", label: "Computer Science" },
   { value: "ai", label: "AI" }
 ];
+
+/** Mirrors apps/web/src/app/analytics/page.tsx's resolveAiRoleFromTemplate() exactly - "ai" test template ids
+ *  encode the role directly (see question-bank.ts's buildTemplateId), so no extra lookup is needed. */
+function resolveAiRoleFromTemplate(attempt: PracticeAttemptRecord): string | null {
+  const templateId = (attempt.testTemplateId ?? "").trim();
+  const match = templateId.match(/^ai_([a-z0-9-]+)_test_\d{3}$/);
+  return match?.[1] ?? null;
+}
 
 const SUMMARY_PAGE_SIZE = 5;
 
@@ -48,8 +57,18 @@ export default function AnalyticsScreen() {
   const { attempts, loading } = useUserPracticeAttempts(user?.uid);
 
   const [trackFilter, setTrackFilter] = useState<TrackFilter>("all");
+  const [aiRoleFilter, setAiRoleFilter] = useState("all");
+  const [aiRoles, setAiRoles] = useState<AiInterviewRole[]>([]);
+  const [fromDate, setFromDate] = useState<Date | null>(null);
+  const [toDate, setToDate] = useState<Date | null>(null);
   const [summaryPage, setSummaryPage] = useState(1);
   const [correctById, setCorrectById] = useState<Map<string, string> | null>(null);
+
+  useEffect(() => {
+    fetchAiRoles()
+      .then(setAiRoles)
+      .catch(() => setAiRoles([]));
+  }, []);
 
   const completedAttempts = useMemo(() => attempts.filter((a) => a.status === "submitted" || a.status === "timed_out"), [attempts]);
 
@@ -105,7 +124,19 @@ export default function AnalyticsScreen() {
       .sort((a, b) => a.submittedAtMs - b.submittedAtMs);
   }, [completedAttempts, correctById]);
 
-  const filteredPoints = useMemo(() => (trackFilter === "all" ? points : points.filter((p) => p.attempt.testType === trackFilter)), [points, trackFilter]);
+  const dateFilteredPoints = useMemo(() => {
+    const fromMs = fromDate ? new Date(fromDate).setHours(0, 0, 0, 0) : Number.NEGATIVE_INFINITY;
+    const toMs = toDate ? new Date(toDate).setHours(23, 59, 59, 999) : Number.POSITIVE_INFINITY;
+    return points.filter((p) => p.submittedAtMs >= fromMs && p.submittedAtMs <= toMs);
+  }, [points, fromDate, toDate]);
+
+  const filteredPoints = useMemo(() => {
+    return dateFilteredPoints.filter((p) => {
+      if (trackFilter !== "all" && p.attempt.testType !== trackFilter) return false;
+      if (trackFilter === "ai" && aiRoleFilter !== "all") return resolveAiRoleFromTemplate(p.attempt) === aiRoleFilter;
+      return true;
+    });
+  }, [dateFilteredPoints, trackFilter, aiRoleFilter]);
 
   const summaryMetrics = useMemo(() => {
     const total = filteredPoints.length;
@@ -166,9 +197,56 @@ export default function AnalyticsScreen() {
         options={TRACK_OPTIONS}
         onChange={(v) => {
           setTrackFilter(v);
+          setAiRoleFilter("all");
           setSummaryPage(1);
         }}
       />
+
+      {trackFilter === "ai" ? (
+        <PickerField
+          label="AI Role"
+          value={aiRoleFilter}
+          options={[{ value: "all", label: "All AI Roles" }, ...aiRoles.map((role) => ({ value: role.id, label: role.name }))]}
+          onChange={(v) => {
+            setAiRoleFilter(v);
+            setSummaryPage(1);
+          }}
+        />
+      ) : null}
+
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        <View style={{ flex: 1 }}>
+          <DateTimeField
+            label="From"
+            mode="date"
+            value={fromDate}
+            onChange={(date) => {
+              setFromDate(date);
+              setSummaryPage(1);
+            }}
+          />
+        </View>
+        <View style={{ flex: 1 }}>
+          <DateTimeField
+            label="To"
+            mode="date"
+            value={toDate}
+            onChange={(date) => {
+              setToDate(date);
+              setSummaryPage(1);
+            }}
+          />
+        </View>
+      </View>
+      {fromDate || toDate ? (
+        <GhostButton
+          label="Clear date range"
+          onPress={() => {
+            setFromDate(null);
+            setToDate(null);
+          }}
+        />
+      ) : null}
 
       <MetricGrid>
         <MetricCard label="Tests Taken" value={String(summaryMetrics.total)} detail="Submitted attempts" tone="success" />

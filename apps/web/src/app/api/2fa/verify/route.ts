@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { generate, verify } from "otplib";
 import { createTwoFactorSession } from "@/lib/server/two-factor-session";
 import { decryptTwoFactorSecret } from "@/lib/server/two-factor-crypto";
+import { buildExtensionCorsHeaders, extensionCorsPreflight, jsonWithExtensionCors } from "@/lib/server/extension-cors";
 import { checkSlidingWindowRateLimit } from "@/lib/server/rate-limit";
 import {
   getUserTwoFactorSettings,
@@ -50,17 +51,22 @@ async function verifyConsecutiveSetupCodes(secret: string, firstToken: string, s
   return false;
 }
 
+export async function OPTIONS(request: Request) {
+  return extensionCorsPreflight(request, ["OPTIONS", "POST"]);
+}
+
 export async function POST(request: Request) {
   try {
     const auth = await verifyRequestAuth(request.headers.get("authorization"));
 
     if (auth.signInProvider === "google.com" || auth.signInProvider === "github.com") {
-      return NextResponse.json(
+      return jsonWithExtensionCors(
+        request,
         {
           code: "TWO_FACTOR_NOT_APPLICABLE",
           error: "Authenticator verification is not required for Google or GitHub sign-ins."
         },
-        { status: 400 }
+        400
       );
     }
 
@@ -74,6 +80,8 @@ export async function POST(request: Request) {
       windowMs: 5 * 60_000
     });
     if (!rateLimit.allowed) {
+      const headers = buildExtensionCorsHeaders(request, ["OPTIONS", "POST"]);
+      headers.set("Retry-After", String(Math.max(1, Math.ceil(rateLimit.retryAfterMs / 1000))));
       return NextResponse.json(
         {
           code: "RATE_LIMITED",
@@ -81,20 +89,19 @@ export async function POST(request: Request) {
         },
         {
           status: 429,
-          headers: {
-            "Retry-After": String(Math.max(1, Math.ceil(rateLimit.retryAfterMs / 1000)))
-          }
+          headers
         }
       );
     }
 
     if (!/^\d{6}$/.test(normalizedToken)) {
-      return NextResponse.json(
+      return jsonWithExtensionCors(
+        request,
         {
           code: "INVALID_2FA_INPUT",
           error: "Enter a valid 6-digit authenticator code."
         },
-        { status: 400 }
+        400
       );
     }
 
@@ -103,12 +110,13 @@ export async function POST(request: Request) {
     const isPendingSetup = Boolean(settings.twoFactorPendingSecret);
 
     if (!encryptedSecret) {
-      return NextResponse.json(
+      return jsonWithExtensionCors(
+        request,
         {
           code: "TWO_FACTOR_NOT_CONFIGURED",
           error: "Two-factor authentication is not configured for this account."
         },
-        { status: 400 }
+        400
       );
     }
 
@@ -116,22 +124,24 @@ export async function POST(request: Request) {
 
     if (isPendingSetup) {
       if (!/^\d{6}$/.test(normalizedNextToken)) {
-        return NextResponse.json(
+        return jsonWithExtensionCors(
+          request,
           {
             code: "INVALID_2FA_NEXT_INPUT",
             error: "Enter the next 6-digit authenticator code after refresh."
           },
-          { status: 400 }
+          400
         );
       }
 
       if (normalizedToken === normalizedNextToken) {
-        return NextResponse.json(
+        return jsonWithExtensionCors(
+          request,
           {
             code: "CONSECUTIVE_CODES_REQUIRED",
             error: "The two setup codes must be consecutive. Wait for code refresh and try again."
           },
-          { status: 400 }
+          400
         );
       }
 
@@ -142,12 +152,13 @@ export async function POST(request: Request) {
       );
 
       if (!hasConsecutiveCodes) {
-        return NextResponse.json(
+        return jsonWithExtensionCors(
+          request,
           {
             code: "CONSECUTIVE_CODES_REQUIRED",
             error: "Setup needs two consecutive valid authenticator codes. Please retry setup verification."
           },
-          { status: 400 }
+          400
         );
       }
 
@@ -161,7 +172,7 @@ export async function POST(request: Request) {
         twoFactorSessionIssuedAt: new Date(enrollmentSession.issuedAtMs)
       });
 
-      return NextResponse.json({
+      return jsonWithExtensionCors(request, {
         firstEnrollment: true,
         twoFactorSessionExpiresAt: new Date(enrollmentSession.expiresAtMs).toISOString(),
         twoFactorSessionToken: enrollmentSession.token,
@@ -180,7 +191,7 @@ export async function POST(request: Request) {
         : Boolean((verificationResult as { valid?: boolean }).valid);
 
     if (!isVerified) {
-      return NextResponse.json({ verified: false });
+      return jsonWithExtensionCors(request, { verified: false });
     }
 
     const twoFactorSession = createTwoFactorSession();
@@ -190,7 +201,7 @@ export async function POST(request: Request) {
       twoFactorSessionIssuedAt: new Date(twoFactorSession.issuedAtMs)
     });
 
-    return NextResponse.json({
+    return jsonWithExtensionCors(request, {
       firstEnrollment: false,
       twoFactorSessionExpiresAt: new Date(twoFactorSession.expiresAtMs).toISOString(),
       twoFactorSessionToken: twoFactorSession.token,
@@ -206,9 +217,10 @@ export async function POST(request: Request) {
         : 500;
     const safeMessage = status === 401 ? "Invalid or expired authentication token." : "Failed to verify authenticator code.";
 
-    return NextResponse.json(
+    return jsonWithExtensionCors(
+      request,
       { error: safeMessage },
-      { status }
+      status
     );
   }
 }

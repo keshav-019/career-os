@@ -112,7 +112,7 @@ export default function DashboardScreen() {
                 {columnJobs.length === 0 ? (
                   <Text style={{ color: colors.muted, fontSize: fontSize.sm }}>No roles in this lane yet.</Text>
                 ) : (
-                  columnJobs.slice(0, 6).map((job) => (
+                  columnJobs.slice(0, 5).map((job) => (
                     <View
                       key={job.id}
                       style={{ backgroundColor: colors.surface, borderRadius: 10, padding: 10, gap: 4, borderWidth: 1, borderColor: colors.border }}

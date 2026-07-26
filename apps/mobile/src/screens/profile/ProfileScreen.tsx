@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { Image, Pressable, Text, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { Plus, Trash2, UserRound } from "lucide-react-native";
+import { FileText, Plus, Trash2, Upload, UserRound } from "lucide-react-native";
 import { useAuth } from "../../contexts/AuthContext";
 import { useTheme } from "../../theme/ThemeContext";
 import { loadProfile, saveProfile } from "../../lib/profile";
 import { uploadImageUriToCloudinary } from "../../lib/cloudinaryUpload";
+import { useUserResumes } from "../../lib/resumes";
+import { deleteUploadedResume, pickAndUploadResume, ResumeUploadCancelledError } from "../../lib/resumeUpload";
 import { makeLocalId, type CareerPreference, type ProfileData } from "../../types/profile";
 import {
   Card,
@@ -13,6 +15,7 @@ import {
   FieldLabel,
   GhostButton,
   LoadingView,
+  Pill,
   PrimaryButton,
   Screen,
   SectionHeader,
@@ -78,12 +81,41 @@ export default function ProfileScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const { resumes } = useUserResumes(user?.uid);
+  const [uploadingResume, setUploadingResume] = useState(false);
+  const [resumeError, setResumeError] = useState<string | null>(null);
+
   useEffect(() => {
     loadProfile().then((p) => setProfile({ ...p, email: p.email || user?.email || "" }));
   }, [user?.email]);
 
   function update<K extends keyof ProfileData>(key: K, value: ProfileData[K]) {
     setProfile((current) => (current ? { ...current, [key]: value } : current));
+  }
+
+  async function handleUploadResume() {
+    if (!user) return;
+    setResumeError(null);
+    setUploadingResume(true);
+    try {
+      await pickAndUploadResume(user.uid);
+      setNotice("Resume uploaded. It's now available in AI Match.");
+    } catch (err) {
+      if (!(err instanceof ResumeUploadCancelledError)) {
+        setResumeError(err instanceof Error ? err.message : "Could not upload this resume.");
+      }
+    } finally {
+      setUploadingResume(false);
+    }
+  }
+
+  async function handleDeleteResume(resumeId: string) {
+    if (!user) return;
+    try {
+      await deleteUploadedResume(user.uid, resumeId);
+    } catch (err) {
+      setResumeError(err instanceof Error ? err.message : "Could not remove this resume.");
+    }
   }
 
   async function handlePickPhoto() {
@@ -290,8 +322,41 @@ export default function ProfileScreen() {
       </Card>
 
       <Card>
-        <SectionHeader eyebrow="Resume" title="Resume file name" subtitle="Cosmetic reference only - use AI Match or Resume Studio to attach an actual resume." />
-        <TextField value={profile.resumeFileName} onChangeText={(v) => update("resumeFileName", v)} placeholder="resume.pdf" />
+        <SectionHeader eyebrow="Resume" title="Uploaded resumes" subtitle="Upload a PDF, DOCX, or TXT resume - it's usable right away in AI Match." />
+        {resumes.length === 0 ? (
+          <Text style={{ color: colors.muted, fontSize: fontSize.sm }}>No resumes uploaded yet.</Text>
+        ) : (
+          resumes.map((resume) => (
+            <View
+              key={resume.id}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 10,
+                padding: 10,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: colors.border,
+                backgroundColor: colors.surface
+              }}
+            >
+              <FileText color={colors.brand} size={18} />
+              <Text style={{ color: colors.text, fontWeight: "700", fontSize: fontSize.sm, flex: 1 }} numberOfLines={1}>
+                {resume.label}
+              </Text>
+              <Pressable onPress={() => void handleDeleteResume(resume.id)} hitSlop={8}>
+                <Trash2 color={colors.danger} size={16} />
+              </Pressable>
+            </View>
+          ))
+        )}
+        {resumeError ? <ErrorText text={resumeError} /> : null}
+        <PrimaryButton
+          label={uploadingResume ? "Uploading..." : "Upload Resume"}
+          icon={<Upload color="#fff" size={14} />}
+          onPress={() => void handleUploadResume()}
+          loading={uploadingResume}
+        />
       </Card>
 
       {error ? <ErrorText text={error} /> : null}

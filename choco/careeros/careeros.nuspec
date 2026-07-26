@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>careeros</id>
+    <version>1.0.0</version>
+    <packageSourceUrl>https://github.com/keshav-019/career-os/tree/first-phase/choco/careeros</packageSourceUrl>
+    <owners>keshav-019</owners>
+    <title>CareerOS Desktop</title>
+    <authors>Keshav Jha</authors>
+    <projectUrl>https://github.com/keshav-019/career-os</projectUrl>
+    <iconUrl>https://raw.githubusercontent.com/keshav-019/career-os/first-phase/apps/desktop/build/icon.png</iconUrl>
+    <copyright>Keshav Jha</copyright>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <projectSourceUrl>https://github.com/keshav-019/career-os</projectSourceUrl>
+    <!-- Proprietary software: no public license file/URL to reference. -->
+    <docsUrl>https://github.com/keshav-019/career-os#readme</docsUrl>
+    <bugTrackerUrl>https://github.com/keshav-019/career-os/issues</bugTrackerUrl>
+    <tags>careeros career job-search resume interview-prep electron desktop</tags>
+    <summary>Career workspace for resumes, jobs, interviews, and applications</summary>
+    <description>
+CareerOS is a desktop career workspace for managing resumes, jobs, interview preparation, coding practice, and AI-assisted application workflows.
+
+This desktop build additionally supports:
+
+- Local LaTeX resume compilation (bundled Tectonic engine, no upload required)
+- Coding Arena: run and submit solutions in C, C++, Java, JavaScript, Python, or Rust entirely on your machine
+
+An internet connection is required for sign-in and AI features.
+    </description>
+    <releaseNotes>https://github.com/keshav-019/career-os/releases/tag/v1.0.0</releaseNotes>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

@@ -1,3 +1,5 @@
+import { requireAuthAndRateLimit } from "@/lib/server/require-auth-rate-limit";
+
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
@@ -100,6 +102,9 @@ async function extractResumeText(file: File): Promise<string> {
 }
 
 export async function POST(request: Request) {
+  const gate = await requireAuthAndRateLimit(request, "resume-extract");
+  if (!gate.ok) return gate.response;
+
   try {
     const formData = await request.formData();
     const file = getFile(formData.get("file"));

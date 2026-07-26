@@ -5,6 +5,7 @@ import {
   type InterviewTestType
 } from "@/lib/interview/question-bank";
 import { listCustomTestPaperRecordsSafe } from "@/lib/interview/custom-test-papers";
+import { requireAuthAndRateLimit } from "@/lib/server/require-auth-rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,15 +16,18 @@ function isTestType(value: string): value is InterviewTestType {
   return TEST_TYPES.includes(value as InterviewTestType);
 }
 
-/** Thin wrapper around the existing (client-safe) question-bank.ts pure functions, exposed over HTTP so the
- *  mobile app can list a track's compiled test templates without bundling the ~6.8MB compiled question JSON -
- *  see apps/mobile/src/lib/practiceAttempts.ts for the consumer. Web itself still calls listInterviewTestTemplates
- *  directly client-side (no change there); this route exists purely for mobile.
+/** Thin wrapper around question-bank.ts's listInterviewTestTemplates(), exposed over HTTP so neither mobile nor
+ *  web's client components need to touch the compiled question bank directly (it's now lazily fetched from R2
+ *  with real bucket credentials, server-side only) - see apps/mobile/src/lib/practiceAttempts.ts and
+ *  apps/web/src/lib/interview/client.ts's fetchInterviewTestTemplates() for the two consumers.
  *
  *  Also merges in any admin-authored test papers from Firestore (see /admin/test-papers and
  *  lib/interview/custom-test-papers.ts) for aptitude/computer-science/ai, listed first so newly added content is
  *  easy to find. Coding has no custom papers - it stays desktop-gated on mobile. */
 export async function GET(request: NextRequest) {
+  const gate = await requireAuthAndRateLimit(request, "interview-templates", { maxRequests: 60 });
+  if (!gate.ok) return gate.response;
+
   try {
     const { searchParams } = new URL(request.url);
     const testType = searchParams.get("testType") ?? "";
@@ -38,7 +42,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const compiledTemplates = listInterviewTestTemplates(testType, limit, roleId);
+    const compiledTemplates = await listInterviewTestTemplates(testType, limit, roleId);
 
     let customTemplates: InterviewTestTemplate[] = [];
     if (testType !== "coding") {

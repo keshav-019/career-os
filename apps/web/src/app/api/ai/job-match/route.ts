@@ -1,9 +1,13 @@
 import type { JobRecord, ResumeVersion } from "@careeros/shared";
 import { matchJobWithAi } from "@/lib/ai/career-ai";
+import { requireAuthAndRateLimit } from "@/lib/server/require-auth-rate-limit";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
+  const gate = await requireAuthAndRateLimit(request, "ai-job-match");
+  if (!gate.ok) return gate.response;
+
   try {
     const body = (await request.json()) as {
       job?: Partial<JobRecord> & Record<string, unknown>;
