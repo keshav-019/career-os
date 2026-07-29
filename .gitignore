@@ -4,7 +4,6 @@
 env.ts
 !.env.example
 !.env.local.example
-!apps/web/.env.production
 .firebase/
 .codex/
 .secrets/
@@ -29,3 +28,7 @@ pnpm-debug.log*
 *.tsbuildinfo
 __pycache__/
 *.pyc
+
+.vercel
+.env*
+!apps/web/.env.production
