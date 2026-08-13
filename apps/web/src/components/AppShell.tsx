@@ -76,6 +76,7 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
       items: [
         { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
         { href: "/applications", label: "Applications", icon: Briefcase },
+        { href: "/previously-applied", label: "Add Application", icon: CirclePlus },
         { href: "/ai-match", label: "AI Match", icon: Sparkles },
         { href: "/resumes", label: "Resume Studio", icon: FileText },
         ...(desktopAppEnabled ? [] : [{ href: "/desktop", label: "Desktop App", icon: Laptop }])
@@ -146,6 +147,10 @@ const routeCopy: Record<string, { title: string; subtitle: string; action?: stri
   "/applications": {
     title: "Applications",
     subtitle: "9 active / 1 offer pending / last sync 2m ago via Browser Extension"
+  },
+  "/previously-applied": {
+    title: "Application Archive",
+    subtitle: "Log submitted roles with the exact JD and resume version used."
   },
   "/jobs": {
     title: "Applications",
