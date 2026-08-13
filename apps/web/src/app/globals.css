@@ -1435,6 +1435,266 @@ input:focus-visible {
   width: min(100%, 560px);
 }
 
+.empty-state-action {
+  justify-self: start;
+  margin-top: 12px;
+}
+
+.submitted-resume-modal {
+  display: grid;
+  grid-template-rows: auto minmax(320px, 1fr) auto;
+  width: min(100%, 980px);
+  height: min(92vh, 840px);
+}
+
+.submitted-resume-frame {
+  width: 100%;
+  height: 100%;
+  min-height: 320px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-muted);
+}
+
+.manual-application-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.55fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.manual-application-form,
+.manual-application-side,
+.manual-application-list,
+.manual-skill-groups {
+  display: grid;
+  gap: 14px;
+}
+
+.manual-application-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.manual-company-field {
+  position: relative;
+}
+
+.manual-company-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.manual-company-input-wrap svg {
+  position: absolute;
+  left: 11px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.manual-company-input-wrap input {
+  width: 100%;
+  padding-left: 34px;
+}
+
+.company-suggestions {
+  position: absolute;
+  z-index: 15;
+  top: calc(100% + 6px);
+  right: 0;
+  left: 0;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 6px;
+}
+
+.company-suggestion-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  padding: 7px;
+  text-align: left;
+}
+
+.company-suggestion-row:hover {
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+}
+
+.company-suggestion-row span,
+.company-suggestion-row small {
+  display: block;
+}
+
+.company-suggestion-row small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.manual-resume-panel {
+  display: grid;
+  gap: 12px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-muted) 42%, transparent);
+  padding: 12px;
+}
+
+.manual-panel-heading,
+.manual-form-actions,
+.manual-entry-heading,
+.manual-entry-actions,
+.manual-preview-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.manual-panel-heading h3 {
+  margin: 3px 0 0;
+  font-size: 15px;
+}
+
+.manual-file-drop {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  color: var(--muted-strong);
+  padding: 14px;
+  cursor: pointer;
+}
+
+.manual-file-drop input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.manual-form-actions {
+  justify-content: flex-end;
+}
+
+.manual-application-side {
+  position: sticky;
+  top: 18px;
+}
+
+.manual-application-preview-card .card-header {
+  margin-bottom: 0;
+}
+
+.manual-preview-facts {
+  justify-content: flex-start;
+  margin-top: 14px;
+}
+
+.manual-preview-facts span,
+.manual-preview-facts a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-elevated) 72%, transparent);
+  color: var(--muted-strong);
+  padding: 7px 9px;
+  font-size: 12px;
+}
+
+.manual-application-entry {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-elevated) 88%, transparent);
+  padding: 13px;
+}
+
+.previously-applied-entry-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.previously-applied-entry-header h3,
+.previously-applied-entry-header p {
+  margin: 0;
+}
+
+.previously-applied-entry-header p {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.manual-entry-actions {
+  justify-content: flex-start;
+}
+
+.manual-entry-jd {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  padding: 10px;
+}
+
+.manual-entry-jd strong,
+.previously-applied-skill-category {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.manual-entry-jd p {
+  max-height: 170px;
+  overflow: auto;
+  margin: 0;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.previously-applied-skill-group {
+  display: grid;
+  gap: 7px;
+}
+
+.previously-applied-skill-category {
+  margin: 0;
+}
+
+.previously-applied-skill-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
 .resume-list {
   display: grid;
   gap: 12px;
@@ -6619,8 +6879,13 @@ input:focus-visible {
   }
 
   .dashboard-grid,
+  .manual-application-layout,
   .two-column-grid {
     grid-template-columns: 1fr;
+  }
+
+  .manual-application-side {
+    position: static;
   }
 
   .not-found-grid {
@@ -6761,9 +7026,31 @@ input:focus-visible {
   .section-heading,
   .kanban-heading,
   .kanban-toolbar,
+  .manual-panel-heading,
+  .manual-entry-heading,
   .filter-row {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .manual-application-grid,
+  .application-expand-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .manual-entry-actions,
+  .manual-form-actions,
+  .manual-preview-facts {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .manual-entry-actions .ghost-button,
+  .manual-form-actions .ghost-button,
+  .manual-form-actions .primary-button,
+  .manual-preview-facts span,
+  .manual-preview-facts a {
+    width: 100%;
   }
 
   .resume-row,

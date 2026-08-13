@@ -1,8 +1,9 @@
 "use client";
 
-import type { JobRecord, JobSource, JobStatus } from "@careeros/shared";
+import type { JobRecord, JobSkillCategory, JobSource, JobStatus } from "@careeros/shared";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import {
+  addDoc,
   collection,
   deleteDoc,
   deleteField,
@@ -111,6 +112,39 @@ function asStringArray(value: unknown): string[] {
     .slice(0, 40);
 }
 
+function asJobSkillCategories(value: unknown): JobSkillCategory[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((entry): JobSkillCategory | null => {
+      if (!entry || typeof entry !== "object") {
+        return null;
+      }
+
+      const record = entry as Record<string, unknown>;
+      const category = asString(record.category);
+      const items = asStringArray(record.items).slice(0, 30);
+
+      if (!category || items.length === 0) {
+        return null;
+      }
+
+      return {
+        category,
+        items
+      };
+    })
+    .filter((entry): entry is JobSkillCategory => Boolean(entry))
+    .slice(0, 20);
+}
+
+function asResumeSource(value: unknown): JobRecord["resumeSource"] | undefined {
+  const candidate = asString(value);
+  return candidate === "resume" || candidate === "visual" ? candidate : undefined;
+}
+
 function parseCareerJob(snapshot: QueryDocumentSnapshot<DocumentData>): CareerJob {
   const data = snapshot.data() as Record<string, unknown>;
   const id = asString(data.id) || snapshot.id;
@@ -137,7 +171,14 @@ function parseCareerJob(snapshot: QueryDocumentSnapshot<DocumentData>): CareerJo
     savedAt,
     appliedAt: asIsoString(data.appliedAt) || undefined,
     nextActionAt: asIsoString(data.nextActionAt) || undefined,
+    jdSkillCategories: asJobSkillCategories(data.jdSkillCategories),
+    resumeSource: asResumeSource(data.resumeSource),
     resumeVersionId: asString(data.resumeVersionId) || undefined,
+    submittedResumeContentType: asString(data.submittedResumeContentType) || undefined,
+    submittedResumeFileName: asString(data.submittedResumeFileName) || undefined,
+    submittedResumeR2Key: asString(data.submittedResumeR2Key) || undefined,
+    submittedResumeUploadedAt: asIsoString(data.submittedResumeUploadedAt) || undefined,
+    submittedResumeUrl: sanitizeHttpUrl(data.submittedResumeUrl) || undefined,
     tags: asStringArray(data.tags),
     jdText: asString(data.jdText) || undefined,
     notes: asString(data.notes) || undefined,
@@ -155,6 +196,20 @@ function parseCareerJob(snapshot: QueryDocumentSnapshot<DocumentData>): CareerJo
     interviewReminderId: asString(data.interviewReminderId) || undefined,
     updatedAt: asIsoString(data.updatedAt) || undefined
   };
+}
+
+function compactRecord<T extends Record<string, unknown>>(record: T): T {
+  const compacted = {} as T;
+
+  Object.entries(record).forEach(([key, value]) => {
+    if (value === undefined) {
+      return;
+    }
+
+    compacted[key as keyof T] = value as T[keyof T];
+  });
+
+  return compacted;
 }
 
 function sortJobsBySavedAtDescending(jobs: CareerJob[]): CareerJob[] {
@@ -239,6 +294,75 @@ export function useUserJobs() {
     loading,
     user
   };
+}
+
+export type JobCreatePayload = {
+  appliedAt?: string;
+  company: string;
+  companyLogoUrl?: string;
+  fitScore?: number;
+  jdSkillCategories?: JobSkillCategory[];
+  jdText?: string;
+  location?: string;
+  notes?: string;
+  remotePolicy?: CareerJob["remotePolicy"];
+  resumeSource?: JobRecord["resumeSource"];
+  resumeVersionId?: string;
+  role: string;
+  sourceUrl?: string;
+  submittedResumeContentType?: string;
+  submittedResumeFileName?: string;
+  submittedResumeR2Key?: string;
+  submittedResumeUploadedAt?: string;
+  submittedResumeUrl?: string;
+  tags?: string[];
+};
+
+export async function createJobRecord(userId: string, payload: JobCreatePayload): Promise<string> {
+  if (!db) {
+    throw new Error("Firestore is not configured.");
+  }
+
+  const nowIso = new Date().toISOString();
+  const appliedAt = asIsoString(payload.appliedAt) || nowIso;
+  const remotePolicy = REMOTE_POLICY_VALUES.has(payload.remotePolicy ?? "unknown") ? payload.remotePolicy ?? "unknown" : "unknown";
+  const normalizedSkills = asJobSkillCategories(payload.jdSkillCategories);
+  const normalizedTags = Array.from(new Set(["manual", "applied", ...asStringArray(payload.tags)])).slice(0, 20);
+
+  const jobRef = await addDoc(
+    collection(db, "users", userId, "jobs"),
+    compactRecord({
+      appliedAt,
+      company: asString(payload.company) || "Unknown company",
+      companyLogoUrl: sanitizeHttpUrl(payload.companyLogoUrl) || undefined,
+      createdAt: nowIso,
+      fitScore: Math.max(0, Math.min(100, Math.round(asNumber(payload.fitScore)))),
+      jdSkillCategories: normalizedSkills,
+      jdText: asString(payload.jdText).slice(0, 30000),
+      location: asString(payload.location) || "Not listed",
+      notes: asString(payload.notes).slice(0, 3000) || undefined,
+      priority: "medium",
+      remotePolicy,
+      resumeSource: payload.resumeSource,
+      resumeVersionId: asString(payload.resumeVersionId) || undefined,
+      role: asString(payload.role) || "Untitled role",
+      savedAt: nowIso,
+      source: "manual",
+      sourceUrl: sanitizeHttpUrl(payload.sourceUrl) || undefined,
+      status: "applied",
+      submittedResumeContentType: asString(payload.submittedResumeContentType) || undefined,
+      submittedResumeFileName: asString(payload.submittedResumeFileName) || undefined,
+      submittedResumeR2Key: asString(payload.submittedResumeR2Key) || undefined,
+      submittedResumeUploadedAt: asIsoString(payload.submittedResumeUploadedAt) || undefined,
+      submittedResumeUrl: sanitizeHttpUrl(payload.submittedResumeUrl) || undefined,
+      tags: normalizedTags,
+      updatedAt: nowIso,
+      userId
+    })
+  );
+
+  await updateDoc(jobRef, { id: jobRef.id });
+  return jobRef.id;
 }
 
 export type JobUpdatePayload = Partial<{

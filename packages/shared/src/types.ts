@@ -50,6 +50,11 @@ export interface SalaryRange {
   currency: "USD" | "INR" | "EUR" | "GBP" | "CAD" | "AUD";
 }
 
+export interface JobSkillCategory {
+  category: string;
+  items: string[];
+}
+
 export interface JobRecord {
   id: string;
   userId: string;
@@ -67,7 +72,14 @@ export interface JobRecord {
   appliedAt?: string;
   nextActionAt?: string;
   salaryRange?: SalaryRange;
+  jdSkillCategories?: JobSkillCategory[];
+  resumeSource?: "resume" | "visual";
   resumeVersionId?: string;
+  submittedResumeContentType?: string;
+  submittedResumeFileName?: string;
+  submittedResumeR2Key?: string;
+  submittedResumeUploadedAt?: string;
+  submittedResumeUrl?: string;
   tags: string[];
   jdText?: string;
   notes?: string;
@@ -81,9 +93,11 @@ export interface ResumeVersion {
   status: ResumeVersionStatus;
   createdAt: string;
   updatedAt: string;
+  contentType?: string;
   fileUrl?: string;
   fileName?: string;
   fileR2Key?: string;
+  fileSize?: number;
   bulletHighlights: string[];
   keywordCoverage: number;
   templateId?: ResumeTemplateId;

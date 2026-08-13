@@ -13,6 +13,11 @@ export type JobStatus = "saved" | "applied" | "interviewing" | "offer" | "reject
 export type JobPriority = "low" | "medium" | "high";
 export type RemotePolicy = "remote" | "hybrid" | "onsite" | "unknown";
 
+export type JobSkillCategory = {
+  category: string;
+  items: string[];
+};
+
 export type CareerJob = {
   id: string;
   userId: string;
@@ -30,7 +35,14 @@ export type CareerJob = {
   savedAt: string;
   appliedAt?: string;
   nextActionAt?: string;
+  jdSkillCategories?: JobSkillCategory[];
+  resumeSource?: "resume" | "visual";
   resumeVersionId?: string;
+  submittedResumeContentType?: string;
+  submittedResumeFileName?: string;
+  submittedResumeR2Key?: string;
+  submittedResumeUploadedAt?: string;
+  submittedResumeUrl?: string;
   tags: string[];
   jdText?: string;
   notes?: string;
@@ -74,6 +86,8 @@ export function sourceLabel(source: JobSource): string {
       return "LinkedIn";
     case "indeed":
       return "Indeed";
+    case "manual":
+      return "Manual";
     default:
       return source;
   }

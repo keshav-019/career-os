@@ -1,7 +1,21 @@
 "use client";
 
 import type { JobStatus } from "@careeros/shared";
-import { ChevronDown, ChevronUp, ExternalLink, Filter, GripVertical, LayoutGrid, MapPin, Rows3, Sparkles, Tag, Trash2 } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  CirclePlus,
+  ExternalLink,
+  Eye,
+  Filter,
+  GripVertical,
+  LayoutGrid,
+  MapPin,
+  Rows3,
+  Sparkles,
+  Tag,
+  Trash2
+} from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState, type ChangeEvent, type DragEvent, type FormEvent } from "react";
 import { CompanyAvatar } from "@/components/CompanyAvatar";
@@ -13,6 +27,7 @@ import { deleteJobRecord, updateJobRecord, useUserJobs, type CareerJob } from "@
 type ViewMode = "kanban" | "table";
 type EditableStatus = "saved" | "applied" | "interviewing" | "offer" | "rejected";
 type BoardColumnId = "saved" | "applied" | "interviewing" | "offer" | "closed";
+type ResumePreviewState = { job: CareerJob; url: string };
 
 const boardColumns: Array<{ id: BoardColumnId; status: CareerJob["status"][]; title: string; dot: string }> = [
   { id: "saved", title: "Saved", dot: "", status: ["saved"] },
@@ -85,6 +100,10 @@ function toDatetimeLocalInputValue(value: string | undefined): string {
 }
 
 function sourceLabel(source: string): string {
+  if (source === "manual") {
+    return "Manual";
+  }
+
   if (source === "chrome-extension") {
     return "Chrome";
   }
@@ -133,6 +152,21 @@ function friendlyDateTimeLabel(value: string | undefined): string {
   return new Date(parsed).toLocaleString();
 }
 
+function isPdfResumeFile(contentType: string | undefined, fileName: string | undefined): boolean {
+  return contentType === "application/pdf" || Boolean(fileName?.toLowerCase().endsWith(".pdf"));
+}
+
+function canPreviewSubmittedResume(job: CareerJob): boolean {
+  return Boolean(
+    (job.submittedResumeR2Key || job.submittedResumeUrl) &&
+      isPdfResumeFile(job.submittedResumeContentType, job.submittedResumeFileName)
+  );
+}
+
+function submittedResumeLabel(job: CareerJob): string {
+  return job.submittedResumeFileName || (job.resumeVersionId ? "Saved resume" : "No resume linked");
+}
+
 export default function ApplicationsPage() {
   const { error, jobs, loading, user } = useUserJobs();
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
@@ -149,6 +183,8 @@ export default function ApplicationsPage() {
   const [isDeleteSubmitting, setIsDeleteSubmitting] = useState(false);
   const [draggingJobId, setDraggingJobId] = useState<string | null>(null);
   const [dragOverColumnId, setDragOverColumnId] = useState<BoardColumnId | null>(null);
+  const [resumePreviewState, setResumePreviewState] = useState<ResumePreviewState | null>(null);
+  const [resumePreviewLoadingJobId, setResumePreviewLoadingJobId] = useState<string | null>(null);
 
   const availableSources = useMemo(() => {
     const sourceValues = Array.from(new Set(jobs.map((job) => sourceLabel(job.source))));
@@ -468,6 +504,56 @@ export default function ApplicationsPage() {
     }
   };
 
+  const getSubmittedResumeUrl = async (job: CareerJob): Promise<string> => {
+    if (!user) {
+      throw new Error("Please sign in to preview submitted resumes.");
+    }
+
+    if (job.submittedResumeR2Key) {
+      const idToken = await user.getIdToken(true);
+      const response = await fetch("/api/profile/files/signed-url", {
+        body: JSON.stringify({ r2Key: job.submittedResumeR2Key }),
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+          "Content-Type": "application/json"
+        },
+        method: "POST"
+      });
+      const payload = (await response.json().catch(() => ({}))) as { error?: string; signedUrl?: string };
+
+      if (!response.ok || !payload.signedUrl) {
+        throw new Error(payload.error || "Unable to create a resume preview link.");
+      }
+
+      return payload.signedUrl;
+    }
+
+    if (job.submittedResumeUrl) {
+      return job.submittedResumeUrl;
+    }
+
+    throw new Error("This application does not have a previewable submitted resume.");
+  };
+
+  const openSubmittedResumePreview = async (job: CareerJob) => {
+    if (!canPreviewSubmittedResume(job)) {
+      setActionError("This application does not have a PDF resume attached.");
+      return;
+    }
+
+    setResumePreviewLoadingJobId(job.id);
+    resetFeedback();
+
+    try {
+      const url = await getSubmittedResumeUrl(job);
+      setResumePreviewState({ job, url });
+    } catch (previewError) {
+      setActionError(previewError instanceof Error ? previewError.message : "Unable to preview submitted resume.");
+    } finally {
+      setResumePreviewLoadingJobId(null);
+    }
+  };
+
   const renderStatusSelect = (job: CareerJob, compact = false) => (
     <label className={compact ? "application-status-field compact" : "application-status-field"}>
       <span>Stage</span>
@@ -530,6 +616,10 @@ export default function ApplicationsPage() {
           <button className="icon-button" aria-label="Filter applications" type="button">
             <Filter size={16} />
           </button>
+          <Link className="primary-button" href="/previously-applied">
+            <CirclePlus size={15} />
+            Add Application
+          </Link>
         </div>
       </section>
 
@@ -539,10 +629,14 @@ export default function ApplicationsPage() {
             <div>
               <p className="eyebrow">Applications</p>
               <h2>No jobs yet</h2>
-              <p>Use the Chrome extension on a job page and this board updates instantly.</p>
+              <p>Use the Chrome extension or add a submitted role manually.</p>
             </div>
           </div>
           <div className="empty-drop">Nothing to show right now. Save your first role to start tracking progress.</div>
+          <Link className="primary-button empty-state-action" href="/previously-applied">
+            <CirclePlus size={15} />
+            Add Application
+          </Link>
         </section>
       ) : null}
 
@@ -618,6 +712,19 @@ export default function ApplicationsPage() {
                           <Sparkles size={13} />
                           AI Match
                         </Link>
+                      ) : null}
+                      {canPreviewSubmittedResume(job) ? (
+                        <button
+                          className="ghost-button"
+                          disabled={isMutationBusy || resumePreviewLoadingJobId === job.id}
+                          onClick={() => {
+                            void openSubmittedResumePreview(job);
+                          }}
+                          type="button"
+                        >
+                          <Eye size={13} />
+                          Resume
+                        </button>
                       ) : null}
                       <button
                         className="ghost-button danger-button"
@@ -735,6 +842,12 @@ export default function ApplicationsPage() {
                             <span>{friendlyDateTimeLabel(job.nextActionAt) || job.nextActionAt}</span>
                           </div>
                         ) : null}
+                        {job.submittedResumeFileName || job.resumeVersionId ? (
+                          <div className="application-expand-field">
+                            <strong>Submitted Resume</strong>
+                            <span>{submittedResumeLabel(job)}</span>
+                          </div>
+                        ) : null}
                       </div>
 
                       <div className="application-expand-description">
@@ -759,6 +872,19 @@ export default function ApplicationsPage() {
                               <Sparkles size={13} />
                               AI Match
                             </Link>
+                          ) : null}
+                          {canPreviewSubmittedResume(job) ? (
+                            <button
+                              className="ghost-button"
+                              disabled={isMutationBusy || resumePreviewLoadingJobId === job.id}
+                              onClick={() => {
+                                void openSubmittedResumePreview(job);
+                              }}
+                              type="button"
+                            >
+                              <Eye size={13} />
+                              View Resume
+                            </button>
                           ) : null}
                           <button
                             className="ghost-button danger-button"
@@ -880,6 +1006,38 @@ export default function ApplicationsPage() {
                 type="button"
               >
                 {isDeleteSubmitting ? "Deleting..." : "Delete Application"}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {resumePreviewState ? (
+        <div className="profile-modal-overlay" onClick={() => setResumePreviewState(null)} role="presentation">
+          <section
+            aria-labelledby="submitted-resume-preview-title"
+            aria-modal="true"
+            className="profile-modal submitted-resume-modal"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+          >
+            <div className="card-header">
+              <div>
+                <p className="eyebrow">Submitted Resume</p>
+                <h2 id="submitted-resume-preview-title">{submittedResumeLabel(resumePreviewState.job)}</h2>
+                <p>
+                  {resumePreviewState.job.role} / {resumePreviewState.job.company}
+                </p>
+              </div>
+              <a className="ghost-button" href={resumePreviewState.url} rel="noreferrer" target="_blank">
+                <ExternalLink size={14} />
+                Open
+              </a>
+            </div>
+            <iframe className="submitted-resume-frame" src={resumePreviewState.url} title="Submitted resume PDF preview" />
+            <div className="modal-actions">
+              <button className="ghost-button" onClick={() => setResumePreviewState(null)} type="button">
+                Close
               </button>
             </div>
           </section>
