@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import type { DecodedIdToken } from "firebase-admin/auth";
 import { getAdminAuth, isFirebaseAdminConfigured } from "@/lib/firebase/admin";
+import { getFirebaseWebApiKey } from "@/lib/public-runtime-env";
 
 export type VerifiedRequestAuth = {
   authTimeMs: number | null;
@@ -33,7 +34,7 @@ if (!globalThis.__CAREER_OS_AUTH_CACHE__) {
   globalThis.__CAREER_OS_AUTH_CACHE__ = authCache;
 }
 
-const FIREBASE_WEB_API_KEY = process.env.FIREBASE_API_KEY ?? process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "";
+const FIREBASE_WEB_API_KEY = getFirebaseWebApiKey();
 
 const LOOKUP_ENDPOINT = FIREBASE_WEB_API_KEY
   ? `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(FIREBASE_WEB_API_KEY)}`

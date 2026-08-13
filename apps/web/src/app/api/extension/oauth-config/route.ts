@@ -1,4 +1,5 @@
 import { extensionCorsPreflight, jsonWithExtensionCors } from "@/lib/server/extension-cors";
+import { getFirebaseWebApiKey } from "@/lib/public-runtime-env";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,7 +26,7 @@ export async function OPTIONS(request: Request) {
 }
 
 export async function GET(request: Request) {
-  const firebaseApiKey = readFirstEnv("FIREBASE_API_KEY", "NEXT_PUBLIC_FIREBASE_API_KEY");
+  const firebaseApiKey = readFirstEnv("FIREBASE_API_KEY", "NEXT_PUBLIC_FIREBASE_API_KEY") || getFirebaseWebApiKey();
   const googleClientId = readFirstEnv("GOOGLE_OAUTH_CLIENT_ID", "NEXT_PUBLIC_GOOGLE_OAUTH_CLIENT_ID");
   const googleClientSecret = readFirstEnv("GOOGLE_OAUTH_CLIENT_SECRET");
   const githubClientId = readFirstEnv("GITHUB_OAUTH_CLIENT_ID", "NEXT_PUBLIC_GITHUB_OAUTH_CLIENT_ID");

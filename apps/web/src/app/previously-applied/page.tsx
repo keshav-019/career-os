@@ -11,8 +11,7 @@ import {
   Link as LinkIcon,
   Loader2,
   MapPin,
-  Save,
-  Search
+  Save
 } from "lucide-react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import Link from "next/link";
@@ -460,7 +459,6 @@ export default function PreviouslyAppliedPage() {
               <label className="profile-field manual-company-field">
                 Company
                 <span className="manual-company-input-wrap">
-                  <Search size={15} />
                   <input
                     autoComplete="off"
                     onBlur={() => setTimeout(() => setShowCompanySuggestions(false), 150)}

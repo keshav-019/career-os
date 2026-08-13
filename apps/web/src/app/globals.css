@@ -1487,18 +1487,6 @@ input:focus-visible {
   align-items: center;
 }
 
-.manual-company-input-wrap svg {
-  position: absolute;
-  left: 11px;
-  color: var(--muted);
-  pointer-events: none;
-}
-
-.manual-company-input-wrap input {
-  width: 100%;
-  padding-left: 34px;
-}
-
 .company-suggestions {
   position: absolute;
   z-index: 15;
