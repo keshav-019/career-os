@@ -6,6 +6,8 @@
  * REST endpoint - the same underlying call the Firebase JS SDK's signInWithPopup makes internally.
  */
 
+import { getFirebaseWebApiKey } from "@/lib/public-runtime-env";
+
 export function readFirstEnv(...names: string[]): string {
   for (const name of names) {
     const value = (process.env[name] ?? "").trim();
@@ -17,7 +19,7 @@ export function readFirstEnv(...names: string[]): string {
   return "";
 }
 
-export const FIREBASE_WEB_API_KEY = readFirstEnv("FIREBASE_API_KEY", "NEXT_PUBLIC_FIREBASE_API_KEY");
+export const FIREBASE_WEB_API_KEY = readFirstEnv("FIREBASE_API_KEY", "NEXT_PUBLIC_FIREBASE_API_KEY") || getFirebaseWebApiKey();
 
 type SignInWithIdpResponse = {
   idToken?: string;
