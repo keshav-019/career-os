@@ -1,7 +1,13 @@
 import fs from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
 
+const require = createRequire(import.meta.url);
+const { loadCareerOsEnv } = require("../scripts/load-careeros-env.cjs");
+
 const ROOT = process.cwd();
+loadCareerOsEnv({ cwd: ROOT });
+
 const EXTENSION_DIRECTORY = path.join(ROOT, "apps", "extension");
 const OUT_DIR = path.join(ROOT, "dist", "extensions");
 const FIREFOX_EXTENSION_ID = process.env.FIREFOX_EXTENSION_ID || "capture@careeros.app";

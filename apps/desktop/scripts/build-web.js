@@ -2,8 +2,11 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
+const { loadCareerOsEnv } = require("../../../scripts/load-careeros-env.cjs");
 
 const repoRoot = path.resolve(__dirname, "../../..");
+loadCareerOsEnv({ cwd: path.resolve(__dirname, "..") });
+
 const webRoot = path.join(repoRoot, "apps", "web");
 const standaloneRoot = path.join(webRoot, ".next", "standalone");
 const standaloneWebRoot = path.join(standaloneRoot, "apps", "web");

@@ -5,8 +5,8 @@
   "description": "Standalone Node/Express backend for the CareerOS Android app - reuses apps/web/src/lib directly (no duplicated business logic). Exists because Vercel's serverless bundling of firebase-admin breaks these routes in production; this runs as a normal long-lived Node process instead (Railway, or any plain Node host).",
   "main": "src/server.ts",
   "scripts": {
-    "start": "tsx src/server.ts",
-    "dev": "tsx watch src/server.ts",
+    "start": "tsx -r ../../scripts/register-env.cjs src/server.ts",
+    "dev": "tsx watch -r ../../scripts/register-env.cjs src/server.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

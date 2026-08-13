@@ -1,4 +1,10 @@
+const fs = require("node:fs");
 const path = require("node:path");
+const rootEnvLoader = path.resolve(__dirname, "../../../scripts/register-env.cjs");
+if (fs.existsSync(rootEnvLoader)) {
+    require(rootEnvLoader);
+}
+
 const { app, BrowserWindow, shell } = require("electron");
 const { URL } = require("node:url");
 const log = require("electron-log");

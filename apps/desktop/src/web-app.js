@@ -224,13 +224,12 @@ function createWebAppRuntime({ app, helperUrl, log }) {
   const webDevLockPath = path.join(webAppRoot, ".next", "dev", "lock");
   const webUrl = `http://${WEB_HOST}:${WEB_PORT}`;
 
-  // Public (non-secret) fallback config for the embedded Next.js server's runtime environment - mirrors
-  // apps/web/.env.production, which only covers *build*-time client-bundle inlining. Server-side code (API
+  // Public (non-secret) fallback config for the embedded Next.js server's runtime environment - mirrors the
+  // repo-root env loader's public defaults, which cover build-time client-bundle inlining. Server-side code (API
   // routes, lib/server/*) reads these same NEXT_PUBLIC_ vars again at actual runtime, and the packaged app has
   // no .env file sitting next to its standalone server.js, so without this, sign-in and other server routes
   // would work at build time but still break at runtime on every machine that installs the app. Every value
-  // here is genuinely public - see apps/web/.env.production's comment for why - and must stay in sync with that
-  // file and apps/mobile/src/config/env.ts.
+  // here is genuinely public and must stay in sync with scripts/load-careeros-env.cjs and apps/mobile/src/config/env.ts.
   const PUBLIC_CONFIG_FALLBACK = {
     NEXT_PUBLIC_FIREBASE_API_KEY: "AIzaSyBEZap2qVQ9yZYWhaHBOaUXfJxB_rvMaCQ",
     NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "career-os-9aa87.firebaseapp.com",
