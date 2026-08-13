@@ -10,8 +10,6 @@ Authentication, profile and settings, application pipeline, interview prep/testi
 Uses Firebase client + Firestore hooks, server route handlers, and @careeros/shared domain types.
 
 ## Files In This Folder
-- `.env.local`
-- `.env.local.example`
 - `eslint.config.mjs`
 - `next-env.d.ts`
 - `next.config.ts`
@@ -26,6 +24,7 @@ Uses Firebase client + Firestore hooks, server route handlers, and @careeros/sha
 
 ## Maintenance Notes
 Preserve App Router conventions and keep UI logic in src/app + src/components while reusable domain code stays in src/lib.
+Local environment variables are loaded from the repo-root `.env.local`; do not add app-local env templates here.
 For production, configure `CAREEROS_ALLOWED_ORIGINS` and `CAREEROS_ALLOWED_EXTENSION_IDS` so `/api/jobs/import` accepts only trusted web origins and extension ids.
 Profile photo uploads use Cloudinary from the browser and require `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` and `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET`.
 

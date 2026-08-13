@@ -25,11 +25,11 @@ talking to the same deployed CareerOS backend and Firebase project the web app u
 
 ## Backend configuration
 
-The app talks to the **deployed production CareerOS web app** for every server-only feature (AI resume review/job
-match, learning plan generation, learning materials, system design validation, interview test templates), and
-talks to **Firebase directly** for everything else (jobs, reminders, practice attempts, resumes), exactly like the
-web app does. Both are already configured in `src/config/env.ts` - there is nothing to fill in before running the
-app. If you ever redeploy the web app to a different URL, update `API_BASE_URL` in that file.
+The app talks to the **deployed production CareerOS backend** for server-only features and talks to **Firebase
+directly** for everything else (jobs, reminders, practice attempts, resumes), exactly like the web app does. Public
+mobile values are read from the repo-root `.env.local` through `EXPO_PUBLIC_*` keys, with hosted CareerOS defaults
+kept in `src/config/env.ts` so a fresh checkout still runs. If you redeploy to a different URL, update the root
+`.env.local` instead of editing app-local env files.
 
 ## One-time setup (do this before the first run)
 

@@ -559,7 +559,7 @@ export default function LoginPage() {
             </div>
           </div>
           <p className="auth-muted">
-            Add Firebase keys in `apps/web/.env.local` or export them as
+            Add Firebase keys in the repo-root `.env.local` or export them as
             `NEXT_PUBLIC_FIREBASE_*` variables in Vercel.
           </p>
         </section>

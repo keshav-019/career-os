@@ -51,8 +51,8 @@ npm install
 npm run dev --workspace @careeros/mobile-backend
 ```
 
-Copy `.env.example` to `.env` and fill in the Firebase Admin service account fields at minimum (OpenRouter keys
-only needed to exercise `/api/ai/*`).
+Copy the repo-root `.env.local.example` to `.env.local` at the repo root and fill in the Firebase Admin service
+account fields at minimum. OpenRouter keys are only needed to exercise `/api/ai/*`.
 
 ## Deploying to Railway
 
@@ -61,9 +61,9 @@ only needed to exercise `/api/ai/*`).
    `npm ci --workspace @careeros/mobile-backend --workspace @careeros/shared` / `npm run start --workspace
    @careeros/mobile-backend`, and this app's own imports reach into `apps/web/src` by relative path, so the whole
    monorepo checkout needs to be present.
-2. Set the environment variables from `.env.example` in Railway's dashboard (Variables tab). `FIREBASE_PRIVATE_KEY`
-   should be pasted with its literal `\n` sequences intact (Railway stores it as one line; this app un-escapes it
-   at startup the same way `apps/web/src/lib/firebase/admin.ts` does).
+2. Set the environment variables from the repo-root `.env.local.example` in Railway's dashboard (Variables tab).
+   `FIREBASE_PRIVATE_KEY` should be pasted with its literal `\n` sequences intact (Railway stores it as one line;
+   this app un-escapes it at startup the same way `apps/web/src/lib/firebase/admin.ts` does).
 3. Deploy. Railway assigns a public URL (Settings -> Networking -> Generate Domain if one isn't assigned
    automatically).
 4. Give that URL to update `apps/mobile/src/config/env.ts`'s `API_BASE_URL` (do NOT change the learning-content

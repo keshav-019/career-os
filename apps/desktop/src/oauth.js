@@ -13,7 +13,7 @@ const { shell } = require("electron");
  * Google: uses a dedicated "Desktop application" OAuth client (public client_id + a client_secret that Google's
  * own docs say isn't meant to stay confidential for this client type - every installed copy of every app using
  * this pattern ships it). The secret is baked in at build time by scripts/prepare-oauth-secret.js, never
- * hardcoded here - see apps/desktop/.env.example.
+ * hardcoded here - see the repo-root .env.local.example.
  *
  * GitHub: has no native/public client type - code exchange always needs a real confidential secret, so this
  * relays the exchange to the already-deployed apps/mobile-backend service instead of holding a GitHub secret in

@@ -42,7 +42,7 @@ Coordinates app workspaces under apps/* and shared package code under packages/*
 ## Maintenance Notes
 
 Keep root scripts workspace-safe and avoid app-specific logic at root when it can live inside the relevant app folder.
-Never commit Firebase keys or server secrets to tracked files. Use environment variables (`.env.local` for local dev, Vercel project envs for deploys).
+Never commit Firebase keys or server secrets to tracked files. Use the repo-root `.env.local` for local dev and hosting-provider environment variables for deploys; `.env.local.example` is the single tracked template for every workspace.
 For production API hardening, set `CAREEROS_ALLOWED_ORIGINS` and `CAREEROS_ALLOWED_EXTENSION_IDS` in deployment environments.
 
 ## Contributor Checklist

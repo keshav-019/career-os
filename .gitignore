@@ -2,6 +2,7 @@
 .env
 .env.*
 env.ts
+!apps/mobile/src/config/env.ts
 !.env.example
 !.env.local.example
 .firebase/
@@ -36,5 +37,3 @@ apps/web/playwright-report/
 apps/web/e2e/.auth/
 
 .vercel
-.env*
-!apps/web/.env.production

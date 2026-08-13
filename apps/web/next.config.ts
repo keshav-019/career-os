@@ -1,8 +1,15 @@
 import type { NextConfig } from "next";
+import { createRequire } from "node:module";
 import path from "node:path";
 
 const appDir = process.cwd();
 const repoRoot = path.resolve(appDir, "../..");
+const require = createRequire(import.meta.url);
+const { loadCareerOsEnv } = require("../../scripts/load-careeros-env.cjs") as {
+  loadCareerOsEnv: (options?: { cwd?: string; includePublicFallbacks?: boolean }) => void;
+};
+
+loadCareerOsEnv({ cwd: appDir });
 
 const nextConfig: NextConfig = {
   output: process.env.CAREEROS_DESKTOP_BUILD === "1" ? "standalone" : undefined,

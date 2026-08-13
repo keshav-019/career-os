@@ -23,7 +23,7 @@ load_env_file() {
 }
 
 load_env_file "${REPO_ROOT}/.env.local"
-load_env_file "${REPO_ROOT}/apps/web/.env.local"
+load_env_file "${REPO_ROOT}/.env"
 MODEL="${OPENROUTER_MODEL:-${MODEL}}"
 
 echo "CareerOS AI inference uses OpenRouter."

@@ -21,8 +21,8 @@ The popup supports three ways to authenticate:
    `apps/web/src/app/api/extension/oauth/[provider]/route.ts`, which exchanges it server-side and mints
    a real Firebase session. The extension never sees or stores a client secret. This requires the site
    operator to set `GOOGLE_OAUTH_CLIENT_ID`/`GOOGLE_OAUTH_CLIENT_SECRET` and/or
-   `GITHUB_OAUTH_CLIENT_ID`/`GITHUB_OAUTH_CLIENT_SECRET` in `apps/web/.env.local` - see the comments
-   there for exact console steps. If a provider isn't configured, its button stays disabled and the
+   `GITHUB_OAUTH_CLIENT_ID`/`GITHUB_OAUTH_CLIENT_SECRET` in the repo-root `.env.local` or the deployment
+   environment. If a provider isn't configured, its button stays disabled and the
    popup shows a "Setup help" panel with the extension's redirect URI.
 2. **Email/password.** Uses Firebase's REST password sign-in endpoint with the deployment's public
    Firebase web API key. If the account has CareerOS authenticator 2FA enabled, the popup asks for the

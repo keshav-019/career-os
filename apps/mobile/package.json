@@ -4,9 +4,9 @@
   "private": true,
   "main": "index.js",
   "scripts": {
-    "start": "expo start",
-    "android": "expo run:android --device",
-    "android:emulator": "expo run:android",
+    "start": "node ../../scripts/run-with-careeros-env.cjs expo start",
+    "android": "node ../../scripts/run-with-careeros-env.cjs expo run:android --device",
+    "android:emulator": "node ../../scripts/run-with-careeros-env.cjs expo run:android",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
