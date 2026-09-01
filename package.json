@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "npm run dev --workspace @careeros/web",
     "build": "npm run build --workspace @careeros/web",
+    "lint": "npm run lint --workspace @careeros/web",
     "start": "npm run start --workspace @careeros/web",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
@@ -19,6 +20,8 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "eslint": "latest",
+    "eslint-config-next": "latest",
     "typescript": "latest"
   }
 }
