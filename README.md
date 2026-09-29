@@ -2,14 +2,20 @@
 
 **One workspace for the whole job search:** track applications, capture job posts from the browser, tailor resumes, and prepare for interviews with aptitude tests, system design practice and a local multi-language coding judge.
 
+**Try it:** [projectyourown.com](https://www.projectyourown.com) · [Chrome extension](https://chromewebstore.google.com/detail/careeros-capture/llendblljmalpjakenfmllaajhblkcim) · [Desktop release](https://github.com/keshav-019/career-os/releases) · Android app coming soon
+
+| Interview War Room | Learning Center |
+| --- | --- |
+| ![CareerOS Interview War Room](docs/screenshots/interview-war-room.jpg) | ![CareerOS Learning Center](docs/screenshots/learning-center.jpg) |
+
 CareerOS is a monorepo with five apps that share one Firebase backend and one set of domain types.
 
 | App | Path | What it does |
 | --- | --- | --- |
 | **Web** | [`apps/web`](apps/web) | Next.js app: dashboard, application pipeline, AI job match, resume builder (visual + LaTeX), Interview War Room, System Design, Learning Center, analytics, calendar, 2FA, admin tools |
 | **Desktop** | [`apps/desktop`](apps/desktop) | Electron companion: local LaTeX resume compilation and a coding-arena judge for C, C++, Java, JavaScript, Python and Rust using the toolchains already on your machine |
-| **Browser extension** | [`apps/extension`](apps/extension) | Manifest V3 extension that detects job postings and saves them to CareerOS (Google/GitHub OAuth via `chrome.identity`) |
-| **Mobile** | [`apps/mobile`](apps/mobile) | React Native / Expo Android app with feature parity for everything that doesn't need local compilers |
+| **Browser extension** | [`apps/extension`](apps/extension) | [Published on the Chrome Web Store](https://chromewebstore.google.com/detail/careeros-capture/llendblljmalpjakenfmllaajhblkcim). Manifest V3 extension that detects job postings and saves them to CareerOS (Google/GitHub OAuth via `chrome.identity`) |
+| **Mobile** | [`apps/mobile`](apps/mobile) | React Native / Expo Android app (not yet on the Play Store) with feature parity for everything that doesn't need local compilers |
 | **Mobile backend** | [`apps/mobile-backend`](apps/mobile-backend) | Long-running Express server that reuses the web app's business logic directly (no copy-paste) for routes that need the Firebase Admin SDK |
 
 Shared types and contracts live in [`packages/shared`](packages/shared).
