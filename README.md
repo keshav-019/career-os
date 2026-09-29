@@ -1,53 +1,58 @@
-# CareerOS Monorepo
+# CareerOS
 
-## Purpose
+**One workspace for the whole job search:** track applications, capture job posts from the browser, tailor resumes, and prepare for interviews with aptitude tests, system design practice and a local multi-language coding judge.
 
-Top-level orchestration folder for all CareerOS runtime apps, shared packages, Firebase config, and project-wide tooling.
+CareerOS is a monorepo with five apps that share one Firebase backend and one set of domain types.
 
-## What This Folder Owns
+| App | Path | What it does |
+| --- | --- | --- |
+| **Web** | [`apps/web`](apps/web) | Next.js app: dashboard, application pipeline, AI job match, resume builder (visual + LaTeX), Interview War Room, System Design, Learning Center, analytics, calendar, 2FA, admin tools |
+| **Desktop** | [`apps/desktop`](apps/desktop) | Electron companion: local LaTeX resume compilation and a coding-arena judge for C, C++, Java, JavaScript, Python and Rust using the toolchains already on your machine |
+| **Browser extension** | [`apps/extension`](apps/extension) | Manifest V3 extension that detects job postings and saves them to CareerOS (Google/GitHub OAuth via `chrome.identity`) |
+| **Mobile** | [`apps/mobile`](apps/mobile) | React Native / Expo Android app with feature parity for everything that doesn't need local compilers |
+| **Mobile backend** | [`apps/mobile-backend`](apps/mobile-backend) | Long-running Express server that reuses the web app's business logic directly (no copy-paste) for routes that need the Firebase Admin SDK |
 
-Workspace-level dependency management, shared scripts, deployment config, and cross-app coordination.
+Shared types and contracts live in [`packages/shared`](packages/shared).
 
-## Integration Points
+## Tech stack
 
-Coordinates app workspaces under apps/* and shared package code under packages/* via npm workspaces.
+- **Frontend:** Next.js (App Router), React, TypeScript, CodeMirror, pdf.js
+- **Backend:** Next.js route handlers, Express, Firebase Auth, Firestore, Firebase Admin SDK
+- **Storage:** Cloudflare R2 (S3 API) and Cloudinary
+- **Desktop / mobile:** Electron, React Native, Expo
+- **Deploy:** Vercel (web), Railway (mobile backend); packaging configs for the Chrome Web Store, winget, Chocolatey and Flathub
 
-## Files In This Folder
+## Architecture notes
 
-- `.gitignore`
-- `.npmrc`
-- `.nvmrc`
-- `coding-problems.seed.json` - the original 28 coding-arena problems, ready to paste (as a whole array, or one
-  entry at a time) into the admin editor at `/admin/coding-problems` (accounts with `admin: true` only). See
-  `apps/web/src/lib/coding-catalog/README.md` for the pipeline that turns a pasted entry into a judge-ready
-  Firestore record, and `apps/web/src/app/admin/coding-problems/README.md` for how the editor itself works.
-- `firebase.json`
-- `firestore.indexes.json`
-- `firestore.rules`
-- `package-lock.json`
-- `package.json`
-- `system-design-problems.seed.json` - a reference export of the 26 System Design problems, for copying the *shape*
-  of a new entry from. Unlike coding problems, System Design problems are **not** admin-editable through a UI - they
-  live directly in `apps/web/src/lib/system-design/catalog.server.ts`. See that folder's README for the full
-  step-by-step guide to adding one.
-- `vercel.json`
+- **One env file.** Every workspace loads the repo-root `.env.local`; [`.env.local.example`](.env.local.example) is the only tracked template.
+- **Why a separate mobile backend?** On Vercel's serverless runtime, routes that use `firebase-admin` fail in production even though they work locally. Rather than duplicate code, `apps/mobile-backend` imports `apps/web/src/lib/**` through a path alias and runs as a normal Node process.
+- **Local-only execution stays local.** Code execution and LaTeX compilation run on the user's machine through the desktop helper, which only listens on localhost.
+- **Locked-down import API.** In production, `CAREEROS_ALLOWED_ORIGINS` and `CAREEROS_ALLOWED_EXTENSION_IDS` restrict who can call `/api/jobs/import`.
 
-## Child Folders
+## Getting started
 
-- `apps`
-- `images`
-- `packages`
-- `scripts`
+Requires Node 20 (see `.nvmrc`) and a Firebase project.
 
-## Maintenance Notes
+```bash
+cp .env.local.example .env.local   # fill in Firebase, R2 and Cloudinary values
+npm install
+npm run dev                        # web app on http://localhost:3000
+```
 
-Keep root scripts workspace-safe and avoid app-specific logic at root when it can live inside the relevant app folder.
-Never commit Firebase keys or server secrets to tracked files. Use the repo-root `.env.local` for local dev and hosting-provider environment variables for deploys; `.env.local.example` is the single tracked template for every workspace.
-For production API hardening, set `CAREEROS_ALLOWED_ORIGINS` and `CAREEROS_ALLOWED_EXTENSION_IDS` in deployment environments.
+Other workspaces:
 
-## Contributor Checklist
+```bash
+npm run desktop:dev                # Electron companion
+npm run extension:package:chrome   # build the browser extension
+npm run mobile:android             # Expo Android app
+npm run mobile-backend:dev         # Express backend for mobile
+npm run typecheck                  # typecheck every workspace
+```
 
-1. Keep changes scoped to this folder responsibility before reaching into adjacent modules.
-2. If contracts change (types, payloads, route behavior), update dependent folders in the same PR.
-3. Prefer additive changes over breaking renames, and document any migration impact clearly.
-4. Run lint/typecheck for affected workspaces after edits and capture known gaps in PR notes.
+Content seeds: [`coding-problems.seed.json`](coding-problems.seed.json) holds the original coding-arena problems (import them through `/admin/coding-problems`), and [`system-design-problems.seed.json`](system-design-problems.seed.json) is a reference export of the System Design catalog.
+
+## Contributing
+
+Every folder has its own README describing what it owns and how it integrates. Keep changes scoped to one folder where possible. If a shared contract changes (types, payloads, route behaviour), update the dependent apps in the same PR, and run `npm run typecheck` before opening it.
+
+Never commit Firebase keys or server secrets. Use `.env.local` locally and the hosting provider's environment variables in deployments.
