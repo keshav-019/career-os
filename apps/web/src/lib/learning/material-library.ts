@@ -1,5 +1,11 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
+import aiPhase1 from "../../../../../learning-material/ai_ml_reading_materials_phase_1.min.json";
+import aiPhase2 from "../../../../../learning-material/ai_ml_reading_materials_phase_2.min.json";
+import aiPhase3 from "../../../../../learning-material/ai_ml_reading_materials_phase_3.min.json";
+import aiPhase4 from "../../../../../learning-material/ai_ml_reading_materials_phase_4.min.json";
+import aiPhase5 from "../../../../../learning-material/ai_ml_reading_materials_phase_5.min.json";
+import aptitudeMaterials from "../../../../../learning-material/aptitude_reading_materials_by_subtopic_54.min.json";
+import computerScienceMaterials from "../../../../../learning-material/cse_detailed_reading_material_minified.json";
+import systemDesignMaterials from "../../../../../learning-material/system_design_deep_reading_materials_210.min.json";
 
 export type LearningTrackId = "computer-science" | "system-design" | "aptitude" | "ai";
 
@@ -904,64 +910,41 @@ function parseMaterialFile(entryName: string, rawRecord: JsonRecord): ParsedMate
   );
 }
 
-async function resolveLearningMaterialDir(): Promise<string | null> {
-  const candidates = [
-    path.resolve(process.cwd(), "learning-material"),
-    path.resolve(process.cwd(), "../learning-material"),
-    path.resolve(process.cwd(), "../../learning-material"),
-    path.resolve(process.cwd(), "../../../learning-material")
-  ];
+const RAW_MATERIAL_DATASETS: Array<{ entryName: string; raw: unknown }> = [
+  { entryName: "cse_detailed_reading_material_minified.json", raw: computerScienceMaterials },
+  { entryName: "system_design_deep_reading_materials_210.min.json", raw: systemDesignMaterials },
+  { entryName: "aptitude_reading_materials_by_subtopic_54.min.json", raw: aptitudeMaterials },
+  { entryName: "ai_ml_reading_materials_phase_1.min.json", raw: aiPhase1 },
+  { entryName: "ai_ml_reading_materials_phase_2.min.json", raw: aiPhase2 },
+  { entryName: "ai_ml_reading_materials_phase_3.min.json", raw: aiPhase3 },
+  { entryName: "ai_ml_reading_materials_phase_4.min.json", raw: aiPhase4 },
+  { entryName: "ai_ml_reading_materials_phase_5.min.json", raw: aiPhase5 }
+];
 
-  for (const candidate of candidates) {
-    try {
-      const stats = await fs.stat(candidate);
-      if (stats.isDirectory()) {
-        return candidate;
-      }
-    } catch {
-      // Skip missing candidates.
-    }
-  }
-
-  return null;
-}
+let parsedMaterialCache: ParsedMaterialFile[] | null = null;
 
 async function loadMaterialFiles(): Promise<ParsedMaterialFile[]> {
-  const materialDir = await resolveLearningMaterialDir();
-  if (!materialDir) {
-    return [];
+  if (parsedMaterialCache) {
+    return parsedMaterialCache;
   }
 
-  const entries = await fs.readdir(materialDir, { withFileTypes: true });
   const files: ParsedMaterialFile[] = [];
 
-  for (const entry of entries) {
-    if (!entry.isFile() || !entry.name.endsWith(".json")) {
-      continue;
-    }
-
-    const fullPath = path.join(materialDir, entry.name);
-    let raw: unknown = null;
-
-    try {
-      raw = JSON.parse(await fs.readFile(fullPath, "utf8"));
-    } catch {
-      continue;
-    }
-
-    const rawRecord = toRecord(raw);
+  RAW_MATERIAL_DATASETS.forEach((dataset) => {
+    const rawRecord = toRecord(dataset.raw);
     if (!rawRecord) {
-      continue;
+      return;
     }
 
-    const parsed = parseMaterialFile(entry.name, rawRecord);
+    const parsed = parseMaterialFile(dataset.entryName, rawRecord);
     if (!parsed) {
-      continue;
+      return;
     }
 
     files.push(parsed);
-  }
+  });
 
+  parsedMaterialCache = files;
   return files;
 }
 
