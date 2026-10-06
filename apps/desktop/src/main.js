@@ -10,6 +10,10 @@ const { URL } = require("node:url");
 const log = require("electron-log");
 const { createWebAppRuntime } = require("./web-app");
 const { createDesktopHelperServer } = require("./helper-server");
+const { applyShellPath } = require("./shell-path");
+
+// Before anything spawns compilers: GUI-launched macOS apps don't get the shell PATH.
+applyShellPath({ log });
 
 const HELPER_HOST = "127.0.0.1";
 const HELPER_PORT = 43823;

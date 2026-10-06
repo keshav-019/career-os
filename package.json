@@ -22,6 +22,7 @@
     "desktop:dist:win": "npm run dist:win --workspace careeros-desktop",
     "desktop:dist:win:local": "npm run dist:win:local --workspace careeros-desktop",
     "desktop:dist:linux": "npm run dist:linux --workspace careeros-desktop",
+    "desktop:dist:mac": "npm run dist:mac --workspace careeros-desktop --",
     "extension:package": "node tools/package-extension.mjs",
     "extension:package:chrome": "node tools/package-extension.mjs --browser=chrome",
     "extension:package:firefox": "node tools/package-extension.mjs --browser=firefox",

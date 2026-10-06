@@ -151,7 +151,7 @@ function createFontAwesomeFallbacks(sourceWithoutComments) {
   commandNames.delete("faIcon");
 
   const definitions = [
-    "% CareerOS portable compiler fallback: omit FontAwesome icons when the bundled Windows engine cannot load the icon font.",
+    "% CareerOS portable compiler fallback: omit FontAwesome icons where the bundled engine cannot load the icon font (Windows, macOS).",
     "\\providecommand{\\faIcon}[2][]{}",
   ];
 
@@ -211,12 +211,16 @@ function findUnsupportedLocalCompileFeature(source) {
   return null;
 }
 
+const FONTAWESOME_CRASH_PLATFORMS = new Set(["win32", "darwin"]);
+
 function prepareSourceForTectonic(source) {
   const sourceWithoutComments = removeLatexComments(source);
   const hasFontAwesomePackage =
     /\\usepackage(?:\[[^\]]*])?\{fontawesome5\}/.test(sourceWithoutComments);
 
-  if (!hasFontAwesomePackage || process.platform !== "win32") {
+  // The bundled Tectonic builds for Windows and macOS abort (SIGABRT) while
+  // loading the FontAwesome 5 fonts, even outside CareerOS; Linux is fine.
+  if (!hasFontAwesomePackage || !FONTAWESOME_CRASH_PLATFORMS.has(process.platform)) {
     return source;
   }
 

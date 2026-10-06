@@ -2,6 +2,7 @@ const fs = require("node:fs");
 const http = require("node:http");
 const path = require("node:path");
 const { spawn, spawnSync } = require("node:child_process");
+const { nodeRuntimePath } = require("./node-runtime");
 
 const WEB_HOST = "127.0.0.1";
 const WEB_PORT = 43824;
@@ -305,7 +306,7 @@ function createWebAppRuntime({ app, helperUrl, log }) {
       throw new Error(`Standalone web server was not found at ${serverPath}. Run the desktop web build before packaging.`);
     }
 
-    webProcess = spawn(process.execPath, [serverPath], {
+    webProcess = spawn(nodeRuntimePath(), [serverPath], {
       cwd: path.dirname(serverPath),
       detached: process.platform !== "win32",
       env: {
