@@ -1,0 +1,53 @@
+# Checks every pull request and push: typecheck all workspaces, and run the
+# desktop app's smoke tests (coding-arena judge, LaTeX runtime, helper API)
+# on macOS and Linux, where toolchain discovery and the bundled LaTeX engine
+# behave differently.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [first-phase]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+
+  desktop-smoke:
+    name: Desktop smoke (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Prepare LaTeX runtime
+        run: npm run desktop:prepare-latex
+      - name: Coding arena
+        run: npm run smoke:coding --workspace careeros-desktop
+      - name: LaTeX runtime
+        run: npm run smoke:latex --workspace careeros-desktop
+      - name: Helper API
+        run: npm run smoke:helper --workspace careeros-desktop

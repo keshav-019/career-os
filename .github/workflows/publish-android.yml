@@ -1,0 +1,103 @@
+# Builds the Android app with EAS and submits it to Google Play when its
+# version changes on the default branch.
+#
+#   push to first-phase that changes "expo.version" in apps/mobile/app.json
+#     -> eas build (production profile, .aab, versionCode auto-incremented)
+#     -> eas submit to the Play track in apps/mobile/eas.json (internal)
+#   Actions -> Publish Android -> Run workflow: same, without the version check.
+#
+# Builds run on Expo's servers; this job only starts them. Setup, including
+# the one-time manual first upload Google Play requires: docs/publishing.md.
+name: Publish Android
+
+on:
+  push:
+    branches: [first-phase]
+    paths:
+      - "apps/mobile/**"
+      - "packages/shared/**"
+      - ".github/workflows/publish-android.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: publish-android
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Detect version bump
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: check
+        env:
+          BEFORE: ${{ github.event.before }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          version=$(jq -r .expo.version apps/mobile/app.json)
+          previous=""
+          if [ -n "$BEFORE" ] && git cat-file -e "$BEFORE" 2>/dev/null; then
+            previous=$(git show "$BEFORE:apps/mobile/app.json" | jq -r .expo.version)
+          fi
+          changed=false
+          if [ "$EVENT" = "workflow_dispatch" ] || [ "$version" != "$previous" ]; then changed=true; fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "Android version $version (previous: ${previous:-unknown}) -> publish: $changed" >> "$GITHUB_STEP_SUMMARY"
+
+  build-and-submit:
+    name: EAS build + Play submit
+    needs: version
+    if: needs.version.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    environment: google-play
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - name: Check credentials
+        id: creds
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::notice::EXPO_TOKEN not set; skipping the Android release. See docs/publishing.md."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.creds.outputs.ready == 'true'
+        uses: actions/checkout@v4
+
+      - if: steps.creds.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - if: steps.creds.outputs.ready == 'true'
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install dependencies
+        if: steps.creds.outputs.ready == 'true'
+        run: npm ci
+
+      - name: Typecheck
+        if: steps.creds.outputs.ready == 'true'
+        run: npm run mobile:typecheck
+
+      - name: Build and submit
+        if: steps.creds.outputs.ready == 'true'
+        working-directory: apps/mobile
+        run: |
+          eas build --platform android --profile production --non-interactive --auto-submit
+          echo "Android ${{ needs.version.outputs.version }}: built and submitted to Google Play (see eas.json for the track)." >> "$GITHUB_STEP_SUMMARY"
