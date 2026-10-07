@@ -1,0 +1,169 @@
+# Publishes CareerOS Capture when its version changes on the default branch.
+#
+#   push to first-phase that changes "version" in apps/extension/manifest.json
+#     -> Chrome Web Store: upload + submit for review (API v2)
+#     -> Firefox Add-ons:  sign + submit (only if AMO secrets are set)
+#   Actions -> Publish Extension -> Run workflow: same, without the version check.
+#
+# A store only accepts a version higher than the one it has, so bump the
+# manifest version to ship. Setup: docs/publishing.md.
+name: Publish Extension
+
+on:
+  push:
+    branches: [first-phase]
+    paths:
+      - "apps/extension/**"
+      - "tools/package-extension.mjs"
+      - ".github/workflows/publish-extension.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: publish-extension
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Detect version bump
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: check
+        env:
+          BEFORE: ${{ github.event.before }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          version=$(jq -r .version apps/extension/manifest.json)
+          previous=""
+          if [ -n "$BEFORE" ] && git cat-file -e "$BEFORE" 2>/dev/null; then
+            previous=$(git show "$BEFORE:apps/extension/manifest.json" | jq -r .version)
+          fi
+          changed=false
+          if [ "$EVENT" = "workflow_dispatch" ] || [ "$version" != "$previous" ]; then changed=true; fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+          echo "Extension version $version (previous: ${previous:-unknown}) -> publish: $changed" >> "$GITHUB_STEP_SUMMARY"
+
+  chrome:
+    name: Chrome Web Store
+    needs: version
+    if: needs.version.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    environment: chrome-web-store
+    env:
+      CWS_SERVICE_ACCOUNT_JSON: ${{ secrets.CWS_SERVICE_ACCOUNT_JSON }}
+      CWS_PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
+      CWS_EXTENSION_ID: ${{ vars.CWS_EXTENSION_ID || 'llendblljmalpjakenfmllaajhblkcim' }}
+    steps:
+      - name: Check credentials
+        id: creds
+        run: |
+          if [ -z "$CWS_SERVICE_ACCOUNT_JSON" ] || [ -z "$CWS_PUBLISHER_ID" ]; then
+            echo "::notice::Chrome Web Store secrets not set (CWS_SERVICE_ACCOUNT_JSON, CWS_PUBLISHER_ID); skipping. See docs/publishing.md."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.creds.outputs.ready == 'true'
+        uses: actions/checkout@v4
+
+      - if: steps.creds.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Package
+        if: steps.creds.outputs.ready == 'true'
+        run: node tools/package-extension.mjs --browser=chrome
+
+      - name: Authenticate
+        if: steps.creds.outputs.ready == 'true'
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.CWS_SERVICE_ACCOUNT_JSON }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/chromewebstore
+
+      - name: Upload and submit for review
+        if: steps.creds.outputs.ready == 'true'
+        env:
+          TOKEN: ${{ steps.auth.outputs.access_token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          item="https://chromewebstore.googleapis.com/v2/publishers/$CWS_PUBLISHER_ID/items/$CWS_EXTENSION_ID"
+          upload="https://chromewebstore.googleapis.com/upload/v2/publishers/$CWS_PUBLISHER_ID/items/$CWS_EXTENSION_ID:upload"
+
+          curl -sS --fail-with-body -X POST -H "Authorization: Bearer $TOKEN" \
+            -T dist/extensions/careeros-capture-chrome.zip "$upload" | tee upload.json
+          echo
+
+          # Uploads can be processed asynchronously; wait until it is no longer in progress.
+          for _ in $(seq 1 30); do
+            state=$(jq -r '.uploadState // empty' upload.json)
+            [ "$state" != "IN_PROGRESS" ] && break
+            sleep 10
+            curl -sS --fail-with-body -H "Authorization: Bearer $TOKEN" "$item:fetchStatus" > status.json
+            jq -c '{uploadState: .lastAsyncUploadState}' status.json > upload.json
+          done
+          state=$(jq -r '.uploadState // empty' upload.json)
+          if [ "$state" != "SUCCEEDED" ]; then
+            echo "::error::Upload of $VERSION did not succeed (state: ${state:-unknown}). A store version must be higher than the published one."
+            exit 1
+          fi
+
+          curl -sS --fail-with-body -X POST -H "Authorization: Bearer $TOKEN" "$item:publish" | tee publish.json
+          echo
+          echo "Chrome Web Store: uploaded $VERSION and submitted it for review." >> "$GITHUB_STEP_SUMMARY"
+
+  firefox:
+    name: Firefox Add-ons
+    needs: version
+    if: needs.version.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    environment: firefox-add-ons
+    env:
+      AMO_JWT_ISSUER: ${{ secrets.AMO_JWT_ISSUER }}
+      AMO_JWT_SECRET: ${{ secrets.AMO_JWT_SECRET }}
+      AMO_CHANNEL: ${{ vars.AMO_CHANNEL || 'listed' }}
+    steps:
+      - name: Check credentials
+        id: creds
+        run: |
+          if [ -z "$AMO_JWT_ISSUER" ] || [ -z "$AMO_JWT_SECRET" ]; then
+            echo "::notice::Firefox Add-ons secrets not set (AMO_JWT_ISSUER, AMO_JWT_SECRET); skipping. See docs/publishing.md."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.creds.outputs.ready == 'true'
+        uses: actions/checkout@v4
+
+      - if: steps.creds.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Package
+        if: steps.creds.outputs.ready == 'true'
+        run: |
+          node tools/package-extension.mjs --browser=firefox
+          mkdir -p build/firefox && cd build/firefox && unzip -q ../../dist/extensions/careeros-capture-firefox.xpi
+
+      - name: Sign and submit
+        if: steps.creds.outputs.ready == 'true'
+        run: |
+          npx --yes web-ext@8 sign --source-dir build/firefox --artifacts-dir dist/amo \
+            --channel "$AMO_CHANNEL" --api-key "$AMO_JWT_ISSUER" --api-secret "$AMO_JWT_SECRET" \
+            --approval-timeout 0
+          echo "Firefox Add-ons: submitted ${{ needs.version.outputs.version }} ($AMO_CHANNEL)." >> "$GITHUB_STEP_SUMMARY"

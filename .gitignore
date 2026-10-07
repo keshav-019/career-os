@@ -37,3 +37,7 @@ apps/web/playwright-report/
 apps/web/e2e/.auth/
 
 .vercel
+
+# Tectonic binaries fetched by `npm run prepare:latex` for the build host
+apps/desktop/vendor/latex/darwin-*/
+apps/desktop/vendor/latex/linux-*/

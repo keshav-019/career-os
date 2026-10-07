@@ -15,7 +15,7 @@ const readPublicEnv = (value: string | undefined, fallback: string) => {
  *  explicitly overrides it (see LEGACY_WEB_BASE_URL below). */
 export const API_BASE_URL = readPublicEnv(
   process.env.EXPO_PUBLIC_CAREEROS_API_BASE_URL,
-  "https://careerosbackend.projectyourown.com"
+  "https://vanisher.projectyourown.com"
 );
 
 /** The original deployed CareerOS web app's origin. Only the learning content routes (/api/learning/library,

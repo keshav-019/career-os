@@ -16,6 +16,7 @@ const fsp = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
 const { spawn, spawnSync } = require("node:child_process");
+const { nodeRuntimePath } = require("../node-runtime");
 
 const DEFAULT_RUN_TIMEOUT_MS = 6_000;
 const DEFAULT_COMPILE_TIMEOUT_MS = 25_000;
@@ -35,13 +36,21 @@ function isWindows() {
   return process.platform === "win32";
 }
 
+function isMac() {
+  return process.platform === "darwin";
+}
+
 function exeName(base) {
   return isWindows() ? `${base}.exe` : base;
 }
 
 /**
  * Runs `command --version`-style probes and returns the first non-empty
- * output line, or "" if the command could not be run at all. Never throws.
+ * output line, or "" if the command could not be run at all or exited with
+ * an error. The exit status matters on macOS: /usr/bin/java, javac, gcc and
+ * python3 exist even when no JDK or Command Line Tools are installed, and
+ * those stubs print an error ("Unable to locate a Java Runtime", "xcrun:
+ * error: invalid active developer path") and exit non-zero. Never throws.
  */
 function probeVersion(command, args) {
   try {
@@ -50,7 +59,7 @@ function probeVersion(command, args) {
       timeout: VERSION_PROBE_TIMEOUT_MS,
       windowsHide: true
     });
-    if (result.error) return "";
+    if (result.error || result.status !== 0) return "";
     const text = (result.stdout || result.stderr || "").trim();
     return text.split(/\r?\n/)[0] || "";
   } catch {
@@ -68,6 +77,17 @@ function uniq(list) {
 
 function cargoBinDir() {
   return path.join(os.homedir(), ".cargo", "bin");
+}
+
+/** Homebrew's bin directories (Apple Silicon first, then Intel). Apps
+ *  launched from Finder or the Dock don't inherit the shell PATH, so these
+ *  are probed explicitly. */
+function macToolDirs() {
+  return isMac() ? ["/opt/homebrew/bin", "/usr/local/bin"] : [];
+}
+
+function inMacToolDirs(binaryName) {
+  return macToolDirs().map((dir) => path.join(dir, binaryName));
 }
 
 function commonWindowsToolDirs(toolFolderNames) {
@@ -93,7 +113,7 @@ function getCCandidates() {
       path.join("C:\\TDM-GCC-64\\bin", "gcc.exe")
     ]);
   }
-  return uniq(["gcc", "cc", "/usr/bin/gcc", "/usr/local/bin/gcc"]);
+  return uniq(["gcc", "cc", ...inMacToolDirs("gcc"), "/usr/bin/gcc", "/usr/local/bin/gcc"]);
 }
 
 function getCppCandidates() {
@@ -106,14 +126,14 @@ function getCppCandidates() {
       path.join("C:\\TDM-GCC-64\\bin", "g++.exe")
     ]);
   }
-  return uniq(["g++", "/usr/bin/g++", "/usr/local/bin/g++"]);
+  return uniq(["g++", ...inMacToolDirs("g++"), "/usr/bin/g++", "/usr/local/bin/g++"]);
 }
 
 function getPythonCandidates() {
   if (isWindows()) {
     return uniq(["python", "python3", "py"]);
   }
-  return uniq(["python3", "python", "/usr/bin/python3", "/usr/local/bin/python3"]);
+  return uniq(["python3", "python", ...inMacToolDirs("python3"), "/usr/bin/python3", "/usr/local/bin/python3"]);
 }
 
 function getRustcCandidates() {
@@ -152,14 +172,42 @@ function scanWindowsJdkInstalls(binaryName) {
   return found;
 }
 
+function scanMacJdkInstalls(binaryName) {
+  // On macOS a JDK can be installed without being on the PATH a GUI app
+  // sees: system-wide JDKs under /Library/Java/JavaVirtualMachines (found by
+  // /usr/libexec/java_home) and Homebrew's keg-only openjdk.
+  if (!isMac()) return [];
+
+  const found = [];
+  const javaHome = probeVersion("/usr/libexec/java_home", []);
+  if (javaHome.startsWith("/")) {
+    found.push(path.join(javaHome, "bin", binaryName));
+  }
+  for (const prefix of ["/opt/homebrew", "/usr/local"]) {
+    found.push(path.join(prefix, "opt", "openjdk", "bin", binaryName));
+  }
+  for (const root of ["/Library/Java/JavaVirtualMachines", path.join(os.homedir(), "Library", "Java", "JavaVirtualMachines")]) {
+    let entries = [];
+    try {
+      entries = fs.readdirSync(root, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const entry of entries) {
+      if (entry.isDirectory()) found.push(path.join(root, entry.name, "Contents", "Home", "bin", binaryName));
+    }
+  }
+  return found;
+}
+
 function getJavacCandidates() {
   const fromHome = getJavaHomeCandidate("javac");
-  return uniq(["javac", fromHome, ...scanWindowsJdkInstalls("javac")]);
+  return uniq(["javac", fromHome, ...scanWindowsJdkInstalls("javac"), ...scanMacJdkInstalls("javac")]);
 }
 
 function getJavaBinaryCandidates() {
   const fromHome = getJavaHomeCandidate("java");
-  return uniq(["java", fromHome, ...scanWindowsJdkInstalls("java")]);
+  return uniq(["java", fromHome, ...scanWindowsJdkInstalls("java"), ...scanMacJdkInstalls("java")]);
 }
 
 function findWorkingCandidate(candidates, versionArgs) {
@@ -183,7 +231,7 @@ function detectC() {
   if (!found) {
     return {
       available: false,
-      message: "No C compiler found. Install GCC (e.g. MinGW-w64 on Windows, build-essential on Linux) and ensure gcc is on PATH."
+      message: "No C compiler found. Install GCC (e.g. MinGW-w64 on Windows, build-essential on Linux, `xcode-select --install` on macOS) and ensure gcc is on PATH."
     };
   }
   return { available: true, command: found.command, version: found.version, message: `Detected ${found.version}` };
@@ -194,7 +242,7 @@ function detectCpp() {
   if (!found) {
     return {
       available: false,
-      message: "No C++ compiler found. Install GCC/G++ (e.g. MinGW-w64 on Windows, build-essential on Linux) and ensure g++ is on PATH."
+      message: "No C++ compiler found. Install GCC/G++ (e.g. MinGW-w64 on Windows, build-essential on Linux, `xcode-select --install` on macOS) and ensure g++ is on PATH."
     };
   }
   return { available: true, command: found.command, version: found.version, message: `Detected ${found.version}` };
@@ -250,7 +298,7 @@ function detectJava() {
 
   return {
     available: false,
-    message: "No Java runtime found. Install a JDK (11+) and ensure javac/java are on PATH, or set JAVA_HOME."
+    message: "No Java runtime found. Install a JDK (11+, e.g. `brew install openjdk` on macOS) and ensure javac/java are on PATH, or set JAVA_HOME."
   };
 }
 
@@ -260,7 +308,7 @@ function detectJavaScript() {
   // user needs to install.
   return {
     available: true,
-    command: process.execPath,
+    command: nodeRuntimePath(),
     version: process.version,
     message: `Bundled with CareerOS Desktop (Node ${process.version})`
   };

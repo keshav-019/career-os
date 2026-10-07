@@ -1,0 +1,13 @@
+**/node_modules
+**/dist
+**/.next
+**/.expo
+.git
+.env*
+!.env.local.example
+apps/desktop
+apps/extension
+apps/mobile
+learning-material
+images
+docs

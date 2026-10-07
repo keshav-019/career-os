@@ -15,7 +15,7 @@ The web app (`apps/web`) is deployed to Vercel, where every route that touches t
 exact same code works fine locally (`next dev` and `next start`). This affects System Design, the interview
 templates API, and the admin content tools. Since Vercel's serverless bundling of `firebase-admin` is the
 suspected cause and that's outside what a `next.config.ts` tweak alone could fully resolve, the mobile app instead
-talks to this backend - a plain long-running Node process (Railway, or any Node host), which sidesteps serverless
+talks to this backend - a plain long-running Node process (a Docker container, or any Node host), which sidesteps serverless
 bundling entirely.
 
 Routes that don't need Firebase Admin (`/api/interview/ai-roles`, `/api/learning/library`, `/api/learning/topic`)
@@ -54,18 +54,39 @@ npm run dev --workspace @careeros/mobile-backend
 Copy the repo-root `.env.local.example` to `.env.local` at the repo root and fill in the Firebase Admin service
 account fields at minimum. OpenRouter keys are only needed to exercise `/api/ai/*`.
 
-## Deploying to Railway
+## Deploying (Docker on vanisher.projectyourown.com)
 
-1. Create a new Railway project from this GitHub repo. Leave the root directory as the repo root (not
-   `apps/mobile-backend`) - the repo-root `railway.json` already points Railway at this workspace specifically via
-   `npm ci --workspace @careeros/mobile-backend --workspace @careeros/shared` / `npm run start --workspace
-   @careeros/mobile-backend`, and this app's own imports reach into `apps/web/src` by relative path, so the whole
-   monorepo checkout needs to be present.
-2. Set the environment variables from the repo-root `.env.local.example` in Railway's dashboard (Variables tab).
-   `FIREBASE_PRIVATE_KEY` should be pasted with its literal `\n` sequences intact (Railway stores it as one line;
-   this app un-escapes it at startup the same way `apps/web/src/lib/firebase/admin.ts` does).
-3. Deploy. Railway assigns a public URL (Settings -> Networking -> Generate Domain if one isn't assigned
-   automatically).
-4. Give that URL to update `apps/mobile/src/config/env.ts`'s `API_BASE_URL` (do NOT change the learning-content
-   asset host - see `resolveAssetUrl` in `apps/mobile/src/lib/learningClient.ts`, which should keep pointing at the
-   Vercel deployment for images, since that content already works fine there and isn't duplicated here).
+The backend ships as a Docker image built from [`Dockerfile`](Dockerfile) (build context: the repo root, since it
+bundles `apps/web/src` and `packages/shared` with esbuild). [`deploy/compose.yml`](deploy/compose.yml) runs it behind
+Caddy, which obtains and renews the HTTPS certificate on its own.
+
+```bash
+docker build -f apps/mobile-backend/Dockerfile -t careeros-mobile-backend .
+docker run --rm -p 8080:8080 --env-file .env.local careeros-mobile-backend
+```
+
+**Continuous deployment.** [`.github/workflows/deploy-backend.yml`](../../.github/workflows/deploy-backend.yml) runs on
+every push to `first-phase` that touches this app, `apps/web/src/lib`, `packages/shared` or the lockfile: it pushes
+`ghcr.io/keshav-019/careeros-mobile-backend:{sha,latest}`, copies `deploy/` to the server, restarts the stack and
+checks `https://vanisher.projectyourown.com/`. CI builds and smoke-tests the same image on every pull request.
+
+**One-time server setup.**
+
+1. Create `/data/home/careeros-backend/.env` on the server with the server-side keys from `.env.local.example`
+   (Firebase Admin, OpenRouter, R2, `CAREEROS_ALLOWED_ORIGINS`). Keep `FIREBASE_PRIVATE_KEY` on one line with its
+   literal `\n` sequences; the app un-escapes them. The workflow never writes this file.
+2. Create a deploy key and authorize it on the server:
+   `ssh-keygen -t ed25519 -N "" -C careeros-deploy -f deploy_key`, then append `deploy_key.pub` to
+   `~/.ssh/authorized_keys` on the server.
+3. In GitHub, Settings -> Environments -> `vanisher`, add the secrets `VANISHER_SSH_KEY` (contents of `deploy_key`)
+   and `VANISHER_KNOWN_HOSTS` (output of `ssh-keyscan vanisher.projectyourown.com`). Optional variables:
+   `CAREEROS_BACKEND_DOMAIN`, `VANISHER_SSH_HOST`, `VANISHER_SSH_USER`, `VANISHER_DEPLOY_DIR`.
+
+Ports 80 and 443 must be open to the internet (Caddy's certificate challenge uses them). To serve another hostname as
+well, point its DNS at the server and set `CAREEROS_BACKEND_DOMAIN` to a comma-separated list, for example
+`vanisher.projectyourown.com, careerosbackend.projectyourown.com`.
+
+Clients find this backend through `EXPO_PUBLIC_CAREEROS_API_BASE_URL` (mobile, defaulting to
+`https://vanisher.projectyourown.com` in `apps/mobile/src/config/env.ts`) and `GITHUB_EXCHANGE_URL` in
+`apps/desktop/src/oauth.js`. Learning-content assets keep loading from the web deployment (see `resolveAssetUrl` in
+`apps/mobile/src/lib/learningClient.ts`).

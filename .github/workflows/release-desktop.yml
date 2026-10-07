@@ -1,17 +1,82 @@
+# Builds the desktop app for Windows, Linux and macOS and publishes a GitHub
+# Release.
+#
+#   push to first-phase where apps/desktop/package.json "version" has no
+#   v<version> release yet  -> build + release v<version>
+#   push a v* tag           -> build + release that tag (skipped if released)
+#   Actions -> Run workflow -> build only (artifacts kept 7 days)
+#
+# macOS builds are signed and notarized when the Apple secrets are set
+# (docs/publishing.md); otherwise they are ad-hoc signed and users allow them
+# in System Settings > Privacy & Security on first launch.
 name: Release Desktop
 
 on:
   push:
+    branches: [first-phase]
     tags:
       - "v*"
+    paths:
+      - "apps/desktop/**"
+      - "apps/web/**"
+      - "packages/**"
+      - "package-lock.json"
+      - ".github/workflows/release-desktop.yml"
   workflow_dispatch:
+
+concurrency:
+  group: release-desktop-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: write
 
 jobs:
+  version:
+    name: Decide release
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.check.outputs.build }}
+      release: ${{ steps.check.outputs.release }}
+      tag: ${{ steps.check.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$REF_TYPE" = "tag" ]; then
+            tag="$REF_NAME"
+            # Re-pushing an existing tag (e.g. git push --tags) must not try to recreate its release.
+            if gh release view "$tag" >/dev/null 2>&1; then
+              build=false; release=false
+            else
+              build=true; release=true
+            fi
+          else
+            tag="v$(jq -r .version apps/desktop/package.json)"
+            if [ "$EVENT" = "workflow_dispatch" ]; then
+              build=true; release=false
+            elif gh release view "$tag" >/dev/null 2>&1; then
+              build=false; release=false
+            else
+              build=true; release=true
+            fi
+          fi
+          {
+            echo "tag=$tag"
+            echo "build=$build"
+            echo "release=$release"
+          } >> "$GITHUB_OUTPUT"
+          echo "Desktop $tag -> build: $build, release: $release" >> "$GITHUB_STEP_SUMMARY"
+
   build:
     name: Build ${{ matrix.platform }}
+    needs: version
+    if: needs.version.outputs.build == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -35,6 +100,22 @@ jobs:
               apps/desktop/dist/*.rpm
               apps/desktop/dist/*.pacman
               apps/desktop/dist/*.blockmap
+          - platform: macos-arm64
+            os: macos-15
+            command: npm run desktop:dist:mac -- --arm64
+            artifactName: careeros-macos-arm64
+            assetPath: |
+              apps/desktop/dist/*.dmg
+              apps/desktop/dist/*.zip
+              apps/desktop/dist/*.blockmap
+          - platform: macos-x64
+            os: macos-15-intel
+            command: npm run desktop:dist:mac -- --x64
+            artifactName: careeros-macos-x64
+            assetPath: |
+              apps/desktop/dist/*.dmg
+              apps/desktop/dist/*.zip
+              apps/desktop/dist/*.blockmap
 
     steps:
       - name: Checkout
@@ -43,7 +124,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install Linux packaging tools
@@ -52,14 +133,46 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y rpm libarchive-tools
 
+      - name: Configure macOS signing
+        if: startsWith(matrix.platform, 'macos')
+        env:
+          MAC_CERTIFICATE_P12_BASE64: ${{ secrets.MAC_CERTIFICATE_P12_BASE64 }}
+          MAC_CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$MAC_CERTIFICATE_P12_BASE64" ] && [ -n "$APPLE_ID" ] && [ -n "$APPLE_APP_SPECIFIC_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            {
+              echo "CSC_LINK=$MAC_CERTIFICATE_P12_BASE64"
+              echo "CSC_KEY_PASSWORD=$MAC_CERTIFICATE_PASSWORD"
+              echo "APPLE_ID=$APPLE_ID"
+              echo "APPLE_APP_SPECIFIC_PASSWORD=$APPLE_APP_SPECIFIC_PASSWORD"
+              echo "APPLE_TEAM_ID=$APPLE_TEAM_ID"
+            } >> "$GITHUB_ENV"
+            echo "macOS: signing with Developer ID and notarizing." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "$GITHUB_ENV"
+            echo "::notice::Apple signing secrets not set; the macOS build is ad-hoc signed (users allow it in Privacy & Security). See docs/publishing.md."
+          fi
+
       - name: Install dependencies
         run: npm ci
 
       - name: Build desktop artifact
+        shell: bash
         run: ${{ matrix.command }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GOOGLE_DESKTOP_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_DESKTOP_OAUTH_CLIENT_SECRET }}
+
+      - name: Smoke-test the macOS app bundle
+        if: startsWith(matrix.platform, 'macos')
+        run: |
+          app=$(find apps/desktop/dist -maxdepth 2 -name CareerOS.app -type d | head -1)
+          codesign --verify --deep --strict "$app"
+          test -x "$app/Contents/Resources/latex/darwin-$(uname -m | sed 's/x86_64/x64/')/tectonic"
+          echo "Bundle signature valid and LaTeX engine present: $app" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -71,8 +184,8 @@ jobs:
 
   release:
     name: Publish GitHub Release
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/')
+    needs: [version, build]
+    if: needs.version.outputs.release == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -94,8 +207,9 @@ jobs:
 
       - name: Publish release assets
         run: |
-          gh release create "${{ github.ref_name }}" release-assets/* \
-            --title "CareerOS ${{ github.ref_name }}" \
+          gh release create "${{ needs.version.outputs.tag }}" release-assets/* \
+            --target "${{ github.sha }}" \
+            --title "CareerOS ${{ needs.version.outputs.tag }}" \
             --notes-file apps/desktop/RELEASE_NOTES.md
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

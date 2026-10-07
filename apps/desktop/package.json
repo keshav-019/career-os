@@ -30,6 +30,7 @@
     "dist:win": "npm run build:web && npm run prepare:latex:win && npm run prepare:oauth && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis zip --publish never && npm run verify:latex:bundle:win",
     "dist:win:local": "npm run build:web && npm run prepare:latex:win && npm run prepare:oauth && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win nsis zip --publish never --config.win.signAndEditExecutable=false && npm run verify:latex:bundle:win",
     "dist:linux": "npm run build:web && npm run prepare:latex && npm run prepare:oauth && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --linux AppImage deb rpm pacman --publish never",
+    "dist:mac": "npm run build:web && npm run prepare:latex && npm run prepare:oauth && electron-builder --mac dmg zip --publish never",
     "dist:flatpak:dir": "npm run build:web && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --config electron-builder.flatpak.yml --linux dir --publish never",
     "build": "npm run build:web"
   },
@@ -58,13 +59,6 @@
     ],
     "extraResources": [
       {
-        "from": "vendor/latex",
-        "to": "latex",
-        "filter": [
-          "**/*"
-        ]
-      },
-      {
         "from": "../web/.next/standalone",
         "to": "web",
         "filter": [
@@ -76,17 +70,46 @@
       "output": "dist"
     },
     "mac": {
+      "artifactName": "CareerOS-${version}-mac-${arch}.${ext}",
       "target": [
-        "dmg"
+        {
+          "target": "dmg"
+        },
+        {
+          "target": "zip"
+        }
       ],
-      "icon": "build/icon.png"
+      "icon": "build/icon-mac.png",
+      "category": "public.app-category.productivity",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extraResources": [
+        {
+          "from": "vendor/latex/darwin-${arch}",
+          "to": "latex/darwin-${arch}",
+          "filter": [
+            "**/*"
+          ]
+        }
+      ]
     },
     "win": {
       "target": [
         "nsis",
         "zip"
       ],
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "extraResources": [
+        {
+          "from": "vendor/latex/win32-x64",
+          "to": "latex/win32-x64",
+          "filter": [
+            "**/*"
+          ]
+        }
+      ]
     },
     "linux": {
       "target": [
@@ -98,7 +121,17 @@
       "icon": "build/icon.png",
       "category": "Office",
       "synopsis": "Career workspace for resumes, jobs, interviews, and applications.",
-      "description": "CareerOS is a desktop career workspace for managing resumes, jobs, interview preparation, coding practice, and AI-assisted application workflows."
-    }
+      "description": "CareerOS is a desktop career workspace for managing resumes, jobs, interview preparation, coding practice, and AI-assisted application workflows.",
+      "extraResources": [
+        {
+          "from": "vendor/latex/linux-${arch}",
+          "to": "latex/linux-${arch}",
+          "filter": [
+            "**/*"
+          ]
+        }
+      ]
+    },
+    "afterSign": "scripts/mac-adhoc-sign.js"
   }
 }

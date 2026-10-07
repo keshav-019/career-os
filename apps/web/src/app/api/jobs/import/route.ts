@@ -1,6 +1,7 @@
 import { normalizeJobImport, type JobSource, type JobSourcePayload } from "@careeros/shared";
 import { NextResponse } from "next/server";
 import { getAdminDb, isFirebaseAdminConfigured } from "@/lib/firebase/admin";
+import { isAllowedExtensionOrigin } from "@/lib/server/extension-origin";
 import { checkSlidingWindowRateLimit } from "@/lib/server/rate-limit";
 import { validateTwoFactorSession } from "@/lib/server/two-factor-session";
 import {
@@ -52,14 +53,6 @@ const CONFIGURED_ALLOWED_ORIGINS = (process.env.CAREEROS_ALLOWED_ORIGINS ?? "")
   .map((value) => value.trim())
   .filter(Boolean);
 
-const CONFIGURED_ALLOWED_EXTENSION_IDS = new Set(
-  (process.env.CAREEROS_ALLOWED_EXTENSION_IDS ?? "")
-    .split(",")
-    .map((value) => value.trim())
-    .filter(Boolean)
-);
-
-const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const ALLOWED_CORS_ORIGINS = new Set([...DEFAULT_ALLOWED_ORIGINS, ...CONFIGURED_ALLOWED_ORIGINS]);
 
 const CONFIGURED_FIREBASE_PROJECT_ID = (process.env.FIREBASE_PROJECT_ID ?? process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? "").trim();
@@ -118,37 +111,7 @@ function firestoreBaseUrl(idToken: string): string {
 }
 
 function isAllowedCorsOrigin(origin: string): boolean {
-  const extensionId = getBrowserExtensionId(origin);
-  if (extensionId) {
-    if (extensionId.protocol === "moz-extension") {
-      return true;
-    }
-
-    if (CONFIGURED_ALLOWED_EXTENSION_IDS.size > 0) {
-      return CONFIGURED_ALLOWED_EXTENSION_IDS.has(extensionId.id);
-    }
-
-    // During local development we allow unpacked extension ids when an explicit allow-list is not configured.
-    return !IS_PRODUCTION;
-  }
-
-  return ALLOWED_CORS_ORIGINS.has(origin);
-}
-
-function getBrowserExtensionId(origin: string): { id: string; protocol: "chrome-extension" | "moz-extension" } | null {
-  try {
-    const parsed = new URL(origin);
-    if (parsed.protocol !== "chrome-extension:" && parsed.protocol !== "moz-extension:") {
-      return null;
-    }
-
-    return {
-      id: parsed.hostname,
-      protocol: parsed.protocol === "moz-extension:" ? "moz-extension" : "chrome-extension"
-    };
-  } catch {
-    return null;
-  }
+  return isAllowedExtensionOrigin(origin) || ALLOWED_CORS_ORIGINS.has(origin);
 }
 
 function isAllowedCorsOriginForRequest(request: Request, origin: string): boolean {

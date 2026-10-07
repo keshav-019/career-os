@@ -1,0 +1,136 @@
+# Builds the mobile backend image and deploys it to vanisher.projectyourown.com.
+#
+#   push to first-phase touching the backend or the web lib it bundles
+#     -> build apps/mobile-backend/Dockerfile, push ghcr.io/<owner>/careeros-mobile-backend:{sha,latest}
+#     -> copy deploy/compose.yml + Caddyfile to the server, pull, restart, check https://<domain>/
+#   Actions -> Deploy Backend -> Run workflow: same.
+#
+# Server setup (one time) and the vanisher environment's secrets: apps/mobile-backend/README.md.
+name: Deploy Backend
+
+on:
+  push:
+    branches: [first-phase]
+    paths:
+      - "apps/mobile-backend/**"
+      - "apps/web/src/lib/**"
+      - "packages/shared/**"
+      - "package-lock.json"
+      - "scripts/load-careeros-env.cjs"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/careeros-mobile-backend
+
+jobs:
+  image:
+    name: Build and push image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: apps/mobile-backend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to vanisher
+    needs: image
+    runs-on: ubuntu-latest
+    environment:
+      name: vanisher
+      url: https://${{ vars.CAREEROS_BACKEND_DOMAIN || 'vanisher.projectyourown.com' }}
+    env:
+      DOMAIN: ${{ vars.CAREEROS_BACKEND_DOMAIN || 'vanisher.projectyourown.com' }}
+      SSH_HOST: ${{ vars.VANISHER_SSH_HOST || 'vanisher.projectyourown.com' }}
+      SSH_USER: ${{ vars.VANISHER_SSH_USER || 'ubuntu' }}
+      DEPLOY_DIR: ${{ vars.VANISHER_DEPLOY_DIR || '/data/home/careeros-backend' }}
+    steps:
+      - name: Check credentials
+        id: creds
+        env:
+          SSH_KEY: ${{ secrets.VANISHER_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VANISHER_KNOWN_HOSTS }}
+        run: |
+          if [ -z "$SSH_KEY" ] || [ -z "$KNOWN_HOSTS" ]; then
+            echo "::notice::VANISHER_SSH_KEY / VANISHER_KNOWN_HOSTS not set; image pushed, deploy skipped. See apps/mobile-backend/README.md."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.creds.outputs.ready == 'true'
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        if: steps.creds.outputs.ready == 'true'
+        env:
+          SSH_KEY: ${{ secrets.VANISHER_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VANISHER_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf 'Host vanisher\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/id_deploy\n  IdentitiesOnly yes\n' \
+            "$SSH_HOST" "$SSH_USER" > ~/.ssh/config
+
+      - name: Upload compose files
+        if: steps.creds.outputs.ready == 'true'
+        run: |
+          ssh vanisher "mkdir -p '$DEPLOY_DIR' && test -f '$DEPLOY_DIR/.env'" || {
+            echo "::error::$DEPLOY_DIR/.env is missing on the server. Create it from .env.local.example first."
+            exit 1
+          }
+          scp apps/mobile-backend/deploy/compose.yml apps/mobile-backend/deploy/Caddyfile "vanisher:$DEPLOY_DIR/"
+
+      - name: Pull and restart
+        if: steps.creds.outputs.ready == 'true'
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+          TAG: ${{ github.sha }}
+        run: |
+          printf '%s' "$TOKEN" | ssh vanisher "docker login ghcr.io -u '$ACTOR' --password-stdin >/dev/null"
+          ssh vanisher "cd '$DEPLOY_DIR' \
+            && export CAREEROS_BACKEND_IMAGE='$IMAGE:$TAG' CAREEROS_BACKEND_DOMAIN='$DOMAIN' \
+            && printf 'CAREEROS_BACKEND_IMAGE=%s\nCAREEROS_BACKEND_DOMAIN=%s\n' \"\$CAREEROS_BACKEND_IMAGE\" \"\$CAREEROS_BACKEND_DOMAIN\" > compose.env \
+            && docker compose --env-file compose.env pull --quiet \
+            && docker compose --env-file compose.env up -d --remove-orphans; \
+            status=\$?; docker logout ghcr.io >/dev/null; docker image prune -f >/dev/null; exit \$status"
+
+      - name: Health check
+        if: steps.creds.outputs.ready == 'true'
+        run: |
+          for _ in $(seq 1 24); do
+            if body=$(curl -fsS --max-time 10 "https://$DOMAIN/") && echo "$body" | grep -q '"ok":true'; then
+              echo "$body"
+              echo "Backend $GITHUB_SHA is live at https://$DOMAIN/" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 5
+          done
+          ssh vanisher "cd '$DEPLOY_DIR' && docker compose --env-file compose.env ps && docker compose --env-file compose.env logs --tail 50"
+          echo "::error::https://$DOMAIN/ did not become healthy."
+          exit 1
