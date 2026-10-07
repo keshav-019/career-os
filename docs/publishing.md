@@ -10,13 +10,14 @@ bump the version in the same commit as the change you want to ship.
 | Desktop app | `apps/desktop/package.json` → `version` | [release-desktop.yml](../.github/workflows/release-desktop.yml) | GitHub Release `v<version>` with Windows, Linux and macOS (Apple Silicon + Intel) builds |
 | Android app | `apps/mobile/app.json` → `expo.version` | [publish-android.yml](../.github/workflows/publish-android.yml) | EAS build, then Google Play (track set in `apps/mobile/eas.json`) |
 | Web + API | nothing | Vercel's Git integration | Production on every push |
+| Mobile backend | nothing | [deploy-backend.yml](../.github/workflows/deploy-backend.yml) | Docker image on GHCR, deployed to `vanisher.projectyourown.com` on every push that touches it ([setup](../apps/mobile-backend/README.md#deploying-docker-on-vanisherprojectyourowncom)) |
 
 Each publishing job checks for its credentials first. Until they are set it
 skips with a notice instead of failing, so each channel can be switched on
 independently. Every workflow can also be started by hand from the Actions
 tab (Run workflow), which skips the version check. [CI](../.github/workflows/ci.yml)
-runs the typecheck and the desktop smoke tests (macOS and Linux) on every pull
-request.
+runs the typecheck, the backend image smoke test and the desktop smoke tests
+(macOS and Linux) on every pull request.
 
 Secrets go in **Settings → Secrets and variables → Actions** (or in the
 GitHub environment named below, to restrict them to that job).

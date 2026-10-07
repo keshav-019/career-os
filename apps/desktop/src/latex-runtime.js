@@ -6,7 +6,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { spawn, spawnSync } = require("node:child_process");
 
-const TECTONIC_VERSION = "0.16.9";
+const TECTONIC_VERSION = "0.17.0";
 const COMPILE_TIMEOUT_MS = 300_000;
 const MAX_SOURCE_LENGTH = 2_000_000;
 const MAX_LOG_CHARS = 22_000;

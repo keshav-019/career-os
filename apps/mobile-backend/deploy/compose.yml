@@ -1,0 +1,41 @@
+# Production stack on vanisher.projectyourown.com: the backend image (built and pushed to GHCR by
+# .github/workflows/deploy-backend.yml) behind Caddy, which gets and renews the HTTPS certificate itself.
+#
+# Lives in $DEPLOY_DIR on the server next to a hand-written .env holding the server-side keys from
+# .env.local.example (Firebase Admin, OpenRouter, R2). The deploy workflow never writes .env.
+name: careeros-backend
+
+services:
+  backend:
+    image: ${CAREEROS_BACKEND_IMAGE:-ghcr.io/keshav-019/careeros-mobile-backend:latest}
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "8080"
+    restart: unless-stopped
+    mem_limit: 512m
+    logging:
+      driver: json-file
+      options: { max-size: 10m, max-file: "3" }
+
+  caddy:
+    image: caddy:2-alpine
+    depends_on: [backend]
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      CAREEROS_BACKEND_DOMAIN: ${CAREEROS_BACKEND_DOMAIN:-vanisher.projectyourown.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: 10m, max-file: "3" }
+
+volumes:
+  caddy_data:
+  caddy_config:

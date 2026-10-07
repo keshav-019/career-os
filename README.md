@@ -26,7 +26,7 @@ Shared types and contracts live in [`packages/shared`](packages/shared).
 - **Backend:** Next.js route handlers, Express, Firebase Auth, Firestore, Firebase Admin SDK
 - **Storage:** Cloudflare R2 (S3 API) and Cloudinary
 - **Desktop / mobile:** Electron, React Native, Expo
-- **Deploy:** Vercel (web), Railway (mobile backend); packaging configs for the Chrome Web Store, winget, Chocolatey and Flathub
+- **Deploy:** Vercel (web), Docker on a self-hosted server (mobile backend, [`apps/mobile-backend`](apps/mobile-backend#deploying-docker-on-vanisherprojectyourowncom)); packaging configs for the Chrome Web Store, winget, Chocolatey and Flathub
 
 ## Architecture notes
 

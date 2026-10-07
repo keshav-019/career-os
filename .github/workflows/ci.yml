@@ -1,7 +1,8 @@
-# Checks every pull request and push: typecheck all workspaces, and run the
-# desktop app's smoke tests (coding-arena judge, LaTeX runtime, helper API)
-# on macOS and Linux, where toolchain discovery and the bundled LaTeX engine
-# behave differently.
+# Checks every pull request and push: typecheck all workspaces, build and
+# smoke-test the mobile backend's Docker image, and run the desktop app's
+# smoke tests (coding-arena judge, LaTeX runtime, helper API) on macOS and
+# Linux, where toolchain discovery and the bundled LaTeX engine behave
+# differently.
 name: CI
 
 on:
@@ -28,6 +29,25 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+
+  backend-image:
+    name: Backend image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: docker build -f apps/mobile-backend/Dockerfile -t careeros-mobile-backend:ci .
+      - name: Smoke test
+        run: |
+          docker run -d --name backend -p 8080:8080 careeros-mobile-backend:ci
+          for _ in $(seq 1 20); do curl -fsS localhost:8080/ && break; sleep 1; done
+          echo
+          curl -fsS localhost:8080/ | grep -q '"ok":true'
+          # Authenticated routes must reject a missing token rather than crash.
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8080/api/system-design/problems)" = 401
+      - name: Container logs
+        if: always()
+        run: docker logs backend || true
 
   desktop-smoke:
     name: Desktop smoke (${{ matrix.os }})

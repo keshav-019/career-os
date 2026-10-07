@@ -22,7 +22,7 @@ const { shell } = require("electron");
 
 const GOOGLE_DESKTOP_CLIENT_ID = "718498812867-j2qv9r2776q8fikd35r7qucl2dm643iu.apps.googleusercontent.com";
 const GITHUB_CLIENT_ID = "Ov23libBHQfpolHiLqXZ";
-const GITHUB_EXCHANGE_URL = "https://careerosbackend.projectyourown.com/api/oauth/github/exchange";
+const GITHUB_EXCHANGE_URL = "https://vanisher.projectyourown.com/api/oauth/github/exchange";
 const PENDING_TIMEOUT_MS = 5 * 60 * 1000;
 
 function loadGoogleClientSecret() {

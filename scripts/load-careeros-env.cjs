@@ -14,7 +14,7 @@ const PUBLIC_ENV_FALLBACKS = Object.freeze({
   NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET: "profile_pics",
   NEXT_PUBLIC_APP_URL: "https://keshav-019-career-os.vercel.app",
   NEXT_PUBLIC_SITE_URL: "https://keshav-019-career-os.vercel.app",
-  EXPO_PUBLIC_CAREEROS_API_BASE_URL: "https://careerosbackend.projectyourown.com",
+  EXPO_PUBLIC_CAREEROS_API_BASE_URL: "https://vanisher.projectyourown.com",
   EXPO_PUBLIC_CAREEROS_LEGACY_WEB_BASE_URL: "https://keshav-019-career-os.vercel.app"
 });
 

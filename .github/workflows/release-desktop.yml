@@ -3,7 +3,7 @@
 #
 #   push to first-phase where apps/desktop/package.json "version" has no
 #   v<version> release yet  -> build + release v<version>
-#   push a v* tag           -> build + release that tag
+#   push a v* tag           -> build + release that tag (skipped if released)
 #   Actions -> Run workflow -> build only (artifacts kept 7 days)
 #
 # macOS builds are signed and notarized when the Apple secrets are set
@@ -49,7 +49,13 @@ jobs:
           EVENT: ${{ github.event_name }}
         run: |
           if [ "$REF_TYPE" = "tag" ]; then
-            tag="$REF_NAME"; build=true; release=true
+            tag="$REF_NAME"
+            # Re-pushing an existing tag (e.g. git push --tags) must not try to recreate its release.
+            if gh release view "$tag" >/dev/null 2>&1; then
+              build=false; release=false
+            else
+              build=true; release=true
+            fi
           else
             tag="v$(jq -r .version apps/desktop/package.json)"
             if [ "$EVENT" = "workflow_dispatch" ]; then

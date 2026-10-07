@@ -1,5 +1,0 @@
-[phases.install]
-cmds = ["npm ci --workspace @careeros/mobile-backend --workspace @careeros/web --workspace @careeros/shared --no-audit --no-fund"]
-
-[phases.build]
-cmds = []

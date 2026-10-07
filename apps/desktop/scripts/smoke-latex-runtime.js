@@ -18,6 +18,10 @@ function tex(strings, ...values) {
 
 const pastedResume = readOptionalFile(pastedResumePath);
 
+// A font the OS ships by default, to exercise fontspec's system-font lookup. Linux has no Arial unless the
+// Microsoft core fonts are installed; DejaVu Sans is present on stock Ubuntu (and the CI runners).
+const systemFont = process.platform === "linux" ? "DejaVu Sans" : "Arial";
+
 const samples = [
   {
     name: "basic-article",
@@ -67,11 +71,11 @@ Errors & 12 & 1 \\
 \end{document}`
   },
   {
-    name: "fontspec-windows-font",
+    name: "fontspec-system-font",
     expect: "pass",
     source: tex`\documentclass{article}
 \usepackage{fontspec}
-\setmainfont{Arial}
+\setmainfont{${systemFont}}
 \begin{document}
 Fontconfig and system fonts are working.
 \end{document}`
@@ -155,7 +159,7 @@ print("CareerOS")
     expect: "pass",
     source: tex`\documentclass{article}
 \usepackage{fontspec}
-\setmainfont{Arial}
+\setmainfont{${systemFont}}
 \begin{document}
 Résumé, café, naïve, São Paulo, München, and an en dash -- all in one local compile.
 \end{document}`
