@@ -37,7 +37,7 @@ Shared types and contracts live in [`packages/shared`](packages/shared).
 
 ## Getting started
 
-Requires Node 20 (see `.nvmrc`) and a Firebase project.
+Requires Node 22 (see `.nvmrc`) and a Firebase project.
 
 ```bash
 cp .env.local.example .env.local   # fill in Firebase, R2 and Cloudinary values

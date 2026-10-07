@@ -35,7 +35,7 @@
     "format": "prettier --write ."
   },
   "engines": {
-    "node": "20.x"
+    "node": "22.x"
   },
   "devDependencies": {
     "@types/node": "latest",

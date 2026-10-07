@@ -5,7 +5,7 @@
 #
 # The image holds no secrets; pass the server-side keys from .env.local.example at runtime (see deploy/).
 
-FROM node:20-bookworm-slim AS build
+FROM node:22-bookworm-slim AS build
 WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
 COPY apps/mobile-backend/package.json apps/mobile-backend/
@@ -17,7 +17,7 @@ COPY apps/web/src apps/web/src
 COPY apps/mobile-backend apps/mobile-backend
 RUN npm run build --workspace @careeros/mobile-backend
 
-FROM node:20-bookworm-slim AS deps
+FROM node:22-bookworm-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json .npmrc ./
 COPY apps/mobile-backend/package.json apps/mobile-backend/
@@ -25,7 +25,7 @@ COPY apps/web/package.json apps/web/
 COPY packages/shared/package.json packages/shared/
 RUN npm ci --workspace @careeros/mobile-backend --include-workspace-root=false --omit=dev --ignore-scripts --no-audit --no-fund
 
-FROM node:20-bookworm-slim
+FROM node:22-bookworm-slim
 ENV NODE_ENV=production PORT=8080
 WORKDIR /app
 COPY --from=deps /app/node_modules node_modules

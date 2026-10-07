@@ -7,7 +7,7 @@
   "scripts": {
     "start": "tsx -r ../../scripts/register-env.cjs src/server.ts",
     "dev": "tsx watch -r ../../scripts/register-env.cjs src/server.ts",
-    "build": "esbuild src/server.ts --tsconfig=tsconfig.json --bundle --platform=node --target=node20 --packages=external --sourcemap --outfile=dist/server.js",
+    "build": "esbuild src/server.ts --tsconfig=tsconfig.json --bundle --platform=node --target=node22 --packages=external --sourcemap --outfile=dist/server.js",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -27,6 +27,6 @@
     "typescript": "latest"
   },
   "engines": {
-    "node": "20.x"
+    "node": "22.x"
   }
 }
