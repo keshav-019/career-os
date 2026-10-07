@@ -68,17 +68,28 @@ jobs:
       SSH_USER: ${{ vars.VANISHER_SSH_USER || 'ubuntu' }}
       DEPLOY_DIR: ${{ vars.VANISHER_DEPLOY_DIR || '/data/home/careeros-backend' }}
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Configure SSH
+      - name: Check credentials
+        id: creds
         env:
           SSH_KEY: ${{ secrets.VANISHER_SSH_KEY }}
           KNOWN_HOSTS: ${{ secrets.VANISHER_KNOWN_HOSTS }}
         run: |
           if [ -z "$SSH_KEY" ] || [ -z "$KNOWN_HOSTS" ]; then
-            echo "::error::Set VANISHER_SSH_KEY and VANISHER_KNOWN_HOSTS in the vanisher environment. See apps/mobile-backend/README.md."
-            exit 1
+            echo "::notice::VANISHER_SSH_KEY / VANISHER_KNOWN_HOSTS not set; image pushed, deploy skipped. See apps/mobile-backend/README.md."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
+
+      - if: steps.creds.outputs.ready == 'true'
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        if: steps.creds.outputs.ready == 'true'
+        env:
+          SSH_KEY: ${{ secrets.VANISHER_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VANISHER_KNOWN_HOSTS }}
+        run: |
           install -m 700 -d ~/.ssh
           printf '%s\n' "$SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
@@ -86,6 +97,7 @@ jobs:
             "$SSH_HOST" "$SSH_USER" > ~/.ssh/config
 
       - name: Upload compose files
+        if: steps.creds.outputs.ready == 'true'
         run: |
           ssh vanisher "mkdir -p '$DEPLOY_DIR' && test -f '$DEPLOY_DIR/.env'" || {
             echo "::error::$DEPLOY_DIR/.env is missing on the server. Create it from .env.local.example first."
@@ -94,6 +106,7 @@ jobs:
           scp apps/mobile-backend/deploy/compose.yml apps/mobile-backend/deploy/Caddyfile "vanisher:$DEPLOY_DIR/"
 
       - name: Pull and restart
+        if: steps.creds.outputs.ready == 'true'
         env:
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ACTOR: ${{ github.actor }}
@@ -108,6 +121,7 @@ jobs:
             status=\$?; docker logout ghcr.io >/dev/null; docker image prune -f >/dev/null; exit \$status"
 
       - name: Health check
+        if: steps.creds.outputs.ready == 'true'
         run: |
           for _ in $(seq 1 24); do
             if body=$(curl -fsS --max-time 10 "https://$DOMAIN/") && echo "$body" | grep -q '"ok":true'; then
